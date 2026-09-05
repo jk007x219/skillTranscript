@@ -1,0 +1,126 @@
+// app/api/advisor/students/[studentId]/skills/route.ts
+import { NextRequest, NextResponse } from "next/server";
+import type { RowDataPacket } from "mysql2";
+import { jsonError, httpError } from "@/lib/api-error";
+import { pool } from "@/lib/db";
+
+export const runtime = "nodejs";
+
+type RouteContext = {
+  params: Promise<{ studentId: string }>;
+};
+
+type SkillScoreRow = RowDataPacket & {
+  skillId: string;
+  skillName: string | null;
+  level: string | null;
+  totalEvaluations: number;
+  completedEvaluations: number;
+  earnedScore: number;
+  maxPossibleScore: number;
+};
+
+export async function GET(request: NextRequest, context: RouteContext) {
+  try {
+    const { studentId } = await context.params;
+
+    // ตรวจสอบว่านิสิตมีอยู่จริง
+    const [studentRows] = await pool.query<RowDataPacket[]>(
+      "SELECT studentId FROM students WHERE studentId = ?",
+      [studentId]
+    );
+    if (studentRows.length === 0) {
+      throw httpError(404, "ไม่พบนิสิต");
+    }
+
+    // ===== คำนวณคะแนนจาก participation (แบบเดียวกับ dashboard) =====
+    const [skillScores] = await pool.query<SkillScoreRow[]>(
+      `SELECT 
+         s.skillId,
+         s.skillname AS skillName,
+         MAX(s.level) AS level,
+         COUNT(DISTINCT a.activityId) AS totalEvaluations,
+         SUM(CASE WHEN p.status = 'completed' THEN 1 ELSE 0 END) AS completedEvaluations,
+         COALESCE(SUM(CASE WHEN p.status = 'completed' THEN p.score ELSE 0 END), 0) AS earnedScore,
+         COUNT(DISTINCT a.activityId) * 3 AS maxPossibleScore
+       FROM skill s
+       LEFT JOIN activityskill acs ON acs.skillId = s.skillId
+       LEFT JOIN activity a ON a.activityId = acs.activityId
+       LEFT JOIN participation p 
+         ON p.activityId = a.activityId 
+         AND p.studentId = ?
+       GROUP BY s.skillId, s.skillname
+       ORDER BY s.skillId`,
+      [studentId]
+    );
+
+    const skills = skillScores.map((row) => {
+      // คำนวณคะแนนตาม level จริง
+      const levelScoreMap: Record<string, number> = {
+        "พื้นฐาน": 1,
+        "กลาง": 2,
+        "สูง": 3,
+      };
+      const level = row.level || "กลาง";
+      const maxScorePerActivity = levelScoreMap[level] || 2;
+      const totalPossibleScore = row.totalEvaluations * maxScorePerActivity;
+
+      const percent = totalPossibleScore > 0
+        ? Math.round((row.earnedScore / totalPossibleScore) * 100)
+        : 0;
+
+      return {
+        skillId: row.skillId,
+        skillName: row.skillName || row.skillId,
+        level: row.level || "กลาง",
+        activities: row.totalEvaluations,
+        completed: row.completedEvaluations,
+        score: row.earnedScore,
+        maxScore: totalPossibleScore,
+        percent: Math.min(100, percent),
+      };
+    });
+
+    // คำนวณคะแนนเฉลี่ย
+    const avgScore = skills.length > 0
+      ? Math.round(skills.reduce((sum, s) => sum + (s.percent || 0), 0) / skills.length)
+      : 0;
+
+    // ดึงข้อมูลนิสิต (พร้อม email จาก users)
+    const [student] = await pool.query<RowDataPacket[]>(
+      `SELECT 
+         s.firstname, s.lastname, s.studentId, s.phone, s.faculty, s.major, s.year,
+         u.email
+       FROM students s
+       INNER JOIN users u ON s.userId = u.userId
+       WHERE s.studentId = ?`,
+      [studentId]
+    );
+
+    if (student.length === 0) {
+      throw httpError(404, "ไม่พบข้อมูลนิสิต");
+    }
+
+    return NextResponse.json({
+      student: {
+        studentId: student[0].studentId,
+        firstName: student[0].firstname || "",
+        lastName: student[0].lastname || "",
+        name: `${student[0].firstname || ""} ${student[0].lastname || ""}`.trim(),
+        email: student[0].email,
+        phone: student[0].phone,
+        faculty: student[0].faculty,
+        major: student[0].major,
+        year: student[0].year,
+      },
+      summary: {
+        totalSkills: skills.length,
+        completedSkills: skills.filter((s) => s.percent >= 80).length,
+        avgScore,
+      },
+      skills,
+    });
+  } catch (error) {
+    return jsonError(error);
+  }
+}
