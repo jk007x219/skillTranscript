@@ -8,8 +8,8 @@ const steps = [
   },
   {
     icon: ClipboardCheck,
-    title: "ผ่านการประเมิน",
-    description: "ทำแบบประเมินหรือผ่านเกณฑ์ที่กำหนด",
+    title: "ทำแบบประเมิน",
+    description: "ทำแบบประเมินที่กำหนด",
   },
   {
     icon: PenLine,

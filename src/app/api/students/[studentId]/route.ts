@@ -1,3 +1,4 @@
+// app/api/students/[studentId]/route.ts (แก้ไขให้ดึง program และ major แยกกัน)
 import { NextRequest, NextResponse } from "next/server";
 import type { RowDataPacket } from "mysql2";
 import { mkdir, writeFile } from "fs/promises";
@@ -21,14 +22,17 @@ async function getStudentWithAdvisors(studentId: string) {
   const [rows] = await pool.query<RowDataPacket[]>(
     `SELECT 
        u.userId, u.email, u.role, u.status,
-       s.studentId, s.firstname, s.lastname, s.faculty, s.major, s.year, s.phone, s.profileImageUrl,
+       s.studentId, s.firstname, s.lastname, s.faculty, 
+       s.program, s.major, s.year, s.admissionYear, s.phone, s.profileImageUrl,
        GROUP_CONCAT(CONCAT(t.firstname, ' ', t.lastname) ORDER BY t.firstname SEPARATOR '||') AS advisorNames
      FROM users u
      LEFT JOIN students s ON u.userId = s.userId
      LEFT JOIN advisor a ON a.studentId = s.studentId
      LEFT JOIN teacher t ON t.userId = a.advisorUserId
      WHERE s.studentId = ?
-     GROUP BY u.userId, u.email, u.role, u.status, s.studentId, s.firstname, s.lastname, s.faculty, s.major, s.year, s.phone, s.profileImageUrl`,
+     GROUP BY u.userId, u.email, u.role, u.status, 
+              s.studentId, s.firstname, s.lastname, s.faculty, 
+              s.program, s.major, s.year, s.admissionYear, s.phone, s.profileImageUrl`,
     [studentId],
   );
 
@@ -44,9 +48,10 @@ function mapStudent(row: RowDataPacket) {
     email: row.email,
     role: row.role,
     faculty: cleanThaiText(row.faculty),
-    major: cleanThaiText(row.major),
-    program: cleanThaiText(row.major),
+    program: cleanThaiText(row.program),   // ✅ หลักสูตร
+    major: cleanThaiText(row.major),       // ✅ วิชาเอก
     year: row.year,
+    admissionYear: row.admissionYear ?? null,
     phone: row.phone,
     profileImageUrl: row.profileImageUrl || null,
     advisorNames: row.advisorNames ? String(row.advisorNames).split("||") : [],
@@ -78,7 +83,6 @@ export async function PUT(request: NextRequest, context: RouteContext) {
     const contentType = request.headers.get("content-type") || "";
     let firstName: string | undefined;
     let lastName: string | undefined;
-    let year: string | number | null | undefined;
     let phone: string | undefined;
     let profileImageUrl: string | undefined;
 
@@ -86,7 +90,6 @@ export async function PUT(request: NextRequest, context: RouteContext) {
       const formData = await request.formData();
       firstName = String(formData.get("firstName") || "");
       lastName = String(formData.get("lastName") || "");
-      year = String(formData.get("year") || "");
       phone = String(formData.get("phone") || "");
       const image = formData.get("profileImage");
 
@@ -104,11 +107,10 @@ export async function PUT(request: NextRequest, context: RouteContext) {
       const body = await request.json();
       firstName = body.firstName;
       lastName = body.lastName;
-      year = body.year;
       phone = body.phone;
     }
 
-    // อัปเดต students
+    // อัปเดต students (ไม่ต้องอัปเดต program/major/year เพราะเป็นข้อมูลจากระบบ)
     const updates: string[] = [];
     const values: any[] = [];
     if (firstName !== undefined) {
@@ -118,10 +120,6 @@ export async function PUT(request: NextRequest, context: RouteContext) {
     if (lastName !== undefined) {
       updates.push("lastname = ?");
       values.push(lastName);
-    }
-    if (year !== undefined) {
-      updates.push("year = ?");
-      values.push(year ? Number(year) : null);
     }
     if (phone !== undefined) {
       updates.push("phone = ?");

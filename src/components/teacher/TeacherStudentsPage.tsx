@@ -16,6 +16,7 @@ type Student = {
   phone: string | null;
   faculty: string | null;
   major: string | null;
+  program: string | null;   // ✅ เพิ่มหลักสูตร
   year: number | null;
 };
 
@@ -46,7 +47,11 @@ export default function TeacherStudentsPage() {
           throw new Error(data.message || "ไม่สามารถโหลดข้อมูลนิสิต");
         }
         const data = await res.json();
-        setStudents(data.students || []);
+        // ✅ เพิ่ม program ในการแมป
+        setStudents(data.students.map((s: any) => ({
+          ...s,
+          program: s.program || null,   // รับจาก API
+        })) || []);
         setError("");
       } catch (err) {
         setError(err instanceof Error ? err.message : "เกิดข้อผิดพลาด");
@@ -119,11 +124,14 @@ export default function TeacherStudentsPage() {
             </div>
           ) : (
             <div className="mt-6 overflow-x-auto rounded-xl border border-blue-100 bg-white">
-              <table className="w-full min-w-[600px] text-sm">
+              <table className="w-full min-w-[800px] text-sm">
                 <thead>
                   <tr className="border-b border-blue-50 bg-blue-50/50">
                     <th className="px-4 py-3 text-left font-medium text-slate-500">รหัสนิสิต</th>
                     <th className="px-4 py-3 text-left font-medium text-slate-500">ชื่อ-นามสกุล</th>
+                    <th className="px-4 py-3 text-left font-medium text-slate-500">ชั้นปี</th>
+                    <th className="px-4 py-3 text-left font-medium text-slate-500">หลักสูตร</th>
+                    <th className="px-4 py-3 text-left font-medium text-slate-500">วิชาเอก</th>
                     <th className="px-4 py-3 text-left font-medium text-slate-500">อีเมล</th>
                     <th className="px-4 py-3 text-left font-medium text-slate-500">เบอร์โทร</th>
                     <th className="px-4 py-3 text-center font-medium text-slate-500">จัดการ</th>
@@ -140,9 +148,15 @@ export default function TeacherStudentsPage() {
                       </td>
                       <td className="px-4 py-3 text-slate-700">
                         {student.name}
-                        {student.year && (
-                          <span className="ml-2 text-xs text-slate-400">ชั้นปี {student.year}</span>
-                        )}
+                      </td>
+                      <td className="px-4 py-3 text-slate-700">
+                        {student.year || "-"}
+                      </td>
+                      <td className="px-4 py-3 text-slate-700">
+                        {student.program || "-"}
+                      </td>
+                      <td className="px-4 py-3 text-slate-700">
+                        {student.major || "-"}
                       </td>
                       <td className="px-4 py-3 text-slate-500">{student.email}</td>
                       <td className="px-4 py-3 text-slate-500">

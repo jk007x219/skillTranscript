@@ -8,6 +8,21 @@ import { pool } from "@/lib/db";
 
 export const runtime = "nodejs";
 
+// ✅ ฟังก์ชันตรวจสอบรหัสผ่าน
+function isValidPassword(password: string): boolean {
+  return /^(?=.*[a-z])(?=.*[A-Z]).{8,}$/.test(password);
+}
+
+// ✅ ตรวจสอบเบอร์โทร (10 หลัก ตัวเลขเท่านั้น)
+function isValidPhone(phone: string): boolean {
+  return /^[0-9]{10}$/.test(phone);
+}
+
+// ✅ ตรวจสอบรหัสนิสิต (ตัวเลขเท่านั้น)
+function isValidStudentId(id: string): boolean {
+  return /^[0-9]+$/.test(id);
+}
+
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
@@ -16,8 +31,9 @@ export async function POST(request: NextRequest) {
       lastName,
       studentId,
       email,
-      major,
-      program,
+      major,              // ✅ วิชาเอก
+      program,            // ✅ หลักสูตร
+      admissionYear,
       year,
       phone,
       password,
@@ -31,11 +47,24 @@ export async function POST(request: NextRequest) {
     if (!/^[^\s@]+@tsu\.ac\.th$/i.test(email)) {
       throw httpError(400, "อีเมลต้องลงท้ายด้วย @tsu.ac.th เท่านั้น");
     }
-    if (password.length < 6) {
-      throw httpError(400, "รหัสผ่านต้องมีอย่างน้อย 6 ตัวอักษร");
+    if (!isValidPassword(password)) {
+      throw httpError(400, "รหัสผ่านต้องมีความยาวอย่างน้อย 8 ตัว และประกอบด้วยตัวพิมพ์เล็กและตัวพิมพ์ใหญ่อย่างน้อย 1 ตัว");
     }
     if (!program) {
       throw httpError(400, "กรุณาเลือกหลักสูตร");
+    }
+    if (!admissionYear) {
+      throw httpError(400, "กรุณาเลือกปีที่เข้าเรียน");
+    }
+
+    // ✅ ตรวจสอบรหัสนิสิต (ถ้ามี)
+    if (studentId && !isValidStudentId(studentId)) {
+      throw httpError(400, "รหัสนิสิตต้องเป็นตัวเลขเท่านั้น");
+    }
+
+    // ✅ ตรวจสอบเบอร์โทร (ถ้ามี)
+    if (phone && !isValidPhone(phone)) {
+      throw httpError(400, "เบอร์โทรต้องเป็นตัวเลข 10 หลักเท่านั้น");
     }
 
     // 2. ตรวจสอบอีเมลซ้ำ
@@ -58,12 +87,11 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // 4. ✅ จัดการอาจารย์ที่ปรึกษา (ไม่ต้องตรวจสอบหลักสูตร)
+    // 4. จัดการอาจารย์ที่ปรึกษา
     const selectedAdvisorUserIds = Array.isArray(advisorUserIds)
       ? [...new Set(advisorUserIds.map((id: unknown) => String(id)).filter(Boolean))]
       : [];
 
-    // ✅ ตรวจสอบเฉพาะว่าอาจารย์มีอยู่ในระบบหรือไม่
     if (selectedAdvisorUserIds.length > 0) {
       const [advisorRows] = await pool.query<RowDataPacket[]>(
         `SELECT userId FROM teacher
@@ -92,19 +120,22 @@ export async function POST(request: NextRequest) {
         [userId, email, passwordHash]
       );
 
-      // 5.2 สร้าง students
+      // 5.2 สร้าง students (✅ เพิ่ม program และ major)
       const newStudentId = studentId || nanoid(10);
       await connection.query(
-        `INSERT INTO students (studentId, userId, firstname, lastname, faculty, major, year, phone)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+        `INSERT INTO students 
+          (studentId, userId, firstname, lastname, faculty, program, major, admissionYear, year, phone)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           newStudentId,
           userId,
           firstName,
           lastName,
           faculty,
-          major || null,
-          year ? Number(year) : null,
+          program,              // ✅ หลักสูตร
+          major || null,        // ✅ วิชาเอก (ถ้าไม่มีให้เป็น null)
+          admissionYear,
+          year || null,
           phone || null,
         ]
       );
@@ -146,7 +177,9 @@ export async function POST(request: NextRequest) {
             email: newUser[0].email,
             role: newUser[0].role,
             faculty: newStudent[0].faculty,
-            major: newStudent[0].major,
+            program: newStudent[0].program,   // ✅ หลักสูตร
+            major: newStudent[0].major,       // ✅ วิชาเอก
+            admissionYear: newStudent[0].admissionYear,
             year: newStudent[0].year,
             phone: newStudent[0].phone,
             status: newUser[0].status,

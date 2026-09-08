@@ -24,16 +24,29 @@ export async function GET(request: NextRequest, context: RouteContext) {
   try {
     const { studentId } = await context.params;
 
-    // ตรวจสอบว่านิสิตมีอยู่จริง
+    // ตรวจสอบว่านิสิตมีอยู่จริง และดึงข้อมูลพื้นฐานรวม program
     const [studentRows] = await pool.query<RowDataPacket[]>(
-      "SELECT studentId FROM students WHERE studentId = ?",
+      `SELECT 
+         s.studentId,
+         s.firstname,
+         s.lastname,
+         u.email,
+         s.phone,
+         s.faculty,
+         s.major,
+         s.program,
+         s.year
+       FROM students s
+       INNER JOIN users u ON u.userId = s.userId
+       WHERE s.studentId = ?`,
       [studentId]
     );
     if (studentRows.length === 0) {
       throw httpError(404, "ไม่พบนิสิต");
     }
+    const student = studentRows[0];
 
-    // ===== คำนวณคะแนนจาก participation (แบบเดียวกับ dashboard) =====
+    // ===== คำนวณคะแนนจาก participation =====
     const [skillScores] = await pool.query<SkillScoreRow[]>(
       `SELECT 
          s.skillId,
@@ -55,7 +68,6 @@ export async function GET(request: NextRequest, context: RouteContext) {
     );
 
     const skills = skillScores.map((row) => {
-      // คำนวณคะแนนตาม level จริง
       const levelScoreMap: Record<string, number> = {
         "พื้นฐาน": 1,
         "กลาง": 2,
@@ -86,32 +98,18 @@ export async function GET(request: NextRequest, context: RouteContext) {
       ? Math.round(skills.reduce((sum, s) => sum + (s.percent || 0), 0) / skills.length)
       : 0;
 
-    // ดึงข้อมูลนิสิต (พร้อม email จาก users)
-    const [student] = await pool.query<RowDataPacket[]>(
-      `SELECT 
-         s.firstname, s.lastname, s.studentId, s.phone, s.faculty, s.major, s.year,
-         u.email
-       FROM students s
-       INNER JOIN users u ON s.userId = u.userId
-       WHERE s.studentId = ?`,
-      [studentId]
-    );
-
-    if (student.length === 0) {
-      throw httpError(404, "ไม่พบข้อมูลนิสิต");
-    }
-
     return NextResponse.json({
       student: {
-        studentId: student[0].studentId,
-        firstName: student[0].firstname || "",
-        lastName: student[0].lastname || "",
-        name: `${student[0].firstname || ""} ${student[0].lastname || ""}`.trim(),
-        email: student[0].email,
-        phone: student[0].phone,
-        faculty: student[0].faculty,
-        major: student[0].major,
-        year: student[0].year,
+        studentId: student.studentId,
+        firstName: student.firstname || "",
+        lastName: student.lastname || "",
+        name: `${student.firstname || ""} ${student.lastname || ""}`.trim(),
+        email: student.email,
+        phone: student.phone,
+        faculty: student.faculty,
+        major: student.major,
+        program: student.program || null,   // ✅ เพิ่มหลักสูตร
+        year: student.year,
       },
       summary: {
         totalSkills: skills.length,

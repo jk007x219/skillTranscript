@@ -294,10 +294,6 @@ function DashboardPanel({
           </div>
           <p className="mt-1 text-xs text-[#1565C0]">{subtitle}</p>
         </div>
-        <div className="inline-flex w-fit items-center gap-2 rounded-full bg-white px-3 py-2 text-xs font-semibold text-slate-700 shadow-sm ring-1 ring-blue-100">
-          <CheckCircle2 className="h-4 w-4" style={{ color: accent }} aria-hidden="true" />
-          ภาพรวม {average}%
-        </div>
       </div>
       <div className="grid gap-6 p-5 lg:grid-cols-[0.9fr_1fr] lg:items-center">
         <RadarChart accent={accent} values={items.map((item) => item.percent)} labels={items.map((item) => item.title)} id={chartId} />
@@ -412,16 +408,6 @@ useEffect(() => {
               ดู Skill Transcript ของฉัน
               <Award className="h-4 w-4" aria-hidden="true" />
             </Link>
-          </div>
-          <div className="relative mt-6 grid grid-cols-2 gap-3 lg:mt-0">
-            <div className="rounded-xl border border-white/15 bg-white/[0.12] p-4 backdrop-blur">
-              <p className="text-xs text-blue-100">ความคืบหน้า</p>
-              <p className="mt-2 text-3xl font-semibold">{summary.overallPercent}%</p>
-            </div>
-            <div className="rounded-xl border border-white/15 bg-white/[0.12] p-4 backdrop-blur">
-              <p className="text-xs text-blue-100">พร้อมรับรอง</p>
-              <p className="mt-2 text-3xl font-semibold">{summary.certificates}</p>
-            </div>
           </div>
         </div>
 

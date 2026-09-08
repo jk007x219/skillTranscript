@@ -1,3 +1,4 @@
+// components/student/RequestActivityPage.tsx
 "use client";
 
 import { useState } from "react";
@@ -75,6 +76,12 @@ export default function RequestActivityPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    // ✅ บังคับให้แนบไฟล์หลักฐาน
+    if (files.length === 0) {
+      alert("กรุณาแนบเอกสารหลักฐานอย่างน้อย 1 ไฟล์");
+      return;
+    }
 
     if (!user?.studentId) {
       alert("ไม่พบข้อมูลนิสิต กรุณาเข้าสู่ระบบใหม่");

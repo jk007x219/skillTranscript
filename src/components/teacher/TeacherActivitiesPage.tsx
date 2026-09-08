@@ -24,6 +24,7 @@ import { useAuth } from "@/context/auth-context";
 type ActivityStatus = "active" | "past";
 
 type ActivitySkill = {
+  skillId?: string;
   name: string;
   level: string;
 };
@@ -33,7 +34,7 @@ type EvaluationQuestion = {
   question: string;
   options: string[];
   correctAnswer: number;
-  skillName: string;
+  skillNames: string[];
 };
 
 type Template = {
@@ -75,8 +76,10 @@ type StaffActivity = {
 type ActivityForm = {
   title: string;
   description: string;
-  dateTime: string;
-  endDateTime: string;
+  startDate: string;      // YYYY-MM-DD
+  startTime: string;      // HH:mm
+  endDate: string;        // YYYY-MM-DD
+  endTime: string;        // HH:mm
   term: string;
   location: string;
   organizer: string;
@@ -94,8 +97,10 @@ const LEVELS = ["พื้นฐาน", "กลาง", "สูง"];
 const emptyForm: ActivityForm = {
   title: "",
   description: "",
-  dateTime: "",
-  endDateTime: "",
+  startDate: "",
+  startTime: "",
+  endDate: "",
+  endTime: "",
   term: "1",
   location: "",
   organizer: "คณะวิทยาศาสตร์และนวัตกรรมดิจิทัล",
@@ -103,25 +108,54 @@ const emptyForm: ActivityForm = {
   templateId: "",
 };
 
+// ===== Helper functions =====
+function getTodayDate() {
+  return new Date().toISOString().split("T")[0];
+}
+
+function getCurrentTime() {
+  const now = new Date();
+  return `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
+}
+
+function combineDateTime(date: string, time: string): string {
+  if (!date || !time) return "";
+  return `${date}T${time}`;
+}
+
+function isValidEndDateTime(startDate: string, startTime: string, endDate: string, endTime: string) {
+  if (!startDate || !startTime || !endDate || !endTime) return true;
+  const start = new Date(`${startDate}T${startTime}`);
+  const end = new Date(`${endDate}T${endTime}`);
+  return end > start;
+}
+
+function calculateHoursMinutes(startDate: string, startTime: string, endDate: string, endTime: string) {
+  if (!startDate || !startTime || !endDate || !endTime) return { hours: 0, minutes: 0 };
+  const start = new Date(`${startDate}T${startTime}`);
+  const end = new Date(`${endDate}T${endTime}`);
+  if (end <= start) return { hours: 0, minutes: 0 };
+  const diffMs = end.getTime() - start.getTime();
+  const hours = Math.floor(diffMs / (1000 * 60 * 60));
+  const minutes = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
+  return { hours, minutes };
+}
+
+function formatHoursMinutes(hours: number, minutes: number): string {
+  if (hours === 0 && minutes === 0) return "";
+  if (hours === 0) return `${minutes} นาที`;
+  if (minutes === 0) return `${hours} ชั่วโมง`;
+  return `${hours} ชั่วโมง ${minutes} นาที`;
+}
+
+function toDateTimeInputValue(date?: string | null, time?: string | null) {
+  if (!date || !time) return "";
+  return `${String(date).slice(0, 10)}T${String(time).slice(0, 5)}`;
+}
+
 function toDateTimeLocalValue(date: Date) {
   const local = new Date(date.getTime() - date.getTimezoneOffset() * 60000);
   return local.toISOString().slice(0, 16);
-}
-
-function calculateActivityHours(start: string, end: string) {
-  if (!start || !end) return 0;
-  const startTime = new Date(start).getTime();
-  const endTime = new Date(end).getTime();
-  if (!Number.isFinite(startTime) || !Number.isFinite(endTime) || endTime <= startTime) return 0;
-  return Math.round(((endTime - startTime) / 3_600_000) * 100) / 100;
-}
-
-function isValidEndDateTime(start: string, end: string) {
-  if (!start || !end) return true;
-  const startTime = new Date(start).getTime();
-  const endTime = new Date(end).getTime();
-  if (!Number.isFinite(startTime) || !Number.isFinite(endTime)) return false;
-  return endTime > startTime;
 }
 
 // ---------- helper components ----------
@@ -171,7 +205,7 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
   );
 }
 
-// ---------- Modals ----------
+// ---------- AddActivityModal ----------
 function AddActivityModal({
   form,
   skillOptions,
@@ -195,9 +229,15 @@ function AddActivityModal({
   onSubmit: () => void;
   isEditing?: boolean;
 }) {
-  const minimumDateTime = toDateTimeLocalValue(new Date());
-  const minimumEndDateTime = form.dateTime || minimumDateTime;
-  const durationHours = calculateActivityHours(form.dateTime, form.endDateTime);
+  const today = getTodayDate();
+
+  const { hours, minutes } = calculateHoursMinutes(
+    form.startDate,
+    form.startTime,
+    form.endDate,
+    form.endTime
+  );
+  const durationDisplay = formatHoursMinutes(hours, minutes);
 
   return (
     <div className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-900/15 px-4 backdrop-blur-sm">
@@ -240,20 +280,73 @@ function AddActivityModal({
             />
           </Field>
 
+          {/* ===== วันที่และเวลา (แยกกัน) ===== */}
           <div className="grid gap-4 sm:grid-cols-2 sm:gap-8">
-            <Field label="วันที่และเวลาที่จัดกิจกรรม/อบรม">
-              <div className="relative">
-                <CalendarDays className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#76B7F2]" />
-                <input
-                  type="datetime-local"
-                  value={form.dateTime}
-                  onChange={(e) => onChange("dateTime", e.target.value)}
-                  min={minimumDateTime}
-                  className="teacher-activity-input pl-10"
-                  required
-                />
-              </div>
+            <Field label="วันที่เริ่มต้น">
+              <input
+                type="date"
+                value={form.startDate}
+                onChange={(e) => onChange("startDate", e.target.value)}
+                min={today}
+                className="teacher-activity-input"
+                required
+              />
             </Field>
+            <Field label="เวลาเริ่มต้น">
+              <input
+                type="time"
+                value={form.startTime}
+                onChange={(e) => onChange("startTime", e.target.value)}
+                step="60"
+                className="teacher-activity-input"
+                required
+              />
+            </Field>
+          </div>
+
+          <div className="grid gap-4 sm:grid-cols-2 sm:gap-8">
+            <Field label="วันที่สิ้นสุด">
+              <input
+                type="date"
+                value={form.endDate}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  if (form.startDate && val && val < form.startDate) return;
+                  onChange("endDate", val);
+                }}
+                min={form.startDate || today}
+                className="teacher-activity-input"
+                required
+              />
+            </Field>
+            <Field label="เวลาสิ้นสุด">
+              <input
+                type="time"
+                value={form.endTime}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  if (form.startDate && form.startTime && val && !isValidEndDateTime(form.startDate, form.startTime, form.endDate, val)) {
+                    return;
+                  }
+                  onChange("endTime", val);
+                }}
+                step="60"
+                className="teacher-activity-input"
+                required
+              />
+            </Field>
+          </div>
+
+          <Field label="จำนวนชั่วโมงกิจกรรม">
+            <input
+              value={durationDisplay}
+              className="teacher-activity-input bg-white/70 text-slate-700"
+              placeholder="คำนวณอัตโนมัติ"
+              readOnly
+            />
+          </Field>
+
+          <div className="grid gap-4 sm:grid-cols-2 sm:gap-8">
             <Field label="ภาคเรียน">
               <select
                 value={form.term}
@@ -265,43 +358,14 @@ function AddActivityModal({
                 <option value="3">ภาคเรียนที่ 3</option>
               </select>
             </Field>
-          </div>
-
-          <div className="grid gap-4 sm:grid-cols-2 sm:gap-8">
-            <Field label="วันที่และเวลาสิ้นสุดกิจกรรม">
-              <div className="relative">
-                <CalendarDays className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#76B7F2]" />
-                <input
-                  type="datetime-local"
-                  value={form.endDateTime}
-                  onChange={(e) => {
-                    const value = e.target.value;
-                    if (form.dateTime && value && !isValidEndDateTime(form.dateTime, value)) return;
-                    onChange("endDateTime", value);
-                  }}
-                  min={minimumEndDateTime}
-                  className="teacher-activity-input pl-10"
-                  required
-                />
-              </div>
-            </Field>
-            <Field label="จำนวนชั่วโมงกิจกรรม">
+            <Field label="สถานที่จัดกิจกรรม">
               <input
-                value={durationHours > 0 ? `${durationHours} ชั่วโมง` : ""}
-                className="teacher-activity-input bg-white/70 text-slate-700"
-                placeholder="คำนวณอัตโนมัติ"
-                readOnly
+                value={form.location}
+                onChange={(e) => onChange("location", e.target.value)}
+                className="teacher-activity-input"
               />
             </Field>
           </div>
-
-          <Field label="สถานที่จัดกิจกรรม">
-            <input
-              value={form.location}
-              onChange={(e) => onChange("location", e.target.value)}
-              className="teacher-activity-input"
-            />
-          </Field>
 
           <Field label="ผู้จัดกิจกรรม">
             <input
@@ -383,20 +447,34 @@ function AddActivityModal({
 }
 
 // ---------- EvaluationModal ----------
-function EvaluationModal({ activity, onClose, onSave }: {
+function EvaluationModal({
+  activity,
+  initialQuestions,
+  isEditing = false,
+  onClose,
+  onSave,
+}: {
   activity: StaffActivity;
+  initialQuestions?: EvaluationQuestion[];
+  isEditing?: boolean;
   onClose: () => void;
   onSave: (evaluation: EvaluationQuestion[]) => void;
 }) {
-  const [questions, setQuestions] = useState<EvaluationQuestion[]>([
-    {
-      id: Date.now().toString(),
-      question: "",
-      options: ["", ""],
-      correctAnswer: 0,
-      skillName: activity.skills.length > 0 ? activity.skills[0].name : "",
-    },
-  ]);
+  const [questions, setQuestions] = useState<EvaluationQuestion[]>(
+    initialQuestions && initialQuestions.length > 0
+      ? initialQuestions
+      : [
+          {
+            id: Date.now().toString(),
+            question: "",
+            options: ["", ""],
+            correctAnswer: 0,
+            skillNames: activity.skills.length > 0 ? [activity.skills[0].name] : [],
+          },
+        ]
+  );
+
+  const skillOptions = activity.skills.map((s) => s.name);
 
   const addQuestion = () => {
     setQuestions((prev) => [
@@ -406,7 +484,7 @@ function EvaluationModal({ activity, onClose, onSave }: {
         question: "",
         options: ["", ""],
         correctAnswer: 0,
-        skillName: activity.skills.length > 0 ? activity.skills[0].name : "",
+        skillNames: skillOptions.length > 0 ? [skillOptions[0]] : [],
       },
     ]);
   };
@@ -417,12 +495,16 @@ function EvaluationModal({ activity, onClose, onSave }: {
   };
 
   const updateQuestion = (id: string, field: keyof EvaluationQuestion, value: any) => {
-    setQuestions((prev) => prev.map((q) => (q.id === id ? { ...q, [field]: value } : q)));
+    setQuestions((prev) =>
+      prev.map((q) => (q.id === id ? { ...q, [field]: value } : q))
+    );
   };
 
   const addOption = (questionId: string) => {
     setQuestions((prev) =>
-      prev.map((q) => (q.id === questionId ? { ...q, options: [...q.options, ""] } : q))
+      prev.map((q) =>
+        q.id === questionId ? { ...q, options: [...q.options, ""] } : q
+      )
     );
   };
 
@@ -430,7 +512,10 @@ function EvaluationModal({ activity, onClose, onSave }: {
     setQuestions((prev) =>
       prev.map((q) =>
         q.id === questionId
-          ? { ...q, options: q.options.map((opt, idx) => (idx === optionIndex ? value : opt)) }
+          ? {
+              ...q,
+              options: q.options.map((opt, idx) => (idx === optionIndex ? value : opt)),
+            }
           : q
       )
     );
@@ -442,8 +527,35 @@ function EvaluationModal({ activity, onClose, onSave }: {
         if (q.id === questionId) {
           const newOptions = q.options.filter((_, idx) => idx !== optionIndex);
           const newCorrect =
-            q.correctAnswer === optionIndex ? 0 : q.correctAnswer > optionIndex ? q.correctAnswer - 1 : q.correctAnswer;
+            q.correctAnswer === optionIndex
+              ? 0
+              : q.correctAnswer > optionIndex
+              ? q.correctAnswer - 1
+              : q.correctAnswer;
           return { ...q, options: newOptions, correctAnswer: newCorrect };
+        }
+        return q;
+      })
+    );
+  };
+
+  const selectCorrectAnswer = (questionId: string, optionIndex: number) => {
+    setQuestions((prev) =>
+      prev.map((q) =>
+        q.id === questionId ? { ...q, correctAnswer: optionIndex } : q
+      )
+    );
+  };
+
+  const toggleSkill = (questionId: string, skillName: string) => {
+    setQuestions((prev) =>
+      prev.map((q) => {
+        if (q.id === questionId) {
+          const current = q.skillNames || [];
+          const newSkillNames = current.includes(skillName)
+            ? current.filter((s) => s !== skillName)
+            : [...current, skillName];
+          return { ...q, skillNames: newSkillNames };
         }
         return q;
       })
@@ -456,16 +568,15 @@ function EvaluationModal({ activity, onClose, onSave }: {
         q.question.trim() !== "" &&
         q.options.every((opt) => opt.trim() !== "") &&
         q.options.length >= 2 &&
-        q.skillName !== ""
+        q.skillNames &&
+        q.skillNames.length > 0
     );
     if (!isValid) {
-      alert("กรุณากรอกข้อมูลให้ครบถ้วน: คำถาม, ตัวเลือก (อย่างน้อย 2 ตัว), และเลือกทักษะ");
+      alert("กรุณากรอกข้อมูลให้ครบถ้วน: คำถาม, ตัวเลือก (อย่างน้อย 2 ตัว), และเลือกทักษะอย่างน้อย 1 ตัว");
       return;
     }
     onSave(questions);
   };
-
-  const skillOptions = activity.skills.map((s) => s.name);
 
   return (
     <div className="fixed inset-0 z-[80] flex items-center justify-center bg-slate-900/40 px-4 backdrop-blur-sm">
@@ -479,23 +590,30 @@ function EvaluationModal({ activity, onClose, onSave }: {
         </button>
 
         <div className="mb-6">
-          <h2 className="text-2xl font-semibold text-slate-950">สร้างแบบประเมินความรู้</h2>
+          <h2 className="text-2xl font-semibold text-slate-950">
+            {isEditing ? "แก้ไขแบบประเมินความรู้" : "สร้างแบบประเมินความรู้"}
+          </h2>
           <div className="mt-2 h-0.5 w-20 rounded-full bg-[#FFC107]" />
-          <p className="mt-2 text-sm text-slate-500">กิจกรรม: <span className="font-medium">{activity.title}</span></p>
+          <p className="mt-2 text-sm text-slate-500">
+            กิจกรรม: <span className="font-medium">{activity.title}</span>
+          </p>
         </div>
 
         <div className="space-y-4">
           {questions.map((q, qIndex) => (
             <div key={q.id} className="rounded-xl border border-blue-100 bg-blue-50/30 p-4">
+              {/* คำถาม */}
               <div className="flex items-start justify-between gap-2">
                 <div className="flex-1">
-                  <label className="block text-sm font-medium text-slate-700">คำถามข้อ {qIndex + 1}</label>
-                  <input
-                    type="text"
+                  <label className="block text-sm font-medium text-slate-700">
+                    คำถามข้อ {qIndex + 1}
+                  </label>
+                  <textarea
                     value={q.question}
                     onChange={(e) => updateQuestion(q.id, "question", e.target.value)}
-                    className="mt-1 h-10 w-full rounded-lg border border-blue-200 bg-white px-3 text-sm outline-none focus:border-[#1565C0] focus:ring-2 focus:ring-blue-100"
+                    className="mt-1 w-full rounded-lg border border-blue-200 bg-white px-3 py-2 text-sm outline-none focus:border-[#1565C0] focus:ring-2 focus:ring-blue-100 resize-y min-h-[60px]"
                     placeholder="พิมพ์คำถาม..."
+                    rows={2}
                   />
                 </div>
                 {questions.length > 1 && (
@@ -510,22 +628,40 @@ function EvaluationModal({ activity, onClose, onSave }: {
                 )}
               </div>
 
+              {/* ตัวเลือก */}
               <div className="mt-3">
-                <label className="block text-sm font-medium text-slate-700">ตัวเลือก</label>
+                <label className="block text-sm font-medium text-slate-700">
+                  ตัวเลือก (คลิกที่ตัวเลือกเพื่อเลือกเป็นคำตอบที่ถูกต้อง)
+                </label>
                 {q.options.map((opt, optIndex) => (
-                  <div key={optIndex} className="mt-1 flex items-center gap-2">
+                  <div
+                    key={optIndex}
+                    className={`mt-1 flex items-center gap-2 rounded-lg border px-3 py-2 transition cursor-pointer ${
+                      q.correctAnswer === optIndex
+                        ? "border-emerald-500 bg-emerald-50 ring-2 ring-emerald-300"
+                        : "border-blue-200 bg-white hover:border-blue-400"
+                    }`}
+                    onClick={() => selectCorrectAnswer(q.id, optIndex)}
+                  >
+                    <span className="text-sm font-medium text-slate-400 min-w-[55px] shrink-0">
+                      ข้อ {optIndex + 1}:
+                    </span>
                     <input
                       type="text"
                       value={opt}
                       onChange={(e) => updateOption(q.id, optIndex, e.target.value)}
-                      className="h-10 flex-1 rounded-lg border border-blue-200 bg-white px-3 text-sm outline-none focus:border-[#1565C0] focus:ring-2 focus:ring-blue-100"
-                      placeholder={`ตัวเลือก ${optIndex + 1}`}
+                      onClick={(e) => e.stopPropagation()}
+                      className="flex-1 bg-transparent text-sm text-slate-700 outline-none placeholder:text-slate-400"
+                      placeholder={`พิมพ์ตัวเลือกข้อ ${optIndex + 1}...`}
                     />
                     {q.options.length > 2 && (
                       <button
                         type="button"
-                        onClick={() => removeOption(q.id, optIndex)}
-                        className="rounded-lg p-1.5 text-slate-400 transition hover:bg-red-50 hover:text-red-500"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          removeOption(q.id, optIndex);
+                        }}
+                        className="rounded-lg p-1 text-slate-400 transition hover:bg-red-50 hover:text-red-500 shrink-0"
                       >
                         <X className="h-4 w-4" />
                       </button>
@@ -541,30 +677,29 @@ function EvaluationModal({ activity, onClose, onSave }: {
                 </button>
               </div>
 
-              <div className="mt-3 grid gap-3 sm:grid-cols-2">
-                <div>
-                  <label className="block text-sm font-medium text-slate-700">เฉลย (ตัวเลือกที่ถูกต้อง)</label>
-                  <select
-                    value={q.correctAnswer}
-                    onChange={(e) => updateQuestion(q.id, "correctAnswer", parseInt(e.target.value))}
-                    className="mt-1 h-10 w-full rounded-lg border border-blue-200 bg-white px-3 text-sm outline-none focus:border-[#1565C0] focus:ring-2 focus:ring-blue-100"
-                  >
-                    {q.options.map((_, idx) => (
-                      <option key={idx} value={idx}>ตัวเลือกที่ {idx + 1}</option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-slate-700">ทักษะที่เกี่ยวข้อง</label>
-                  <select
-                    value={q.skillName}
-                    onChange={(e) => updateQuestion(q.id, "skillName", e.target.value)}
-                    className="mt-1 h-10 w-full rounded-lg border border-blue-200 bg-white px-3 text-sm outline-none focus:border-[#1565C0] focus:ring-2 focus:ring-blue-100"
-                  >
-                    {skillOptions.map((skill) => (
-                      <option key={skill} value={skill}>{skill}</option>
-                    ))}
-                  </select>
+              {/* ทักษะที่เกี่ยวข้อง */}
+              <div className="mt-3">
+                <label className="block text-sm font-medium text-slate-700">
+                  ทักษะที่เกี่ยวข้อง (เลือกได้หลายทักษะ)
+                </label>
+                <div className="mt-1 flex flex-wrap gap-3">
+                  {skillOptions.length > 0 ? (
+                    skillOptions.map((skill) => (
+                      <label key={skill} className="flex items-center gap-1.5 text-sm">
+                        <input
+                          type="checkbox"
+                          checked={(q.skillNames || []).includes(skill)}
+                          onChange={() => toggleSkill(q.id, skill)}
+                          className="h-4 w-4 rounded border-blue-300 text-[#1565C0] focus:ring-[#1565C0]"
+                        />
+                        <span>{skill}</span>
+                      </label>
+                    ))
+                  ) : (
+                    <span className="text-sm text-slate-400">
+                      ไม่มีทักษะในกิจกรรมนี้ กรุณาเพิ่มทักษะก่อน
+                    </span>
+                  )}
                 </div>
               </div>
             </div>
@@ -592,7 +727,7 @@ function EvaluationModal({ activity, onClose, onSave }: {
             onClick={handleSave}
             className="rounded-lg bg-[#1565C0] px-6 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-[#0D47A1]"
           >
-            บันทึกแบบประเมิน
+            {isEditing ? "อัปเดตแบบประเมิน" : "บันทึกแบบประเมิน"}
           </button>
         </div>
       </div>
@@ -714,6 +849,7 @@ export default function TeacherActivitiesPage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [form, setForm] = useState<ActivityForm>(emptyForm);
   const [evaluationActivity, setEvaluationActivity] = useState<StaffActivity | null>(null);
+  const [editingEvaluationActivity, setEditingEvaluationActivity] = useState<StaffActivity | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [generatingId, setGeneratingId] = useState<string | null>(null);
@@ -786,7 +922,7 @@ export default function TeacherActivitiesPage() {
     [activities, activeTab]
   );
 
-  // ---------- กิจกรรม (แก้ไขแล้ว) ----------
+  // ---------- กิจกรรม ----------
   const updateConfirmation = async (activityId: string) => {
     const activity = activities.find((a) => a.id === activityId);
     if (!activity) return;
@@ -794,7 +930,6 @@ export default function TeacherActivitiesPage() {
 
     try {
       if (newVal && activity.hasEvaluation) {
-        // เปิดสวิตช์ -> สร้างรหัส, เปลี่ยนสถานะเป็น active
         const res = await fetch(`/api/activities/${activityId}/generate-code`, { method: "POST" });
         if (!res.ok) {
           const err = await res.json();
@@ -802,7 +937,6 @@ export default function TeacherActivitiesPage() {
         }
         const data = await res.json();
 
-        // อัปเดต confirmationEnabled, verificationCode, codeExpiresAt และ status
         const updateRes = await fetch(`/api/activities/${activityId}`, {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
@@ -810,19 +944,15 @@ export default function TeacherActivitiesPage() {
             confirmationEnabled: true,
             verificationCode: data.code,
             codeExpiresAt: data.expiresAt,
-            status: "active", // ✅ เปลี่ยนเป็น active
+            status: "active",
           }),
         });
         if (!updateRes.ok) throw new Error("อัปเดตไม่สำเร็จ");
 
-        // โหลดข้อมูลใหม่
         await fetchActivities();
-
-        // แสดง modal รหัส
         setModalActivityId(activityId);
         setShowCodeModal(true);
       } else {
-        // ปิดสวิตช์ -> ลบรหัส, เปลี่ยนสถานะเป็น past
         const updateRes = await fetch(`/api/activities/${activityId}`, {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
@@ -830,12 +960,11 @@ export default function TeacherActivitiesPage() {
             confirmationEnabled: false,
             verificationCode: null,
             codeExpiresAt: null,
-            status: "past", // ✅ เปลี่ยนเป็น past
+            status: "past",
           }),
         });
         if (!updateRes.ok) throw new Error("อัปเดตไม่สำเร็จ");
 
-        // โหลดข้อมูลใหม่
         await fetchActivities();
       }
     } catch (err) {
@@ -843,6 +972,7 @@ export default function TeacherActivitiesPage() {
     }
   };
 
+  // ===== สร้างกิจกรรม =====
   const createActivity = async () => {
     if (!user?.id) {
       alert("ไม่พบข้อมูลอาจารย์ กรุณาเข้าสู่ระบบใหม่");
@@ -850,19 +980,29 @@ export default function TeacherActivitiesPage() {
     }
 
     try {
-      const startDate = new Date(form.dateTime);
-      const endDate = new Date(form.endDateTime);
+      const startDateTime = combineDateTime(form.startDate, form.startTime);
+      const endDateTime = combineDateTime(form.endDate, form.endTime);
+
+      if (!startDateTime || !endDateTime) {
+        throw new Error("กรุณาระบุวันที่และเวลาเริ่มต้นและสิ้นสุดกิจกรรม");
+      }
+
+      const startDateObj = new Date(startDateTime);
+      const endDateObj = new Date(endDateTime);
       const now = new Date();
 
-      if (!form.dateTime || !form.endDateTime) throw new Error("กรุณาระบุวันที่เวลาเริ่มต้นและสิ้นสุดกิจกรรม");
-      if (startDate.getTime() < now.getTime() - 60_000) throw new Error("ไม่สามารถเลือกวันที่หรือเวลาย้อนหลังได้");
-      if (endDate <= startDate) throw new Error("วันที่เวลาสิ้นสุดต้องมากกว่าวันที่เวลาเริ่มต้น");
+      if (startDateObj.getTime() < now.getTime() - 60_000) {
+        throw new Error("ไม่สามารถเลือกวันที่หรือเวลาย้อนหลังได้");
+      }
+      if (endDateObj <= startDateObj) {
+        throw new Error("วันที่เวลาสิ้นสุดต้องมากกว่าวันที่เวลาเริ่มต้น");
+      }
 
       const payload = {
         title: form.title,
         description: form.description,
-        dateTime: form.dateTime,
-        endDateTime: form.endDateTime,
+        dateTime: startDateTime,
+        endDateTime: endDateTime,
         term: form.term,
         location: form.location,
         organizer: form.organizer,
@@ -888,17 +1028,80 @@ export default function TeacherActivitiesPage() {
     }
   };
 
-  const saveEvaluation = async (evaluation: EvaluationQuestion[]) => {
-    if (!evaluationActivity) return;
+  // ===== บันทึกแบบประเมิน =====
+  const saveEvaluation = async (evaluation: EvaluationQuestion[], activityId: string) => {
     try {
-      const res = await fetch(`/api/activities/${evaluationActivity.id}`, {
+      const res = await fetch(`/api/activities/${activityId}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ evaluation, hasEvaluation: true }),
+        body: JSON.stringify({
+          evaluation,
+          hasEvaluation: true,
+        }),
       });
-      if (!res.ok) throw new Error("บันทึกแบบประเมินไม่สำเร็จ");
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.message || "บันทึกแบบประเมินไม่สำเร็จ");
+      }
       await fetchActivities();
-      setEvaluationActivity(null);
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "เกิดข้อผิดพลาด");
+    }
+  };
+
+  // ===== แก้ไขกิจกรรม =====
+  const handleUpdateActivity = async () => {
+    if (!editingActivity) return;
+    try {
+      const startDateTime = combineDateTime(editForm.startDate, editForm.startTime);
+      const endDateTime = combineDateTime(editForm.endDate, editForm.endTime);
+
+      if (!startDateTime || !endDateTime) {
+        throw new Error("กรุณาระบุวันที่และเวลาเริ่มต้นและสิ้นสุดกิจกรรม");
+      }
+
+      const startDateObj = new Date(startDateTime);
+      const endDateObj = new Date(endDateTime);
+      const now = new Date();
+
+      if (startDateObj.getTime() < now.getTime() - 60_000) {
+        throw new Error("ไม่สามารถเลือกวันที่หรือเวลาย้อนหลังได้");
+      }
+      if (endDateObj <= startDateObj) {
+        throw new Error("วันที่เวลาสิ้นสุดต้องมากกว่าวันที่เวลาเริ่มต้น");
+      }
+
+      const updatedSkills = editForm.selectedSkills.map((skill) => {
+        const matched = skillOptions.find((s) => s.skillname === skill.name);
+        return { ...skill, skillId: skill.skillId || matched?.skillId || "" };
+      });
+
+      const payload = {
+        title: editForm.title,
+        description: editForm.description,
+        dateTime: startDateTime,
+        endDateTime: endDateTime,
+        term: editForm.term,
+        location: editForm.location,
+        organizer: editForm.organizer,
+        selectedSkills: updatedSkills,
+        templateId: editForm.templateId || undefined,
+      };
+
+      const res = await fetch(`/api/activities/${editingActivity.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.message || "อัปเดตกิจกรรมไม่สำเร็จ");
+      }
+      await fetchActivities();
+      setIsEditModalOpen(false);
+      setEditingActivity(null);
+      setEditForm(emptyForm);
+      alert("อัปเดตกิจกรรมสำเร็จ");
     } catch (err) {
       alert(err instanceof Error ? err.message : "เกิดข้อผิดพลาด");
     }
@@ -979,62 +1182,17 @@ export default function TeacherActivitiesPage() {
     setEditForm({
       title: activity.title,
       description: activity.description,
-      dateTime: activity.date && activity.time ? `${activity.date}T${activity.time.slice(0, 5)}` : "",
-      endDateTime: activity.endDate && activity.endTime ? `${activity.endDate}T${activity.endTime.slice(0, 5)}` : "",
+      startDate: activity.date || "",
+      startTime: activity.time ? activity.time.slice(0, 5) : "",
+      endDate: activity.endDate || "",
+      endTime: activity.endTime ? activity.endTime.slice(0, 5) : "",
       term: activity.term,
       location: activity.location,
       organizer: activity.organizer || "คณะวิทยาศาสตร์และนวัตกรรมดิจิทัล",
-      selectedSkills: activity.skills.map((skill) => ({ skillId: "", name: skill.name, level: skill.level })),
+      selectedSkills: activity.skills.map((skill) => ({ skillId: skill.skillId || "", name: skill.name, level: skill.level })),
       templateId: activity.templateId || "",
     });
     setIsEditModalOpen(true);
-  };
-
-  const handleUpdateActivity = async () => {
-    if (!editingActivity) return;
-    try {
-      const startDate = new Date(editForm.dateTime);
-      const endDate = new Date(editForm.endDateTime);
-      const now = new Date();
-
-      if (!editForm.dateTime || !editForm.endDateTime) throw new Error("กรุณาระบุวันที่เวลาเริ่มต้นและสิ้นสุดกิจกรรม");
-      if (startDate.getTime() < now.getTime() - 60_000) throw new Error("ไม่สามารถเลือกวันที่หรือเวลาย้อนหลังได้");
-      if (endDate <= startDate) throw new Error("วันที่เวลาสิ้นสุดต้องมากกว่าวันที่เวลาเริ่มต้น");
-
-      const updatedSkills = editForm.selectedSkills.map((skill) => {
-        const matched = skillOptions.find((s) => s.skillname === skill.name);
-        return { ...skill, skillId: matched?.skillId || "" };
-      });
-
-      const payload = {
-        title: editForm.title,
-        description: editForm.description,
-        dateTime: editForm.dateTime,
-        endDateTime: editForm.endDateTime,
-        term: editForm.term,
-        location: editForm.location,
-        organizer: editForm.organizer,
-        selectedSkills: updatedSkills,
-        templateId: editForm.templateId || undefined,
-      };
-
-      const res = await fetch(`/api/activities/${editingActivity.id}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-      if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.message || "อัปเดตกิจกรรมไม่สำเร็จ");
-      }
-      await fetchActivities();
-      setIsEditModalOpen(false);
-      setEditingActivity(null);
-      setEditForm(emptyForm);
-      alert("อัปเดตกิจกรรมสำเร็จ");
-    } catch (err) {
-      alert(err instanceof Error ? err.message : "เกิดข้อผิดพลาด");
-    }
   };
 
   const handleDelete = async (activityId: string) => {
@@ -1056,11 +1214,18 @@ export default function TeacherActivitiesPage() {
   const handleFormChange = (field: keyof ActivityForm, value: string) => {
     setForm((prev) => {
       const next = { ...prev, [field]: value };
-      if (field === "dateTime" && next.endDateTime && !isValidEndDateTime(value, next.endDateTime)) {
-        next.endDateTime = "";
+      if (field === "startDate" || field === "startTime") {
+        if (next.endDate && next.endTime && !isValidEndDateTime(next.startDate, next.startTime, next.endDate, next.endTime)) {
+          next.endDate = "";
+          next.endTime = "";
+        }
       }
-      if (field === "endDateTime" && next.dateTime && value && !isValidEndDateTime(next.dateTime, value)) {
-        return prev;
+      if (field === "endDate" || field === "endTime") {
+        if (next.startDate && next.startTime && next.endDate && next.endTime) {
+          if (!isValidEndDateTime(next.startDate, next.startTime, next.endDate, next.endTime)) {
+            return prev;
+          }
+        }
       }
       return next;
     });
@@ -1097,11 +1262,18 @@ export default function TeacherActivitiesPage() {
   const handleEditFormChange = (field: keyof ActivityForm, value: string) => {
     setEditForm((prev) => {
       const next = { ...prev, [field]: value };
-      if (field === "dateTime" && next.endDateTime && !isValidEndDateTime(value, next.endDateTime)) {
-        next.endDateTime = "";
+      if (field === "startDate" || field === "startTime") {
+        if (next.endDate && next.endTime && !isValidEndDateTime(next.startDate, next.startTime, next.endDate, next.endTime)) {
+          next.endDate = "";
+          next.endTime = "";
+        }
       }
-      if (field === "endDateTime" && next.dateTime && value && !isValidEndDateTime(next.dateTime, value)) {
-        return prev;
+      if (field === "endDate" || field === "endTime") {
+        if (next.startDate && next.startTime && next.endDate && next.endTime) {
+          if (!isValidEndDateTime(next.startDate, next.startTime, next.endDate, next.endTime)) {
+            return prev;
+          }
+        }
       }
       return next;
     });
@@ -1135,6 +1307,14 @@ export default function TeacherActivitiesPage() {
   };
 
   const modalActivity = modalActivityId ? activities.find((a) => a.id === modalActivityId) : null;
+
+  // ===== ฟังก์ชันแปลง hours เป็นชั่วโมง:นาที =====
+  const formatActivityHours = (hours: number | null | undefined): string => {
+    if (hours === null || hours === undefined || hours === 0) return "";
+    const h = Math.floor(hours);
+    const m = Math.round((hours - h) * 60);
+    return formatHoursMinutes(h, m);
+  };
 
   return (
     <TeacherShell activePath="/teacher/activities">
@@ -1210,11 +1390,12 @@ export default function TeacherActivitiesPage() {
                               : ""}
                           </p>
                           {activity.hours ? (
-                            <p className="mt-1 text-[#1565C0]">{Number(activity.hours).toFixed(2)} ชั่วโมง</p>
+                            <p className="mt-1 text-[#1565C0]">{formatActivityHours(activity.hours)}</p>
                           ) : null}
                         </div>
                       </div>
-                      {!activity.hasEvaluation && (
+                      {/* แสดงปุ่มสร้าง/แก้ไขแบบประเมิน */}
+                      {!activity.hasEvaluation ? (
                         <p className="mt-3 flex items-center gap-1 text-[10px] text-red-500">
                           <FileWarning className="h-3 w-3" />
                           ยังไม่มีแบบประเมินความรู้
@@ -1226,6 +1407,14 @@ export default function TeacherActivitiesPage() {
                             สร้างแบบประเมิน
                           </button>
                         </p>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => setEditingEvaluationActivity(activity)}
+                          className="mt-3 text-xs text-[#1565C0] underline underline-offset-2 hover:text-[#0D47A1]"
+                        >
+                          แก้ไขแบบประเมิน
+                        </button>
                       )}
                       {activity.verificationCode && activity.confirmationEnabled && (
                         <p className="mt-2 flex items-center gap-2 text-xs text-emerald-600">
@@ -1245,8 +1434,8 @@ export default function TeacherActivitiesPage() {
                       <p className="mb-5 text-sm font-bold text-slate-950">ทักษะ:</p>
                       <div className="flex flex-col items-start gap-3">
                         {activity.skills.length > 0 ? (
-                          activity.skills.map((skill) => (
-                            <ActivityPill key={`${activity.id}-${skill.name}`} skill={skill} />
+                          activity.skills.map((skill, index) => (
+                            <ActivityPill key={`${activity.id}-${index}`} skill={skill} />
                           ))
                         ) : (
                           <span className="text-xs text-slate-400">ยังไม่ได้กำหนดทักษะ</span>
@@ -1364,7 +1553,24 @@ export default function TeacherActivitiesPage() {
         <EvaluationModal
           activity={evaluationActivity}
           onClose={() => setEvaluationActivity(null)}
-          onSave={saveEvaluation}
+          onSave={(updatedEvaluation) => {
+            saveEvaluation(updatedEvaluation, evaluationActivity.id);
+            setEvaluationActivity(null);
+          }}
+        />
+      )}
+
+      {/* Modal แก้ไขแบบประเมิน */}
+      {editingEvaluationActivity && (
+        <EvaluationModal
+          activity={editingEvaluationActivity}
+          initialQuestions={editingEvaluationActivity.evaluation}
+          isEditing={true}
+          onClose={() => setEditingEvaluationActivity(null)}
+          onSave={(updatedEvaluation) => {
+            saveEvaluation(updatedEvaluation, editingEvaluationActivity.id);
+            setEditingEvaluationActivity(null);
+          }}
         />
       )}
 
@@ -1417,7 +1623,7 @@ export default function TeacherActivitiesPage() {
                       <th className="px-4 py-3 text-left font-medium text-slate-500">ลำดับ</th>
                       <th className="px-4 py-3 text-left font-medium text-slate-500">รหัสนิสิต</th>
                       <th className="px-4 py-3 text-left font-medium text-slate-500">ชื่อ-นามสกุล</th>
-                      <th className="px-4 py-3 text-left font-medium text-slate-500">สาขา</th>
+                      <th className="px-4 py-3 text-left font-medium text-slate-500">หลักสูตร</th>
                       <th className="px-4 py-3 text-center font-medium text-slate-500">คะแนน</th>
                     </tr>
                   </thead>
@@ -1427,7 +1633,7 @@ export default function TeacherActivitiesPage() {
                         <td className="px-4 py-3 text-slate-500">{index + 1}</td>
                         <td className="px-4 py-3 font-medium text-slate-800">{p.studentId}</td>
                         <td className="px-4 py-3 text-slate-700">{`${p.firstname || ""} ${p.lastname || ""}`.trim()}</td>
-                        <td className="px-4 py-3 text-slate-500">{p.major || "-"}</td>
+                        <td className="px-4 py-3 text-slate-500">{p.program || "-"}</td>
                         <td className="px-4 py-3 text-center font-semibold text-[#1565C0]">
                           {p.score !== null && p.score !== undefined ? Number(p.score).toFixed(1) : "-"}
                         </td>
@@ -1470,7 +1676,8 @@ export default function TeacherActivitiesPage() {
           background: rgba(255, 255, 255, 0.38);
           box-shadow: 0 0 0 3px rgba(21, 101, 192, 0.1);
         }
-        .teacher-activity-input[type="datetime-local"]::-webkit-calendar-picker-indicator {
+        .teacher-activity-input[type="date"]::-webkit-calendar-picker-indicator,
+        .teacher-activity-input[type="time"]::-webkit-calendar-picker-indicator {
           filter: invert(0.4) sepia(1) hue-rotate(180deg);
         }
         .teacher-activity-input option {

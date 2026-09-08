@@ -2,12 +2,6 @@ import Image from "next/image";
 import Link from "next/link";
 import { LogIn, Menu, UserPlus } from "lucide-react";
 
-const navigationItems = [
-  { label: "หน้าแรก", href: "#" },
-  { label: "เกี่ยวกับระบบ", href: "#features" },
-  { label: "คำถามที่พบบ่อย", href: "#footer" },
-];
-
 // Navbar หลักของระบบ แสดงตรามหาวิทยาลัย เมนูนำทาง และปุ่มเข้าสู่ระบบ/สมัครสมาชิก
 export default function Navbar() {
   return (
@@ -29,22 +23,6 @@ export default function Navbar() {
             <p className="truncate text-xs text-slate-500">มหาวิทยาลัยทักษิณ</p>
           </div>
         </Link>
-
-        <div className="hidden items-center gap-8 lg:flex">
-          {navigationItems.map((item, index) => (
-            <Link
-              key={item.label}
-              href={item.href}
-              className={`text-sm font-medium transition hover:text-[#1565C0] ${
-                index === 0
-                  ? "border-b-2 border-[#1565C0] pb-2 text-[#1565C0]"
-                  : "text-slate-700"
-              }`}
-            >
-              {item.label}
-            </Link>
-          ))}
-        </div>
 
         <div className="hidden items-center gap-3 md:flex">
           <Link

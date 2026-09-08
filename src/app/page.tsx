@@ -2,7 +2,6 @@ import Footer from "@/components/layout/Footer";
 import Navbar from "@/components/layout/Navbar";
 import FeatureSection from "@/components/home/FeatureSection";
 import Hero from "@/components/home/Hero";
-import StatisticSection from "@/components/home/StatisticSection";
 import StepSection from "@/components/home/StepSection";
 
 export default function HomePage() {
@@ -12,7 +11,6 @@ export default function HomePage() {
       <Hero />
       <FeatureSection />
       <StepSection />
-      <StatisticSection />
       <Footer />
     </main>
   );

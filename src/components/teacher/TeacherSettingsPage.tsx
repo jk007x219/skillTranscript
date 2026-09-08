@@ -13,6 +13,7 @@ import {
   Loader2,
 } from "lucide-react";
 import TeacherShell from "@/components/teacher/TeacherShell";
+import { useAuth } from "@/context/auth-context";
 
 type TeacherProfile = {
   id: string;
@@ -28,6 +29,7 @@ type TeacherProfile = {
 };
 
 export default function TeacherSettingsPage() {
+  const { user, refreshUser, updateProfile } = useAuth();
   const { update } = useSession();
   const [profile, setProfile] = useState<TeacherProfile | null>(null);
   const [loading, setLoading] = useState(true);
@@ -112,12 +114,23 @@ export default function TeacherSettingsPage() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.message || "บันทึกไม่สำเร็จ");
+
+      // ✅ อัปเดต session ผ่าน next-auth
+      await update({
+        user: {
+          firstName: formData.firstName,
+          lastName: formData.lastName,
+          profileImageUrl: data.user?.profileImageUrl || previewUrl,
+        },
+      });
+
+      // ✅ อัปเดต AuthContext
+      await refreshUser();
+
+      // ✅ อัปเดตข้อมูลในหน้า
+      setProfile(data.user);
       setMessage("บันทึกข้อมูลเรียบร้อยแล้ว");
       setProfileImage(null);
-      // อัปเดต session เพื่อให้ header แสดงรูปใหม่
-      await update();
-      // อัปเดตข้อมูลในหน้า
-      setProfile(data.user);
     } catch (err) {
       setError(err instanceof Error ? err.message : "เกิดข้อผิดพลาด");
     } finally {

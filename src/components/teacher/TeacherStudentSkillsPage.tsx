@@ -17,10 +17,15 @@ import {
   Sparkles,
   Star,
   UsersRound,
+  X,
+  CalendarDays,
+  MapPin,
+  Clock,
 } from "lucide-react";
 import TeacherShell from "@/components/teacher/TeacherShell";
 import { useAuth } from "@/context/auth-context";
 
+// ===== Types =====
 type Student = {
   studentId: string;
   firstName: string;
@@ -30,6 +35,7 @@ type Student = {
   phone: string | null;
   faculty: string | null;
   major: string | null;
+  program: string | null;
   year: number | null;
 };
 
@@ -48,7 +54,7 @@ type SkillWithIcon = SkillData & {
   icon: React.ElementType;
 };
 
-// ===== จาก StudentDashboard =====
+// ===== ฟังก์ชันช่วยเหลือ =====
 const facultySkillNames = [
   "การสร้างนวัตกรรมสังคม",
   "การคิดเชิงออกแบบนวัตกรรม",
@@ -75,7 +81,7 @@ function getSkillIcon(title: string): React.ElementType {
   return Star;
 }
 
-// ===== RadarChart ===== (copy จาก StudentDashboard)
+// ===== Radar Chart =====
 function chartAngles(count: number) {
   return Array.from({ length: count }, (_, index) => -90 + (360 / count) * index);
 }
@@ -216,8 +222,8 @@ function RadarChart({
   );
 }
 
-// ===== ProgressList ===== (copy จาก StudentDashboard)
-function ProgressList({ items, accent }: { items: SkillWithIcon[]; accent: string }) {
+// ===== ProgressList (เพิ่ม onSkillClick) =====
+function ProgressList({ items, accent, onSkillClick }: { items: SkillWithIcon[]; accent: string; onSkillClick?: (skill: SkillWithIcon) => void }) {
   if (items.length === 0) {
     return (
       <div className="rounded-xl border border-blue-100 bg-blue-50/50 px-4 py-6 text-center text-sm text-slate-500">
@@ -231,7 +237,8 @@ function ProgressList({ items, accent }: { items: SkillWithIcon[]; accent: strin
       {items.map((item) => (
         <div
           key={item.skillId}
-          className="grid grid-cols-[36px_1fr_48px] items-center gap-3 rounded-lg border border-slate-100 bg-white/80 p-3 shadow-sm transition duration-300 hover:-translate-y-0.5 hover:border-blue-100 hover:shadow-md"
+          onClick={() => onSkillClick && onSkillClick(item)}
+          className="grid grid-cols-[36px_1fr_48px] items-center gap-3 rounded-lg border border-slate-100 bg-white/80 p-3 shadow-sm transition duration-300 hover:-translate-y-0.5 hover:border-blue-100 hover:shadow-md cursor-pointer"
         >
           <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-slate-50 ring-1 ring-slate-100">
             <item.icon className="h-5 w-5 text-slate-800" aria-hidden="true" />
@@ -259,19 +266,21 @@ function ProgressList({ items, accent }: { items: SkillWithIcon[]; accent: strin
   );
 }
 
-// ===== DashboardPanel ===== (copy จาก StudentDashboard)
+// ===== DashboardPanel (เพิ่ม onSkillClick) =====
 function DashboardPanel({
   title,
   subtitle,
   accent,
   items,
   chartId,
+  onSkillClick,
 }: {
   title: string;
   subtitle: string;
   accent: string;
   items: SkillWithIcon[];
   chartId: string;
+  onSkillClick?: (skill: SkillWithIcon) => void;
 }) {
   const average =
     items.length > 0 ? Math.round(items.reduce((total, item) => total + item.percent, 0) / items.length) : 0;
@@ -295,12 +304,137 @@ function DashboardPanel({
       </div>
       <div className="grid gap-6 p-5 lg:grid-cols-[0.9fr_1fr] lg:items-center">
         <RadarChart accent={accent} values={items.map((item) => item.percent)} labels={items.map((item) => item.skillName)} id={chartId} />
-        <ProgressList items={items} accent={accent} />
+        <ProgressList items={items} accent={accent} onSkillClick={onSkillClick} />
       </div>
     </section>
   );
 }
 
+// ===== Modal แสดงกิจกรรม =====
+function ActivityModal({
+  skill,
+  activities,
+  onClose,
+  loading,
+}: {
+  skill: SkillWithIcon | null;
+  activities: any[];
+  onClose: () => void;
+  loading: boolean;
+}) {
+  if (!skill) return null;
+
+  return (
+    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/40 px-4 backdrop-blur-sm">
+      <div className="relative max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-2xl bg-white p-6 shadow-2xl sm:p-8">
+        <button
+          type="button"
+          onClick={onClose}
+          className="absolute right-4 top-4 rounded-full p-2 text-slate-400 transition hover:bg-slate-100 hover:text-slate-600"
+        >
+          <X className="h-5 w-5" />
+        </button>
+
+        <div className="mb-5">
+          <div className="flex items-center gap-3">
+            <skill.icon className="h-6 w-6 text-[#1565C0]" />
+            <h2 className="text-2xl font-semibold text-slate-950">{skill.skillName}</h2>
+          </div>
+          <div className="mt-2 h-0.5 w-20 rounded-full bg-[#FFC107]" />
+          <p className="mt-2 text-sm text-slate-500">
+            กิจกรรมที่นิสิตเข้าร่วมและได้รับทักษะนี้ (คะแนน {skill.percent}%)
+          </p>
+        </div>
+
+        {loading ? (
+          <div className="flex items-center justify-center py-12">
+            <Loader2 className="h-8 w-8 animate-spin text-[#1565C0]" />
+            <span className="ml-3 text-slate-500">กำลังโหลดข้อมูล...</span>
+          </div>
+        ) : activities.length === 0 ? (
+          <div className="py-12 text-center text-slate-400">
+            <p>ยังไม่มีกิจกรรมที่เกี่ยวข้องกับทักษะนี้</p>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {activities.map((act, index) => (
+              <div
+                key={`${act.id}-${index}`}   // ✅ แก้ไข key ให้ไม่ซ้ำกัน
+                className="rounded-xl border border-blue-100 bg-white p-4 shadow-sm transition hover:shadow-md"
+              >
+                <h3 className="text-base font-semibold text-slate-950">{act.name}</h3>
+                <div className="mt-2 grid grid-cols-2 gap-x-4 gap-y-1 text-sm text-slate-600">
+                  <div className="flex items-center gap-2">
+                    <CalendarDays className="h-4 w-4 text-slate-400" />
+                    <span>
+                      {act.date
+                        ? new Date(act.date).toLocaleDateString("th-TH", {
+                            year: "numeric",
+                            month: "long",
+                            day: "numeric",
+                          })
+                        : "-"}
+                    </span>
+                  </div>
+                  {act.time && (
+                    <div className="flex items-center gap-2">
+                      <Clock className="h-4 w-4 text-slate-400" />
+                      <span>
+                        {new Date(`2000-01-01T${act.time}`).toLocaleTimeString("th-TH", {
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        })}
+                      </span>
+                    </div>
+                  )}
+                  {act.location && (
+                    <div className="flex items-center gap-2 col-span-2">
+                      <MapPin className="h-4 w-4 text-slate-400" />
+                      <span>{act.location}</span>
+                    </div>
+                  )}
+                  {act.organizer && (
+                    <div className="flex items-center gap-2 col-span-2">
+                      <span className="text-slate-400">ผู้จัด:</span>
+                      <span>{act.organizer}</span>
+                    </div>
+                  )}
+                  {act.hours !== null && act.hours !== undefined && (
+                    <div className="flex items-center gap-2">
+                      <span className="text-slate-400">ชั่วโมง:</span>
+                      <span>{Number(act.hours).toFixed(2)}</span>
+                    </div>
+                  )}
+                  {act.score !== null && act.score !== undefined && (
+                    <div className="flex items-center gap-2">
+                      <span className="text-slate-400">คะแนน:</span>
+                      <span className="font-semibold text-[#1565C0]">{Number(act.score).toFixed(1)}</span>
+                    </div>
+                  )}
+                </div>
+                {act.description && (
+                  <p className="mt-2 text-sm text-slate-500 border-t border-slate-100 pt-2">
+                    {act.description}
+                  </p>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+
+        <div className="mt-6 flex justify-end">
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-lg bg-[#1565C0] px-6 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-[#0D47A1]"
+          >
+            ปิด
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
 // ===== Main Component =====
 export default function TeacherStudentSkillsPage() {
   const params = useParams<{ studentId: string }>();
@@ -311,6 +445,12 @@ export default function TeacherStudentSkillsPage() {
   const [allSkills, setAllSkills] = useState<SkillData[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+
+  // State สำหรับ Modal
+  const [selectedSkill, setSelectedSkill] = useState<SkillWithIcon | null>(null);
+  const [skillActivities, setSkillActivities] = useState<any[]>([]);
+  const [loadingActivities, setLoadingActivities] = useState(false);
+  const [showModal, setShowModal] = useState(false);
 
   const studentId = Array.isArray(params.studentId)
     ? params.studentId[0]
@@ -376,7 +516,7 @@ export default function TeacherStudentSkillsPage() {
     }));
   }, [allSkills]);
 
-  // แยกทักษะตามหมวดหมู่ (แบบเดียวกับ StudentDashboard)
+  // แยกทักษะตามหมวดหมู่
   const { facultySkills, essentialSkills } = useMemo(() => {
     const faculty: SkillWithIcon[] = [];
     const essential: SkillWithIcon[] = [];
@@ -399,6 +539,37 @@ export default function TeacherStudentSkillsPage() {
     if (!student) return "";
     return student.firstName?.charAt(0) || student.name?.charAt(0) || "";
   }, [student]);
+
+  // ฟังก์ชันคลิกที่ทักษะ
+  const handleSkillClick = async (skill: SkillWithIcon) => {
+    setSelectedSkill(skill);
+    setShowModal(true);
+    setLoadingActivities(true);
+    setSkillActivities([]);
+
+    try {
+      const res = await fetch(
+        `/api/advisor/students/${studentId}/skills/${skill.skillId}/activities`
+      );
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.message || "ไม่สามารถโหลดกิจกรรมได้");
+      }
+      const data = await res.json();
+      setSkillActivities(data.activities || []);
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "เกิดข้อผิดพลาด");
+      setSkillActivities([]);
+    } finally {
+      setLoadingActivities(false);
+    }
+  };
+
+  const closeModal = () => {
+    setShowModal(false);
+    setSelectedSkill(null);
+    setSkillActivities([]);
+  };
 
   if (authLoading || loading) {
     return (
@@ -479,7 +650,11 @@ export default function TeacherStudentSkillsPage() {
                   {student.faculty || "-"}
                 </p>
                 <p>
-                  <span className="font-semibold text-slate-900">สาขา :</span>{" "}
+                  <span className="font-semibold text-slate-900">หลักสูตร :</span>{" "}
+                  {student.program || "-"}
+                </p>
+                <p>
+                  <span className="font-semibold text-slate-900">วิชาเอก :</span>{" "}
                   {student.major || "-"}
                 </p>
               </div>
@@ -531,6 +706,7 @@ export default function TeacherStudentSkillsPage() {
             accent="#FFC107"
             items={facultySkills}
             chartId="faculty-skill-chart"
+            onSkillClick={handleSkillClick}
           />
 
           <DashboardPanel
@@ -539,6 +715,7 @@ export default function TeacherStudentSkillsPage() {
             accent="#1565C0"
             items={essentialSkills}
             chartId="essential-skill-chart"
+            onSkillClick={handleSkillClick}
           />
 
           <div className="flex items-center gap-2 text-xs text-slate-400">
@@ -547,6 +724,16 @@ export default function TeacherStudentSkillsPage() {
           </div>
         </div>
       </section>
+
+      {/* Modal */}
+      {showModal && (
+        <ActivityModal
+          skill={selectedSkill}
+          activities={skillActivities}
+          onClose={closeModal}
+          loading={loadingActivities}
+        />
+      )}
     </TeacherShell>
   );
 }

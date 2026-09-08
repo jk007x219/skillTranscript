@@ -1,3 +1,4 @@
+// src/services/auth.ts
 import type { AuthResponse, RegisterPayload, StudentProfilePayload } from "@/types/auth";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "/api";

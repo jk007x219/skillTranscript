@@ -1,3 +1,4 @@
+// components/staff/StaffSettingsPage.tsx
 "use client";
 
 import { useEffect, useState } from "react";
@@ -109,12 +110,26 @@ export default function StaffSettingsPage() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.message || "บันทึกไม่สำเร็จ");
+      
       setMessage("บันทึกข้อมูลเรียบร้อยแล้ว");
       setProfileImage(null);
-      // อัปเดต session เพื่อให้ header แสดงรูปใหม่
-      await update();
-      // อัปเดตข้อมูลในหน้า
+      
+      // ✅ อัปเดตโปรไฟล์ใน state
       setProfile(data.user);
+      
+      // ✅ อัปเดต session ด้วยข้อมูลใหม่ เพื่อให้ Shell อัปเดตทันที
+      await update({ 
+        user: {
+          firstName: data.user.firstName,
+          lastName: data.user.lastName,
+          profileImageUrl: data.user.profileImageUrl,
+        } 
+      });
+      
+      // ✅ อัปเดต previewUrl ให้เป็นรูปใหม่
+      if (data.user.profileImageUrl) {
+        setPreviewUrl(data.user.profileImageUrl);
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "เกิดข้อผิดพลาด");
     } finally {

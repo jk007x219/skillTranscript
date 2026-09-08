@@ -9,7 +9,7 @@ services:
       MYSQL_USER: skilltranscript
       MYSQL_PASSWORD: skilltranscript
     ports:
-      - "3306:3306"
+      - "3386:3306"
     volumes:
       - mysql-data:/var/lib/mysql
     healthcheck:
@@ -19,30 +19,33 @@ services:
       retries: 10
       start_period: 20s
 
-  app:
-    image: node:20-alpine
-    container_name: skilltranscript-app
+  app_skilltranscript086:
+    image: arraya086/skilltranscript:v02
+    container_name: skilltranscript-app-086
     working_dir: /app
+
     depends_on:
       mysql:
         condition: service_healthy
+
+    env_file:
+      - .env
+
     environment:
       NODE_ENV: production
       PORT: 3000
-      NEXTAUTH_URL: http://localhost:3000
-      AUTH_SECRET: change-this-secret
+      NEXTAUTH_URL: http://miscis.scidi.tsu.ac.th:3086
+      AUTH_URL: http://miscis.scidi.tsu.ac.th:3086
+      AUTH_TRUST_HOST: "true"
+
       DB_HOST: mysql
       DB_PORT: 3306
       DB_USER: skilltranscript
       DB_PASSWORD: skilltranscript
       DB_NAME: skilltranscript
-    volumes:
-      - .:/app
-      - /app/node_modules
-    command: >
-      sh -lc "npm install && npm run build && npm run start -- --hostname 0.0.0.0 --port 3000"
+      WATCHPACK_POLLING: "true"
     ports:
-      - "3000:3000"
+      - "3086:3000"
     restart: unless-stopped
 
 volumes:

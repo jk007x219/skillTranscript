@@ -17,7 +17,8 @@ export async function GET(request: NextRequest, context: RouteContext) {
          s.studentId, 
          s.firstname, 
          s.lastname, 
-         s.major, 
+         s.major,
+         s.program,   -- ✅ เพิ่มหลักสูตร
          p.score
        FROM participation p
        JOIN students s ON p.studentId = s.studentId

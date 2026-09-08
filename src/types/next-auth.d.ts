@@ -13,6 +13,7 @@ declare module "next-auth" {
       major?: string | null;
       program?: string | null;
       year?: number | null;
+      admissionYear?: number | null;  // ✅ เพิ่ม
       phone?: string | null;
       status?: string;
       profileImageUrl?: string | null;
@@ -31,6 +32,7 @@ declare module "next-auth" {
     major?: string | null;
     program?: string | null;
     year?: number | null;
+    admissionYear?: number | null;  // ✅ เพิ่ม
     phone?: string | null;
     status?: string;
     profileImageUrl?: string | null;
@@ -51,6 +53,7 @@ declare module "next-auth/jwt" {
     major?: string | null;
     program?: string | null;
     year?: number | null;
+    admissionYear?: number | null;  // ✅ เพิ่ม
     phone?: string | null;
     status?: string;
     profileImageUrl?: string | null;

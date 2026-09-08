@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { pool } from "@/lib/db";
 import { jsonError, httpError } from "@/lib/api-error";
 import { nanoid } from "nanoid";
+import { auth } from "@/auth";
 
 function splitDateTime(value: string) {
   const [date, time] = value.split("T");
@@ -21,7 +22,9 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const visible = searchParams.get("visible") === "true";
     const studentId = searchParams.get("studentId");
-    const teacherId = searchParams.get("teacherId");
+    const session = await auth();
+    const role = session?.user?.role;
+    const isExecutive = Boolean(session?.user?.isExecutive);
 
     let query = `
       SELECT 
@@ -31,8 +34,8 @@ export async function GET(request: NextRequest) {
         a.confirmationEnabled, a.hasEvaluation, a.evaluation,
         a.verification_code, a.code_expires_at, a.createdBy, a.templateId,
         COUNT(p.ParticipationId) as attendeeCount,
-        sp.status as participationStatus,
-        sp.score as participationScore
+        MAX(sp.status) as participationStatus,
+        MAX(sp.score) as participationScore
       FROM activity a
       LEFT JOIN participation p ON a.activityId = p.activityId
       ${
@@ -49,9 +52,9 @@ export async function GET(request: NextRequest) {
 
     const conditions: string[] = [];
 
-    if (teacherId) {
+    if (role === "teacher" && !isExecutive && session?.user?.id) {
       conditions.push(`a.createdBy = ?`);
-      values.push(teacherId);
+      values.push(session.user.id);
     }
 
     if (visible) {
@@ -88,6 +91,7 @@ export async function GET(request: NextRequest) {
     (skills as any[]).forEach((skill) => {
       if (!skillMap[skill.activityId]) skillMap[skill.activityId] = [];
       skillMap[skill.activityId].push({
+        skillId: skill.skillId,
         name: skill.skillname,
         level: skill.level || "กลาง",
       });
@@ -127,6 +131,13 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
+    const session = await auth();
+    const role = session?.user?.role;
+    const isExecutive = Boolean(session?.user?.isExecutive);
+    if (!session?.user?.id || !["teacher", "officer", "executive"].includes(role || "") && !isExecutive) {
+      throw httpError(403, "ไม่มีสิทธิ์สร้างกิจกรรม");
+    }
+
     const body = await request.json();
 
     const {
@@ -138,7 +149,6 @@ export async function POST(request: NextRequest) {
       location,
       selectedSkills,
       organizer,
-      createdBy,
       templateId,
     } = body;
 
@@ -193,7 +203,7 @@ export async function POST(request: NextRequest) {
         location || "",
         organizer || "คณะวิทยาศาสตร์และนวัตกรรมดิจิทัล",
         term || "1",
-        createdBy || null,
+        session.user.id,
         finalTemplateId,
       ]
     );

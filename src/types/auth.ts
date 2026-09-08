@@ -196,3 +196,53 @@ export const {
     },
   },
 });
+
+// src/types/auth.ts
+export interface AuthUser {
+  id: string;
+  firstName: string;
+  lastName: string;
+  email: string;
+  role: 'student' | 'teacher' | 'officer' | 'executive';
+  studentId: string | null;
+  faculty: string | null;
+  major: string | null;
+  program: string | null;
+  year: number | null;
+  admissionYear: number | null;
+  phone: string | null;
+  status?: string;
+  profileImageUrl: string | null;
+  advisorNames: string[];
+  isExecutive: boolean;
+  mustChangePassword?: boolean;
+  position?: string | null;   // ✅ เพิ่ม position
+}
+
+export interface AuthResponse {
+  message?: string;
+  user: AuthUser;
+}
+
+export interface RegisterPayload {
+  firstName: string;
+  lastName: string;
+  studentId: string;
+  email: string;
+  major: string;
+  program: string;
+  admissionYear: number;
+  year: number;
+  phone: string;
+  password: string;
+  role: string;
+  advisorUserIds: string[];
+}
+
+export interface StudentProfilePayload {
+  firstName?: string;
+  lastName?: string;
+  year?: number;
+  phone?: string;
+  profileImage?: File | string;
+}

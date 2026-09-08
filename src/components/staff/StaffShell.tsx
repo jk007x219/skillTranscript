@@ -1,4 +1,4 @@
-// components/staff/StaffShell.tsx
+// components/staff/StaffShell.tsx (ลบปุ่มกระดิ่ง)
 "use client";
 
 import Image from "next/image";
@@ -7,7 +7,6 @@ import { useState } from "react";
 import type { ReactNode } from "react";
 import type { LucideIcon } from "lucide-react";
 import {
-  Bell,
   ChevronDown,
   Home,
   ClipboardCheck,
@@ -44,8 +43,6 @@ const sidebarLinks: SidebarLink[] = [
   },
   { href: "/staff/library", label: "คลังข้อมูลและแม่แบบ", icon: Database },
 ];
-
-const notificationCount = 3;
 
 function SidebarNav({
   activePath,
@@ -127,18 +124,7 @@ export default function StaffShell({
           </div>
 
           <div className="flex items-center gap-4">
-            <button
-              type="button"
-              aria-label="การแจ้งเตือน"
-              className="relative flex h-10 w-10 items-center justify-center rounded-full border border-blue-100 bg-white text-slate-700 shadow-sm transition hover:-translate-y-0.5 hover:bg-blue-50"
-            >
-              <Bell className="h-5 w-5" aria-hidden="true" />
-              {notificationCount > 0 && (
-                <span className="absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-[10px] font-semibold text-white ring-2 ring-white">
-                  {notificationCount}
-                </span>
-              )}
-            </button>
+            {/* ❌ ลบปุ่ม Bell ออกแล้ว */}
 
             <div className="group relative">
               <button
@@ -169,9 +155,9 @@ export default function StaffShell({
               </button>
 
               <div className="absolute right-0 top-full hidden w-44 overflow-hidden rounded-xl border border-blue-100 bg-white shadow-lg group-hover:block">
-<Link href="/staff/settings" className="block bg-[#FFC107] px-4 py-3 text-sm font-semibold text-slate-950">
-  ตั้งค่าโปรไฟล์
-</Link>
+                <Link href="/staff/settings" className="block bg-[#FFC107] px-4 py-3 text-sm font-semibold text-slate-950">
+                  ตั้งค่าโปรไฟล์
+                </Link>
                 <Link
                   href="/change-password"
                   className="flex items-center gap-2 px-4 py-3 text-sm text-slate-700 transition hover:bg-blue-50"

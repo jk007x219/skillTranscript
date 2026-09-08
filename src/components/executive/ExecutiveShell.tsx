@@ -1,4 +1,5 @@
-// components/executive/ExecutiveShell.tsx
+// components/executive/ExecutiveShell.tsx (ลบปุ่มกระดิ่ง)
+"use client";
 
 import Image from "next/image";
 import Link from "next/link";
@@ -6,7 +7,6 @@ import { useState } from "react";
 import type { ReactNode } from "react";
 import type { LucideIcon } from "lucide-react";
 import {
-  Bell,
   ChevronDown,
   LayoutDashboard,
   UsersRound,
@@ -96,13 +96,7 @@ export default function ExecutiveShell({
           </div>
 
           <div className="flex items-center gap-4">
-            <button
-              type="button"
-              aria-label="การแจ้งเตือน"
-              className="relative flex h-10 w-10 items-center justify-center rounded-full border border-blue-100 bg-white text-slate-700 shadow-sm transition hover:-translate-y-0.5 hover:bg-blue-50"
-            >
-              <Bell className="h-5 w-5" aria-hidden="true" />
-            </button>
+            {/* ❌ ลบปุ่ม Bell ออกแล้ว */}
 
             <div className="group relative">
               <button type="button" className="flex items-center gap-3 rounded-xl border border-transparent px-2 py-2 transition hover:border-blue-100 hover:bg-blue-50">
@@ -125,7 +119,6 @@ export default function ExecutiveShell({
               </button>
 
               <div className="absolute right-0 top-full hidden w-44 overflow-hidden rounded-xl border border-blue-100 bg-white shadow-lg group-hover:block">
-                {/* ✅ แก้ไข: เปลี่ยนจาก staff/settings เป็น teacher/settings */}
                 <Link href="/teacher/settings" className="block bg-[#FFC107] px-4 py-3 text-sm font-semibold text-slate-950">
                   ตั้งค่าโปรไฟล์
                 </Link>

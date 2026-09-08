@@ -1,13 +1,13 @@
-// components/student/StudentShell.tsx (เพิ่ม Banner และแก้ไข Avatar)
+// components/student/StudentShell.tsx
 "use client";
 
 import Image from "next/image";
 import Link from "next/link";
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import type { ReactNode } from "react";
 import type { LucideIcon } from "lucide-react";
 import {
-  Bell,
   BookOpenCheck,
   CalendarDays,
   ChevronDown,
@@ -20,6 +20,7 @@ import {
   User,
   AlertTriangle,
   Lock,
+  CheckCircle2,
 } from "lucide-react";
 import { useAuth } from "@/context/auth-context";
 
@@ -35,6 +36,27 @@ const sidebarLinks: SidebarLink[] = [
   { href: "/student/request-activity", label: "คำขอเพิ่มกิจกรรม", icon: ClipboardCheck },
   { href: "/student/request-status", label: "สถานะคำขอ", icon: BookOpenCheck },
 ];
+
+// ✅ Toast แจ้งเตือนแบบเดียวกับ AlertBanner ในหน้า RegisterPage
+// role="status" + aria-live="polite" เพราะเป็นข้อความ informational ไม่ใช่ error ที่ต้องขัดจังหวะ
+function LogoutToast({ message }: { message: string }) {
+  return (
+    <div
+      role="status"
+      aria-live="polite"
+      aria-atomic="true"
+      className="fixed right-4 top-24 z-[60] flex max-w-xs items-start gap-3 rounded-xl border border-emerald-200 bg-emerald-50 p-3 pr-2 text-emerald-700 shadow-lg animate-[fadeSlideIn_0.25s_ease-out] sm:right-6"
+    >
+      <span
+        className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-emerald-600"
+        aria-hidden="true"
+      >
+        <CheckCircle2 className="h-4 w-4" />
+      </span>
+      <p className="flex-1 text-sm leading-5">{message}</p>
+    </div>
+  );
+}
 
 function SidebarNav({
   activePath,
@@ -82,12 +104,26 @@ export default function StudentShell({
   children: ReactNode;
 }) {
   const { user, logout } = useAuth();
+  const router = useRouter();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [loggingOut, setLoggingOut] = useState(false);
   const displayName = user ? `${user.firstName} ${user.lastName}`.trim() : "นิสิต";
   const subtitle = user?.major || user?.faculty || "นิสิต";
 
+  // ✅ แสดง toast ก่อน แล้วค่อยออกจากระบบ+redirect หลังผ่านไปสักครู่
+  const handleLogout = () => {
+    if (loggingOut) return;
+    setLoggingOut(true);
+    setTimeout(() => {
+      logout();
+      router.push("/");
+    }, 800);
+  };
+
   return (
     <main className="min-h-screen bg-[radial-gradient(circle_at_top_left,rgba(255,193,7,0.16),transparent_28%),linear-gradient(135deg,#F8FAFC_0%,#EEF6FF_48%,#F8FAFC_100%)] text-slate-900">
+      {loggingOut && <LogoutToast message="กำลังออกจากระบบ..." />}
+
       <header className="sticky top-0 z-40 border-b border-blue-100/80 bg-white/90 shadow-sm backdrop-blur-xl">
         <div className="flex h-20 items-center justify-between px-4 sm:px-6 lg:px-8">
           <div className="flex min-w-0 items-center gap-3">
@@ -110,15 +146,6 @@ export default function StudentShell({
           </div>
 
           <div className="flex items-center gap-4">
-            <button
-              type="button"
-              aria-label="การแจ้งเตือน"
-              className="relative hidden h-10 w-10 items-center justify-center rounded-full border border-blue-100 bg-white text-slate-700 shadow-sm transition hover:-translate-y-0.5 hover:bg-blue-50 sm:flex"
-            >
-              <Bell className="h-5 w-5" aria-hidden="true" />
-              <span className="absolute right-2 top-2 h-2.5 w-2.5 rounded-full bg-red-500 ring-2 ring-white" />
-            </button>
-
             <div className="group relative">
               <button type="button" className="flex items-center gap-3 rounded-xl border border-transparent px-2 py-2 transition hover:border-blue-100 hover:bg-blue-50">
                 <div className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-full bg-slate-200 text-slate-600 shadow-sm">
@@ -147,17 +174,23 @@ export default function StudentShell({
                   <Lock className="h-4 w-4" />
                   เปลี่ยนรหัสผ่าน
                 </Link>
-                <Link href="/" onClick={logout} className="flex items-center gap-2 px-4 py-3 text-sm text-slate-700 transition hover:bg-blue-50">
+                {/* ✅ เปลี่ยนจาก Link เป็น button เพื่อคุมจังหวะแสดง toast ก่อน redirect */}
+                <button
+                  type="button"
+                  onClick={handleLogout}
+                  disabled={loggingOut}
+                  className="flex w-full items-center gap-2 px-4 py-3 text-left text-sm text-slate-700 transition hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-60"
+                >
                   <LogOut className="h-4 w-4" aria-hidden="true" />
                   ออกจากระบบ
-                </Link>
+                </button>
               </div>
             </div>
           </div>
         </div>
       </header>
 
-      {/* ✅ Banner แจ้งเตือนเปลี่ยนรหัสผ่าน */}
+      {/* Banner แจ้งเตือนเปลี่ยนรหัสผ่าน */}
       {user?.mustChangePassword && (
         <div className="bg-amber-50 border-b border-amber-200 px-4 py-2.5 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between max-w-7xl mx-auto">

@@ -1,3 +1,4 @@
+// app/api/students/[studentId]/skill-transcript/route.ts
 import { NextResponse } from "next/server";
 import type { RowDataPacket } from "mysql2";
 import { httpError, jsonError } from "@/lib/api-error";
@@ -35,6 +36,7 @@ type ActivityRow = RowDataPacket & {
   date: Date | string | null;
   joinDate: Date | string | null;
   skills: string | null;
+  score: number | string | null;  // ✅ เพิ่มคะแนน
 };
 
 function toNumber(value: unknown) {
@@ -44,8 +46,12 @@ function toNumber(value: unknown) {
 
 function formatThaiDate(value: Date | string | null) {
   if (!value) return "-";
+
   const date = value instanceof Date ? value : new Date(value);
-  if (Number.isNaN(date.getTime())) return "-";
+
+  if (Number.isNaN(date.getTime())) {
+    return "-";
+  }
 
   return new Intl.DateTimeFormat("th-TH", {
     day: "numeric",
@@ -58,10 +64,20 @@ function normalizeSkillName(name: string) {
   return name.replace(/^ทักษะ/, "").trim();
 }
 
-export async function GET(_request: Request, context: RouteContext) {
+export async function GET(
+  _request: Request,
+  context: RouteContext
+) {
   try {
     const { studentId } = await context.params;
 
+    if (!studentId) {
+      throw httpError(400, "ไม่พบรหัสนิสิต");
+    }
+
+    // =========================================================
+    // 1. ตรวจสอบว่านิสิตมีอยู่จริง
+    // =========================================================
     const [studentRows] = await pool.query<StudentRow[]>(
       `SELECT
          s.studentId,
@@ -73,94 +89,214 @@ export async function GET(_request: Request, context: RouteContext) {
          s.profileImageUrl,
          u.email
        FROM students s
-       INNER JOIN users u ON u.userId = s.userId
+       INNER JOIN users u
+         ON u.userId = s.userId
        WHERE s.studentId = ?`,
-      [studentId],
+      [studentId]
     );
 
     if (studentRows.length === 0) {
       throw httpError(404, "ไม่พบข้อมูลนิสิต");
     }
 
+    const student = studentRows[0];
+
+    // =========================================================
+    // 2. ดึงคะแนนทักษะ "เฉพาะนิสิตคนนี้"
+    // =========================================================
     const [skillRows] = await pool.query<SkillScoreRow[]>(
       `SELECT
          s.skillId,
          s.skillname AS skillName,
-         MAX(s.level) AS level,
-         COALESCE(SUM(CASE WHEN p.status = 'completed' THEN p.score ELSE 0 END), 0) AS earnedScore,
-         COALESCE(SUM(CASE
-           WHEN acs.ActivitySkillId IS NULL THEN 0
-           WHEN acs.level = 'พื้นฐาน' THEN 1
-           WHEN acs.level = 'สูง' THEN 3
-           ELSE 2
-         END), 0) AS maxPossibleScore
+
+         COALESCE(
+           GROUP_CONCAT(
+             DISTINCT COALESCE(acs.level, 'กลาง')
+             ORDER BY acs.level
+             SEPARATOR ','
+           ),
+           'กลาง'
+         ) AS level,
+
+         COALESCE(
+           SUM(ps.earnedScore),
+           0
+         ) AS earnedScore,
+
+         COALESCE(
+           SUM(ps.maxScore),
+           0
+         ) AS maxPossibleScore
+
        FROM skill s
-       LEFT JOIN activityskill acs ON acs.skillId = s.skillId
-       LEFT JOIN activity a ON a.activityId = acs.activityId
+
+       LEFT JOIN participation_skill ps
+         ON ps.skillName = s.skillname
+
        LEFT JOIN participation p
-         ON p.activityId = a.activityId
+         ON p.ParticipationId = ps.participationId
          AND p.studentId = ?
-       GROUP BY s.skillId, s.skillname
-       ORDER BY s.skillId`,
-      [studentId],
+         AND p.status = 'completed'
+
+       LEFT JOIN activityskill acs
+         ON acs.skillname = s.skillname
+         AND acs.activityId = p.activityId
+
+       WHERE
+         ps.participationId IS NULL
+         OR p.ParticipationId IS NOT NULL
+
+       GROUP BY
+         s.skillId,
+         s.skillname
+
+       ORDER BY
+         s.skillId`,
+      [studentId]
     );
 
+    // =========================================================
+    // 3. สร้างข้อมูลทักษะ
+    // =========================================================
+    const skills = skillRows.map((row) => {
+      const earnedScore = toNumber(row.earnedScore);
+      const maxPossibleScore = toNumber(row.maxPossibleScore);
+
+      const percent =
+        maxPossibleScore > 0
+          ? Math.round(
+              (earnedScore / maxPossibleScore) * 10000
+            ) / 100
+          : 0;
+
+      return {
+        skillId: row.skillId,
+
+        name: normalizeSkillName(
+          row.skillName || row.skillId
+        ),
+
+        level: row.level || "กลาง",
+
+        earnedScore,
+
+        maxPossibleScore,
+
+        percent: Math.min(
+          100,
+          Math.max(0, percent)
+        ),
+      };
+    });
+
+    // =========================================================
+    // 4. ดึงกิจกรรมของ "นิสิตคนนี้เท่านั้น" พร้อมคะแนน
+    // =========================================================
     const [activityRows] = await pool.query<ActivityRow[]>(
       `SELECT
          a.activityId,
          a.activityName,
          a.date,
          p.joinDate,
-         GROUP_CONCAT(CONCAT(acs.skillname, ': ', COALESCE(acs.level, 'กลาง')) ORDER BY acs.skillname SEPARATOR '||') AS skills
+         p.score,  -- ✅ เพิ่มคะแนน
+
+         GROUP_CONCAT(
+           CONCAT(
+             acs.skillname,
+             ': ',
+             COALESCE(acs.level, 'กลาง')
+           )
+           ORDER BY acs.skillname
+           SEPARATOR '||'
+         ) AS skills
+
        FROM participation p
-       INNER JOIN activity a ON a.activityId = p.activityId
-       LEFT JOIN activityskill acs ON acs.activityId = a.activityId
-       WHERE p.studentId = ? AND p.status = 'completed'
-       GROUP BY a.activityId, a.activityName, a.date, p.joinDate
-       ORDER BY COALESCE(p.joinDate, a.date) DESC, a.activityName ASC
+
+       INNER JOIN activity a
+         ON a.activityId = p.activityId
+
+       LEFT JOIN activityskill acs
+         ON acs.activityId = a.activityId
+
+       WHERE
+         p.studentId = ?
+         AND p.status = 'completed'
+
+       GROUP BY
+         a.activityId,
+         a.activityName,
+         a.date,
+         p.joinDate,
+         p.score
+
+       ORDER BY
+         COALESCE(p.joinDate, a.date) DESC,
+         a.activityName ASC
+
        LIMIT 9`,
-      [studentId],
+      [studentId]
     );
 
-    const skills = skillRows.map((row) => {
-      const maxPossibleScore = toNumber(row.maxPossibleScore);
-      const earnedScore = Math.min(toNumber(row.earnedScore), maxPossibleScore || toNumber(row.earnedScore));
-      const percent = maxPossibleScore > 0 ? Math.round((earnedScore / maxPossibleScore) * 100) : 0;
-
-      return {
-        skillId: row.skillId,
-        name: normalizeSkillName(row.skillName || row.skillId),
-        level: row.level || "กลาง",
-        earnedScore,
-        maxPossibleScore,
-        percent: Math.min(100, Math.max(0, percent)),
-      };
-    });
-
-    const student = studentRows[0];
-
+    // =========================================================
+    // 5. ส่งข้อมูลกลับ
+    // =========================================================
     return NextResponse.json({
       profile: {
-        name: `${student.firstname || ""} ${student.lastname || ""}`.trim() || student.studentId,
+        name:
+          `${student.firstname || ""} ${
+            student.lastname || ""
+          }`.trim() || student.studentId,
+
         nameEn: "",
+
         studentId: student.studentId,
-        faculty: cleanThaiText(student.faculty) || "-",
-        major: cleanThaiText(student.major) || "-",
-        email: student.email || "-",
-        phone: student.phone || "-",
-        profileImageUrl: student.profileImageUrl || null,
+
+        faculty:
+          cleanThaiText(student.faculty) || "-",
+
+        major:
+          cleanThaiText(student.major) || "-",
+
+        email:
+          student.email || "-",
+
+        phone:
+          student.phone || "-",
+
+        profileImageUrl:
+          student.profileImageUrl || null,
       },
+
       skills,
+
       activities: activityRows.map((row) => {
-        const skills = row.skills ? String(row.skills).split("||") : [];
+        const activitySkills = row.skills
+          ? String(row.skills).split("||")
+          : [];
+
         return {
           id: row.activityId,
-          name: row.activityName || "-",
-          detail: skills[0] || "",
-          detail2: skills[1] || "",
-          date: formatThaiDate(row.joinDate || row.date),
+
+          name:
+            row.activityName || "-",
+
+          detail:
+            activitySkills[0] || "",
+
+          detail2:
+            activitySkills[1] || "",
+
+          date:
+            formatThaiDate(
+              row.joinDate || row.date
+            ),
+
+          score: row.score !== null && row.score !== undefined
+            ? toNumber(row.score)
+            : null,  // ✅ ส่งคะแนนกลับไป
         };
       }),
+
       dateIssued: formatThaiDate(new Date()),
     });
   } catch (error) {

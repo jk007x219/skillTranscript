@@ -1,4 +1,4 @@
-// app/student/skill-transcript/page.tsx
+// components/student/SkillTranscriptPage.tsx
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
@@ -11,6 +11,8 @@ import {
   Home,
   Mail,
   Phone,
+  MapPin,
+  Building2,
 } from "lucide-react";
 import { useAuth } from "@/context/auth-context";
 
@@ -41,11 +43,20 @@ type TranscriptData = {
     detail: string;
     detail2: string;
     date: string;
+    score: number | null;
+    organizer: string | null;  // ✅ เพิ่มผู้จัด
+    location: string | null;   // ✅ เพิ่มสถานที่
   }[];
   dateIssued: string;
 };
 
-const facultySkillNames = [
+type DeanSettings = {
+  deanName: string;
+  deanSignatureUrl: string | null;
+};
+
+// ✅ รายชื่อทักษะที่นิสิตคณะวิทย์ต้องมี (6 ทักษะ)
+const FACULTY_SKILL_NAMES = [
   "การสร้างนวัตกรรมสังคม",
   "การคิดเชิงออกแบบนวัตกรรม",
   "การใช้ปัญญาประดิษฐ์",
@@ -54,8 +65,17 @@ const facultySkillNames = [
   "การใช้ห้องปฏิบัติการ",
 ];
 
+// ✅ รายชื่อทักษะที่จำเป็น (5 ทักษะ)
+const ESSENTIAL_SKILL_NAMES = [
+  "การสื่อสาร",
+  "การเป็นผู้ประกอบการ",
+  "การทำงานเป็นทีม",
+  "การคิดและการแก้ปัญหา",
+  "ดิจิทัล",
+];
+
 function isFacultySkill(name: string) {
-  return facultySkillNames.some((skillName) => name.includes(skillName));
+  return FACULTY_SKILL_NAMES.some((skillName) => name.includes(skillName));
 }
 
 function formatScore(value: number) {
@@ -70,14 +90,11 @@ type RadarItem = {
   score: number;
 };
 
-// Break a (space-less, Thai) label into up to 3 short lines so it fits
-// next to a radar chart spoke, mirroring the reference design.
 function wrapRadarLabel(label: string, maxCharsPerLine = 12): string[] {
   if (label.length <= maxCharsPerLine) return [label];
 
   const words = label.split(" ");
   if (words.length > 1) {
-    // has real word breaks — wrap on words
     const lines: string[] = [];
     let current = "";
     for (const w of words) {
@@ -93,7 +110,6 @@ function wrapRadarLabel(label: string, maxCharsPerLine = 12): string[] {
     return lines.slice(0, 3);
   }
 
-  // no spaces (typical Thai compound) — chunk by character count
   const lines: string[] = [];
   for (let i = 0; i < label.length; i += maxCharsPerLine) {
     lines.push(label.slice(i, i + maxCharsPerLine));
@@ -110,10 +126,10 @@ function RadarChartSVG({
   color: string;
   id: string;
 }) {
-  if (data.length < 3) {
+  if (data.length === 0) {
     return (
       <div className="flex h-[190px] items-center justify-center text-center text-[9px] leading-4 text-slate-400">
-        ยังไม่มีข้อมูลทักษะเพียงพอสำหรับกราฟ
+        ยังไม่มีข้อมูลทักษะในหมวดนี้
       </div>
     );
   }
@@ -197,7 +213,6 @@ function RadarChartSVG({
           strokeWidth="1.4"
         />
 
-        {/* score value, just outside the outer grid ring */}
         {data.map((item, i) => {
           const p = point(100, i, 10);
           return (
@@ -216,7 +231,6 @@ function RadarChartSVG({
           );
         })}
 
-        {/* category label, further out; wraps to multiple lines when long */}
         {data.map((item, i) => {
           const p = point(100, i, 35);
           const lines = wrapRadarLabel(item.skill, 34);
@@ -293,6 +307,33 @@ export default function SkillTranscriptPage() {
   const [transcript, setTranscript] = useState<TranscriptData | null>(null);
   const [isLoadingTranscript, setIsLoadingTranscript] = useState(false);
   const [error, setError] = useState("");
+  const [deanSettings, setDeanSettings] = useState<DeanSettings>({
+    deanName: "",
+    deanSignatureUrl: null,
+  });
+  const [isLoadingDean, setIsLoadingDean] = useState(true);
+
+  useEffect(() => {
+    const fetchDeanSettings = async () => {
+      try {
+        const res = await fetch("/api/staff/certificate-settings");
+        if (!res.ok) {
+          console.warn("ไม่สามารถโหลดข้อมูลคณบดี:", res.status);
+          setDeanSettings({ deanName: "", deanSignatureUrl: null });
+          return;
+        }
+        const data = await res.json();
+        setDeanSettings(data.settings || { deanName: "", deanSignatureUrl: null });
+      } catch (err) {
+        console.warn("โหลดข้อมูลคณบดีล้มเหลว:", err);
+        setDeanSettings({ deanName: "", deanSignatureUrl: null });
+      } finally {
+        setIsLoadingDean(false);
+      }
+    };
+
+    fetchDeanSettings();
+  }, []);
 
   useEffect(() => {
     if (!user?.studentId) {
@@ -327,19 +368,37 @@ export default function SkillTranscriptPage() {
   const data = useMemo(() => {
     if (!transcript) return null;
 
-    const facultySkills = transcript.skills.filter((skill) => isFacultySkill(skill.name));
-    const personalSkills = transcript.skills.filter((skill) => !isFacultySkill(skill.name));
+    const skillMap = new Map(
+      transcript.skills.map((skill) => [skill.name, skill])
+    );
+
+    const radarDigital = FACULTY_SKILL_NAMES.map((name) => {
+      const skill = skillMap.get(name);
+      return {
+        skill: name,
+        score: skill?.percent ?? 0,
+      };
+    });
+
+    const radarPersonal = ESSENTIAL_SKILL_NAMES.map((name) => {
+      const skill = skillMap.get(name);
+      return {
+        skill: name,
+        score: skill?.percent ?? 0,
+      };
+    });
+
+    const facultySkills = transcript.skills.filter((skill) =>
+      FACULTY_SKILL_NAMES.some((name) => skill.name.includes(name))
+    );
+    const personalSkills = transcript.skills.filter((skill) =>
+      ESSENTIAL_SKILL_NAMES.some((name) => skill.name.includes(name))
+    );
 
     return {
       ...transcript,
-      radarDigital: facultySkills.map((skill) => ({
-        skill: skill.name,
-        score: skill.percent,
-      })),
-      radarPersonal: personalSkills.map((skill) => ({
-        skill: skill.name,
-        score: skill.percent,
-      })),
+      radarDigital,
+      radarPersonal,
       skillsBars: facultySkills.map((skill) => ({
         name: skill.name,
         percent: skill.percent,
@@ -359,7 +418,7 @@ export default function SkillTranscriptPage() {
     window.print();
   };
 
-  if (authLoading || isLoadingTranscript) {
+  if (authLoading || isLoadingTranscript || isLoadingDean) {
     return (
       <div className="min-h-screen flex items-center justify-center text-sm text-slate-500">
         กำลังโหลดข้อมูล...
@@ -382,6 +441,9 @@ export default function SkillTranscriptPage() {
       </div>
     );
   }
+
+  const deanName = deanSettings.deanName || "";
+  const deanSignatureUrl = deanSettings.deanSignatureUrl;
 
   return (
     <>
@@ -592,12 +654,9 @@ export default function SkillTranscriptPage() {
 
         <div className="mobile-wrap">
           <main className="transcript-page">
-            {/* =================================================
-                HEADER
-            ================================================= */}
+            {/* HEADER */}
             <header className="transcript-header relative flex items-center justify-between border-b border-[#6d84a4]">
               <div className="w-[92px] flex items-center">
-                {/* เปลี่ยน path ให้ตรงกับ logo ใน public ของโปรเจกต์ */}
                 <img
                   src="/tsu-logo.png"
                   alt="TSU"
@@ -618,7 +677,6 @@ export default function SkillTranscriptPage() {
               </div>
 
               <div className="w-[110px] flex items-center justify-end">
-                {/* เปลี่ยน path ให้ตรงกับโลโก้คณะใน public ของโปรเจกต์ */}
                 <img
                   src="/faculty-logo.png"
                   alt="คณะวิทยาศาสตร์และนวัตกรรมดิจิทัล"
@@ -628,20 +686,15 @@ export default function SkillTranscriptPage() {
                   }}
                 />
               </div>
-
             </header>
 
-            {/* diamond divider */}
             <div className="h-[10px] flex items-center justify-center relative">
               <div className="absolute w-[130px] h-px bg-[#6d84a4]" />
               <div className="relative z-10 w-[7px] h-[7px] bg-[#203c63] rotate-45 border border-white" />
             </div>
 
-            {/* =================================================
-                TOP SECTION: PROFILE + 2 RADARS
-            ================================================= */}
+            {/* TOP SECTION: PROFILE + 2 RADARS */}
             <section className="top-grid">
-              {/* Profile */}
               <div className="transcript-card profile-card">
                 <div className="flex flex-col items-center">
                   <div className="w-[76px] h-[76px] rounded-full bg-[#d9dee7] border border-[#bfc6d1] relative overflow-hidden mt-[2px]">
@@ -700,38 +753,23 @@ export default function SkillTranscriptPage() {
                 </div>
               </div>
 
-              {/* Radar 1 */}
               <div className="transcript-card radar-card relative">
                 <h3 className="text-[8.5px] text-[#26364d] font-semibold leading-[11px] text-center min-h-[23px]">
                   ทักษะที่จำเป็นของนิสิตคณะวิทยาศาสตร์และนวัตกรรมดิจิทัล
                 </h3>
-
-                <RadarChartSVG
-                  data={data.radarDigital}
-                  color="#ffb329"
-                  id="digital"
-                />
+                <RadarChartSVG data={data.radarDigital} color="#ffb329" id="digital" />
               </div>
 
-              {/* Radar 2 */}
               <div className="transcript-card radar-card">
                 <h3 className="text-[8.5px] text-[#26364d] font-semibold leading-[11px] text-center min-h-[23px]">
                   ทักษะที่จำเป็นต้องมี
                 </h3>
-
-                <RadarChartSVG
-                  data={data.radarPersonal}
-                  color="#4592ee"
-                  id="personal"
-                />
+                <RadarChartSVG data={data.radarPersonal} color="#4592ee" id="personal" />
               </div>
             </section>
 
-            {/* =================================================
-                SKILLS SECTION
-            ================================================= */}
+            {/* SKILLS SECTION */}
             <section className="skills-grid">
-              {/* Left */}
               <div className="transcript-card skills-card">
                 <div className="flex items-center justify-between border-b border-[#e3e6eb] pb-[5px]">
                   <div className="flex items-center gap-[5px]">
@@ -764,7 +802,6 @@ export default function SkillTranscriptPage() {
                 </div>
               </div>
 
-              {/* Right */}
               <div className="transcript-card skills-card">
                 <div className="flex items-center justify-between border-b border-[#e3e6eb] pb-[5px]">
                   <div className="flex items-center gap-[5px]">
@@ -792,9 +829,7 @@ export default function SkillTranscriptPage() {
               </div>
             </section>
 
-            {/* =================================================
-                ACTIVITIES
-            ================================================= */}
+            {/* ACTIVITIES */}
             <section className="transcript-card activity-card">
               <div className="section-title">
                 <CalendarDays
@@ -809,15 +844,28 @@ export default function SkillTranscriptPage() {
               <div className="activity-grid">
                 {data.activities.length > 0 ? (
                   data.activities.map((activity) => (
-                    <div
-                      key={activity.id}
-                      className="activity-item"
-                    >
+                    <div key={activity.id} className="activity-item">
                       <h3 className="activity-title text-[#173b69] font-bold text-[8.2px] leading-[10px]">
                         {activity.name}
                       </h3>
 
-                      <p className="activity-detail text-[#555] text-[7.2px] leading-[9px] mt-[4px]">
+                      {/* ✅ ผู้จัด */}
+                      {activity.organizer && (
+                        <p className="text-[#555] text-[6.8px] leading-[8px] mt-[2px] flex items-center gap-1">
+                          <Building2 className="h-[8px] w-[8px] text-[#777]" />
+                          {activity.organizer}
+                        </p>
+                      )}
+
+                      {/* ✅ สถานที่ */}
+                      {activity.location && (
+                        <p className="text-[#555] text-[6.8px] leading-[8px] flex items-center gap-1">
+                          <MapPin className="h-[8px] w-[8px] text-[#777]" />
+                          {activity.location}
+                        </p>
+                      )}
+
+                      <p className="activity-detail text-[#555] text-[7.2px] leading-[9px] mt-[2px]">
                         {activity.detail || "-"}
                         {activity.detail2 && (
                           <>
@@ -826,6 +874,13 @@ export default function SkillTranscriptPage() {
                           </>
                         )}
                       </p>
+
+                      {/* ✅ คะแนน */}
+                      {activity.score !== null && activity.score !== undefined && (
+                        <p className="absolute bottom-[5px] left-[7px] text-[#173b69] text-[6.5px] font-medium">
+                          คะแนน: {activity.score.toFixed(2)}
+                        </p>
+                      )}
 
                       <p className="absolute bottom-[5px] right-[7px] text-[#777] text-[6.5px]">
                         {activity.date}
@@ -840,9 +895,7 @@ export default function SkillTranscriptPage() {
               </div>
             </section>
 
-            {/* =================================================
-                FOOTER
-            ================================================= */}
+            {/* FOOTER */}
             <footer className="mt-[7px] border-t-2 border-[#587596] pt-[5px] text-center">
               <div className="flex justify-center items-center gap-[6px]">
                 <CalendarDays size={12} className="text-[#173b69]" />
@@ -852,12 +905,29 @@ export default function SkillTranscriptPage() {
               </div>
 
               <div className="mt-[23px]">
-                <p className="text-[6.5px] text-[#173b69]">
-                  (ผศ.ดร.นพมาศ ปักเข็ม)
-                </p>
-                <p className="text-[6.5px] text-[#173b69] mt-[2px]">
-                  คณบดีคณะวิทยาศาสตร์และนวัตกรรมดิจิทัล
-                </p>
+                {deanName || deanSignatureUrl ? (
+                  <>
+                    {deanSignatureUrl && (
+                      <div className="flex justify-center mb-1">
+                        <img
+                          src={deanSignatureUrl}
+                          alt="ลายเซ็นคณบดี"
+                          className="h-12 w-auto object-contain"
+                        />
+                      </div>
+                    )}
+                    <p className="text-[6.5px] text-[#173b69]">
+                      {deanName ? `(${deanName})` : "(ยังไม่ระบุชื่อคณบดี)"}
+                    </p>
+                    <p className="text-[6.5px] text-[#173b69] mt-[2px]">
+                      คณบดีคณะวิทยาศาสตร์และนวัตกรรมดิจิทัล
+                    </p>
+                  </>
+                ) : (
+                  <p className="text-[6.5px] text-slate-400">
+                    (ยังไม่มีการตั้งค่าข้อมูลคณบดี)
+                  </p>
+                )}
               </div>
             </footer>
           </main>

@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { pool } from "@/lib/db";
 import { jsonError, httpError } from "@/lib/api-error";
 import { nanoid } from "nanoid";
+import { auth } from "@/auth";
 
 // helper: แยกวันที่และเวลาจาก datetime-local string
 function splitDateTime(value: string) {
@@ -118,7 +119,8 @@ export async function GET(
   }
 }
 
-// ========== PUT ==========
+// app/api/activities/[id]/route.ts (เฉพาะฟังก์ชัน PUT)
+
 export async function PUT(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -126,6 +128,24 @@ export async function PUT(
   const connection = await pool.getConnection();
   try {
     const { id } = await params;
+    const session = await auth();
+    const role = session?.user?.role;
+    const isExecutive = Boolean(session?.user?.isExecutive);
+    if (!session?.user?.id || !["teacher", "officer", "executive"].includes(role || "") && !isExecutive) {
+      throw httpError(403, "ไม่มีสิทธิ์แก้ไขกิจกรรม");
+    }
+
+    if (role === "teacher" && !isExecutive) {
+      const [rows] = await connection.query<any[]>(
+        "SELECT createdBy FROM activity WHERE activityId = ? LIMIT 1",
+        [id],
+      );
+      if (rows.length === 0) throw httpError(404, "ไม่พบกิจกรรม");
+      if (rows[0].createdBy !== session.user.id) {
+        throw httpError(403, "คุณแก้ไขได้เฉพาะกิจกรรมที่สร้างเอง");
+      }
+    }
+
     const body = await request.json();
 
     const {
@@ -149,12 +169,24 @@ export async function PUT(
     const values: any[] = [];
 
     const addUpdate = (field: string, value: any, transform?: (v: any) => any) => {
-      if (value !== undefined) {
+      if (value !== undefined && value !== null) {
         updates.push(`${field} = ?`);
         values.push(transform ? transform(value) : value);
+      } else if (value === null) {
+        updates.push(`${field} = ?`);
+        values.push(null);
       }
     };
 
+    // ✅ ฟังก์ชันแปลง ISO datetime เป็น MySQL datetime
+    const toMySQLDateTime = (date: string | Date | null): string | null => {
+      if (!date) return null;
+      const d = typeof date === 'string' ? new Date(date) : date;
+      if (isNaN(d.getTime())) return null;
+      return d.toISOString().slice(0, 19).replace('T', ' ');
+    };
+
+    // อัปเดตฟิลด์พื้นฐาน
     addUpdate("activityName", title);
     addUpdate("description", description);
     addUpdate("term", term);
@@ -162,6 +194,7 @@ export async function PUT(
     addUpdate("organizer", organizer);
     addUpdate("status", status);
 
+    // จัดการวันที่และเวลา
     if (dateTime !== undefined) {
       const start = splitDateTime(dateTime);
       addUpdate("date", start.date);
@@ -173,6 +206,7 @@ export async function PUT(
       addUpdate("endTime", finish.time);
     }
 
+    // คำนวณชั่วโมง (ถ้ามีทั้ง start และ end)
     if (dateTime !== undefined && endDateTime !== undefined) {
       const startDate = new Date(dateTime);
       const endDate = new Date(endDateTime);
@@ -182,20 +216,29 @@ export async function PUT(
       }
     }
 
-    if (confirmationEnabled !== undefined) {
-      addUpdate("confirmationEnabled", confirmationEnabled, (v: boolean) => (v ? 1 : 0));
-    }
-    if (hasEvaluation !== undefined) {
-      addUpdate("hasEvaluation", hasEvaluation, (v: boolean) => (v ? 1 : 0));
-    }
+    // อัปเดตสถานะการยืนยัน
+    addUpdate("confirmationEnabled", confirmationEnabled, (v: boolean) => (v ? 1 : 0));
+    addUpdate("hasEvaluation", hasEvaluation, (v: boolean) => (v ? 1 : 0));
+
+    // จัดการ evaluation: แปลงเป็น JSON พร้อม skillNames (array)
     if (evaluation !== undefined) {
-      addUpdate("evaluation", JSON.stringify(evaluation));
+      const evalData = evaluation.map((q: any) => ({
+        id: q.id,
+        question: q.question,
+        options: q.options,
+        correctAnswer: q.correctAnswer,
+        skillNames: q.skillNames || [],
+      }));
+      addUpdate("evaluation", JSON.stringify(evalData));
     }
-    if (verificationCode !== undefined) {
-      addUpdate("verification_code", verificationCode);
-    }
+
+    // ✅ อัปเดตรหัสยืนยันและวันหมดอายุ (แปลงวันที่ให้ MySQL ยอมรับ)
+    addUpdate("verification_code", verificationCode);
+
+    // แปลง codeExpiresAt จาก ISO string เป็น MySQL datetime
     if (codeExpiresAt !== undefined) {
-      addUpdate("code_expires_at", codeExpiresAt);
+      const mysqlDate = toMySQLDateTime(codeExpiresAt);
+      addUpdate("code_expires_at", mysqlDate);
     }
 
     if (updates.length === 0) {
@@ -204,10 +247,12 @@ export async function PUT(
 
     await connection.beginTransaction();
 
+    // อัปเดต activity
     values.push(id);
     const query = `UPDATE activity SET ${updates.join(", ")} WHERE activityId = ?`;
     await connection.query(query, values);
 
+    // จัดการทักษะที่เกี่ยวข้อง (ถ้ามีการส่ง selectedSkills มา)
     if (selectedSkills !== undefined && Array.isArray(selectedSkills)) {
       await connection.query("DELETE FROM activityskill WHERE activityId = ?", [id]);
 
@@ -228,6 +273,7 @@ export async function PUT(
 
     await connection.commit();
 
+    // ดึงข้อมูลที่อัปเดตแล้วเพื่อส่งกลับ
     const [updated] = await pool.query(
       `SELECT * FROM activity WHERE activityId = ?`,
       [id]
@@ -255,6 +301,7 @@ export async function PUT(
     });
   } catch (error) {
     await connection.rollback();
+    console.error("PUT Error:", error);
     return jsonError(error);
   } finally {
     connection.release();
@@ -269,14 +316,23 @@ export async function DELETE(
   const connection = await pool.getConnection();
   try {
     const { id } = await params;
+    const session = await auth();
+    const role = session?.user?.role;
+    const isExecutive = Boolean(session?.user?.isExecutive);
+    if (!session?.user?.id || !["teacher", "officer", "executive"].includes(role || "") && !isExecutive) {
+      throw httpError(403, "ไม่มีสิทธิ์ลบกิจกรรม");
+    }
 
     // ตรวจสอบว่ามีกิจกรรมนี้อยู่
     const [rows] = await pool.query(
-      "SELECT activityId FROM activity WHERE activityId = ?",
+      "SELECT activityId, createdBy FROM activity WHERE activityId = ?",
       [id]
     );
     if ((rows as any[]).length === 0) {
       throw httpError(404, "ไม่พบกิจกรรม");
+    }
+    if (role === "teacher" && !isExecutive && (rows as any[])[0].createdBy !== session.user.id) {
+      throw httpError(403, "คุณลบได้เฉพาะกิจกรรมที่สร้างเอง");
     }
 
     await connection.beginTransaction();

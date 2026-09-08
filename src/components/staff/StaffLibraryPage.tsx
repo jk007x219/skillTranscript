@@ -31,6 +31,11 @@ type Template = {
   updatedAt: Date;
 };
 
+type DeanSettings = {
+  deanName: string;
+  deanSignatureUrl: string | null;
+};
+
 export default function StaffLibraryPage() {
   const { user } = useAuth();
   const [templates, setTemplates] = useState<Template[]>([]);
@@ -40,6 +45,15 @@ export default function StaffLibraryPage() {
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [selectedTemplate, setSelectedTemplate] = useState<Template | null>(null);
   const [previewImage, setPreviewImage] = useState<string | null>(null);
+  const [deanSettings, setDeanSettings] = useState<DeanSettings>({
+    deanName: "",
+    deanSignatureUrl: null,
+  });
+  const [deanName, setDeanName] = useState("");
+  const [deanSignature, setDeanSignature] = useState<File | null>(null);
+  const [deanSignaturePreview, setDeanSignaturePreview] = useState<string | null>(null);
+  const [removeDeanSignature, setRemoveDeanSignature] = useState(false);
+  const [isSavingDean, setIsSavingDean] = useState(false);
 
   // ฟอร์มเพิ่ม
   const [form, setForm] = useState({
@@ -74,9 +88,76 @@ export default function StaffLibraryPage() {
     }
   }, []);
 
+  const fetchDeanSettings = useCallback(async () => {
+    try {
+      const res = await fetch("/api/staff/certificate-settings");
+      if (!res.ok) throw new Error("ไม่สามารถโหลดข้อมูลคณบดี");
+      const data = await res.json();
+      const settings = data.settings as DeanSettings;
+      setDeanSettings(settings);
+      setDeanName(settings.deanName || "");
+      setDeanSignaturePreview(settings.deanSignatureUrl || null);
+      setRemoveDeanSignature(false);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "เกิดข้อผิดพลาด");
+    }
+  }, []);
+
   useEffect(() => {
     fetchTemplates();
-  }, [fetchTemplates]);
+    fetchDeanSettings();
+  }, [fetchDeanSettings, fetchTemplates]);
+
+  const handleDeanSignatureChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith("image/")) {
+      alert("กรุณาเลือกไฟล์รูปภาพลายเซ็นเท่านั้น");
+      return;
+    }
+    if (file.size > 2 * 1024 * 1024) {
+      alert("ไฟล์ลายเซ็นต้องมีขนาดไม่เกิน 2 MB");
+      return;
+    }
+
+    setDeanSignature(file);
+    setDeanSignaturePreview(URL.createObjectURL(file));
+    setRemoveDeanSignature(false);
+  };
+
+  const handleSaveDeanSettings = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!deanName.trim()) {
+      alert("กรุณากรอกชื่อคณบดี");
+      return;
+    }
+
+    setIsSavingDean(true);
+    try {
+      const formData = new FormData();
+      formData.append("deanName", deanName.trim());
+      if (deanSignature) formData.append("signature", deanSignature);
+      if (removeDeanSignature) formData.append("removeSignature", "true");
+
+      const res = await fetch("/api/staff/certificate-settings", {
+        method: "PUT",
+        body: formData,
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || "บันทึกข้อมูลคณบดีไม่สำเร็จ");
+
+      setDeanSettings(data.settings);
+      setDeanName(data.settings.deanName || "");
+      setDeanSignature(null);
+      setDeanSignaturePreview(data.settings.deanSignatureUrl || null);
+      setRemoveDeanSignature(false);
+      alert("บันทึกข้อมูลคณบดีเรียบร้อยแล้ว");
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "เกิดข้อผิดพลาด");
+    } finally {
+      setIsSavingDean(false);
+    }
+  };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -231,6 +312,79 @@ export default function StaffLibraryPage() {
               เพิ่มแม่แบบ
             </button>
           </div>
+
+          <form onSubmit={handleSaveDeanSettings} className="mt-8 border-y border-blue-100 py-6">
+            <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_280px] lg:items-end">
+              <div>
+                <div className="flex items-center gap-2">
+                  <ImageIcon className="h-5 w-5 text-[#1565C0]" aria-hidden="true" />
+                  <h2 className="text-lg font-semibold text-slate-950">ข้อมูลคณบดีสำหรับใบรับรอง</h2>
+                </div>
+                <p className="mt-1 text-sm text-slate-500">
+                  ชื่อและลายเซ็นนี้จะแสดงในใบรับรองที่ผู้รับดาวน์โหลด
+                </p>
+                <label htmlFor="dean-name" className="mt-4 block text-sm font-medium text-slate-700">
+                  ชื่อคณบดี
+                </label>
+                <input
+                  id="dean-name"
+                  value={deanName}
+                  onChange={(event) => setDeanName(event.target.value)}
+                  placeholder="เช่น ผศ.ดร.นพมาศ ปักเข็ม"
+                  className="mt-1.5 h-11 w-full max-w-xl rounded-lg border border-blue-200 bg-white px-3 text-sm outline-none transition focus:border-[#1565C0] focus:ring-4 focus:ring-blue-100"
+                />
+              </div>
+
+              <div className="border-l-0 border-blue-100 lg:border-l lg:pl-6">
+                <p className="text-sm font-medium text-slate-700">ลายเซ็นคณบดี</p>
+                <div className="mt-2 flex items-center gap-3">
+                  <div className="flex h-16 w-28 items-center justify-center overflow-hidden border-b border-slate-300 bg-slate-50">
+                    {deanSignaturePreview && !removeDeanSignature ? (
+                      <img src={deanSignaturePreview} alt="ลายเซ็นคณบดี" className="h-full w-full object-contain" />
+                    ) : (
+                      <span className="text-xs text-slate-400">ยังไม่มีลายเซ็น</span>
+                    )}
+                  </div>
+                  <div className="flex flex-col gap-1.5">
+                    <label htmlFor="dean-signature" className="cursor-pointer text-sm font-medium text-[#1565C0] hover:text-[#0D47A1]">
+                      เลือกรูปลายเซ็น
+                    </label>
+                    <input
+                      id="dean-signature"
+                      type="file"
+                      accept="image/png,image/jpeg,image/webp"
+                      onChange={handleDeanSignatureChange}
+                      className="sr-only"
+                    />
+                    <span className="text-xs text-slate-400">PNG, JPG หรือ WEBP ไม่เกิน 2 MB</span>
+                    {(deanSettings.deanSignatureUrl || deanSignaturePreview) && !removeDeanSignature && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setDeanSignature(null);
+                          setDeanSignaturePreview(null);
+                          setRemoveDeanSignature(true);
+                        }}
+                        className="w-fit text-xs font-medium text-red-600 hover:text-red-700"
+                      >
+                        ลบลายเซ็น
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div className="mt-5 flex justify-end">
+              <button
+                type="submit"
+                disabled={isSavingDean}
+                className="inline-flex h-10 items-center gap-2 rounded-lg bg-[#1565C0] px-4 text-sm font-semibold text-white shadow-sm transition hover:bg-[#0D47A1] disabled:opacity-50"
+              >
+                {isSavingDean ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle className="h-4 w-4" />}
+                บันทึกข้อมูลคณบดี
+              </button>
+            </div>
+          </form>
 
           {/* Error */}
           {error && (

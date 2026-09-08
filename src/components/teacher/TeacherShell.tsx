@@ -1,4 +1,4 @@
-// components/teacher/TeacherShell.tsx
+// components/teacher/TeacherShell.tsx (ลบปุ่มกระดิ่ง)
 "use client";
 
 import Image from "next/image";
@@ -7,7 +7,6 @@ import { useState } from "react";
 import type { ReactNode } from "react";
 import type { LucideIcon } from "lucide-react";
 import {
-  Bell,
   ChevronDown,
   Home,
   ClipboardCheck,
@@ -104,13 +103,7 @@ export default function TeacherShell({
           </div>
 
           <div className="flex items-center gap-4">
-            <button
-              type="button"
-              aria-label="การแจ้งเตือน"
-              className="relative flex h-10 w-10 items-center justify-center rounded-full border border-blue-100 bg-white text-slate-700 shadow-sm transition hover:-translate-y-0.5 hover:bg-blue-50"
-            >
-              <Bell className="h-5 w-5" aria-hidden="true" />
-            </button>
+            {/* ❌ ลบปุ่ม Bell ออกแล้ว */}
 
             <div className="group relative">
               <button type="button" className="flex items-center gap-3 rounded-xl border border-transparent px-2 py-2 transition hover:border-blue-100 hover:bg-blue-50">

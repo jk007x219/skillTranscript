@@ -1,6 +1,7 @@
 import Image from "next/image";
 import Link from "next/link";
-import { Facebook, Instagram, Mail, MapPin, Phone, Youtube } from "lucide-react";
+import { Facebook, Mail, MapPin, Phone,Chrome, } from "lucide-react";
+import Google from "next-auth/providers/google";
 
 const footerMenus = ["หน้าแรก", "เกี่ยวกับระบบ", "คำถามที่พบบ่อย"];
 const supportMenus = ["คู่มือการใช้งาน", "คำถามที่พบบ่อย"];
@@ -22,31 +23,6 @@ export default function Footer() {
           </div>
         </div>
 
-        <div>
-          <h3 className="mb-4 text-sm font-semibold text-slate-950">เมนูหลัก</h3>
-          <ul className="space-y-2 text-sm text-slate-600">
-            {footerMenus.map((item) => (
-              <li key={item}>
-                <Link href="#" className="transition hover:text-[#1565C0]">
-                  {item}
-                </Link>
-              </li>
-            ))}
-          </ul>
-        </div>
-
-        <div>
-          <h3 className="mb-4 text-sm font-semibold text-slate-950">ช่วยเหลือ</h3>
-          <ul className="space-y-2 text-sm text-slate-600">
-            {supportMenus.map((item) => (
-              <li key={item}>
-                <Link href="#" className="transition hover:text-[#1565C0]">
-                  {item}
-                </Link>
-              </li>
-            ))}
-          </ul>
-        </div>
 
         <div>
           <h3 className="mb-4 text-sm font-semibold text-slate-950">ติดต่อเรา</h3>
@@ -65,16 +41,24 @@ export default function Footer() {
         <div>
           <h3 className="mb-4 text-sm font-semibold text-slate-950">ติดตามข่าวสาร</h3>
           <div className="flex items-center gap-3">
-            {[Facebook, Instagram, Youtube].map((Icon, index) => (
-              <Link
-                key={index}
-                href="#"
-                aria-label="Social Media"
-                className="flex h-9 w-9 items-center justify-center rounded-full bg-[#1565C0] text-white shadow-md transition hover:bg-blue-700"
-              >
-                <Icon className="h-4 w-4" aria-hidden="true" />
-              </Link>
-            ))}
+            {/* Facebook */}
+            <Link
+              href="https://www.facebook.com/scidi.tsu/?locale=th_TH"
+              aria-label="Facebook"
+              className="flex h-9 w-9 items-center justify-center rounded-full bg-[#1565C0] text-white shadow-md transition hover:bg-blue-700"
+            >
+              <Facebook className="h-4 w-4" aria-hidden="true" />
+            </Link>
+            {/* Google */}
+            <Link
+              href="https://scidi.tsu.ac.th/"
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label="SCIDI Website"
+              className="flex h-9 w-9 items-center justify-center rounded-full bg-[#1565C0] text-white shadow-md transition hover:bg-blue-700"
+            >
+              <Chrome className="h-4 w-4" aria-hidden="true" />
+            </Link>
           </div>
         </div>
       </div>

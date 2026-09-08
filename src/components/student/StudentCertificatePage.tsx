@@ -3,29 +3,38 @@
 
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { ArrowLeft, Loader2, Download, Printer } from "lucide-react";
+import {
+  ArrowLeft,
+  Loader2,
+  Download,
+  Printer,
+} from "lucide-react";
 import StudentShell from "@/components/student/StudentShell";
 import { useAuth } from "@/context/auth-context";
 
-type CertificateData = {
-  studentName: string;
-  activityName: string;
-  date: string | null;
-  time: string | null;
-  endDate: string | null;
-  endTime: string | null;
-  hours: number;
-  organizer: string;
-  templateImageUrl: string;
-  templateName: string;
-  score?: number;
+type Skill = {
+  name: string;
+  level: string;
 };
 
-function formatThaiDate(value?: string | null) {
+type CertificateData = {
+  studentName: string;
+  skills: Skill[];
+  certifiedDate: string | null;
+  signerName: string;
+  deanSignatureUrl: string | null;
+  templateImageUrl: string;
+  templateName: string;
+};
+
+// ============================================================
+// ✅ ฟังก์ชันจัดรูปแบบวันที่ รองรับ null, undefined
+// ============================================================
+
+function formatThaiDate(value: string | null | undefined): string {
   if (!value) return "-";
   const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "-";
-
+  if (isNaN(date.getTime())) return "-";
   return date.toLocaleDateString("th-TH", {
     year: "numeric",
     month: "long",
@@ -33,40 +42,111 @@ function formatThaiDate(value?: string | null) {
   });
 }
 
-function formatThaiTime(value?: string | null) {
-  if (!value) return "";
-  const date = new Date(`2000-01-01T${String(value).slice(0, 5)}`);
-  if (Number.isNaN(date.getTime())) return "";
+// ============================================================
+// Certificate Preview Component
+// ============================================================
 
-  return date.toLocaleTimeString("th-TH", {
-    hour: "2-digit",
-    minute: "2-digit",
-  });
+function CertificatePreview({ certificate }: { certificate: CertificateData }) {
+  return (
+    <div
+      id="certificate-preview"
+      className="
+        relative
+        mx-auto
+        w-full
+        max-w-[1100px]
+        overflow-hidden
+        bg-white
+        shadow-xl
+        print:shadow-none
+      "
+      style={{ aspectRatio: "1.414 / 1" }}
+    >
+      {/* Template Background */}
+      <img
+        src={certificate.templateImageUrl}
+        alt={certificate.templateName}
+        className="absolute inset-0 h-full w-full object-cover"
+        onError={(e) => {
+          const target = e.currentTarget;
+          if (!target.src.endsWith("/certificate-placeholder.png")) {
+            target.src = "/certificate-placeholder.png";
+          }
+        }}
+      />
+
+      <div className="absolute left-1/2 top-[6%] -translate-x-1/2">
+        <img
+          src="/tsu-logo.png"
+          alt="TSU Logo"
+          className="h-14 w-auto object-contain"
+        />
+      </div>
+
+      <div className="absolute left-[10%] right-[10%] top-[20%] text-center text-[#173F70]">
+        <p className="text-[18px] font-bold sm:text-2xl">ใบรับรองทักษะ</p>
+        <p className="mt-1 text-[8px] font-medium sm:text-xs">คณะวิทยาศาสตร์และนวัตกรรมดิจิทัล มหาวิทยาลัยทักษิณ</p>
+      </div>
+
+      <div className="absolute left-[15%] right-[15%] top-[38%] text-center text-[#24466D]">
+        <p className="text-[10px] font-medium sm:text-sm">ขอรับรองว่า</p>
+      </div>
+
+      <div className="absolute left-[15%] right-[15%] top-[44%] flex justify-center">
+        <div className="rounded-md bg-white/85 px-4 py-1 text-center text-[21px] font-bold leading-tight text-[#173F70] sm:text-3xl md:text-4xl">
+          {certificate.studentName || "-"}
+        </div>
+      </div>
+
+      <div className="absolute left-[14%] right-[14%] top-[56%] text-center text-[#24466D]">
+        <p className="text-[9px] font-medium sm:text-sm">ได้รับทักษะการรับรองทักษะ</p>
+        <div className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1.5 rounded-md bg-white/80 px-3 py-2 sm:grid-cols-3">
+          {certificate.skills.map((skill) => (
+            <p key={`${skill.name}-${skill.level}`} className="text-[7px] font-medium leading-tight text-[#173F70] sm:text-[10px]">
+              {skill.name} <span className="text-slate-600">ระดับ{skill.level}</span>
+            </p>
+          ))}
+        </div>
+      </div>
+
+      {/* วันที่รับรอง */}
+      <div className="absolute left-[28%] right-[28%] top-[77%] text-center text-[10px] font-medium text-[#24466D] sm:text-sm">
+        ให้ไว้ ณ วันที่&nbsp;
+        {formatThaiDate(certificate.certifiedDate)}
+      </div>
+
+      <div className="absolute bottom-[7%] left-1/2 w-[34%] -translate-x-1/2 text-center">
+        {certificate.deanSignatureUrl && (
+          <img
+            src={certificate.deanSignatureUrl}
+            alt="ลายเซ็นคณบดี"
+            className="mx-auto mb-[-2px] h-10 max-w-full object-contain"
+          />
+        )}
+        <div className="mb-2 border-t border-[#24466D]" />
+        <p className="text-[8px] font-medium text-[#24466D] sm:text-xs">
+          ( {certificate.signerName || "-"} )
+        </p>
+        <p className="mt-1 text-[7px] leading-tight text-[#24466D] sm:text-[10px]">
+          คณบดีคณะวิทยาศาสตร์และนวัตกรรมดิจิทัล
+          <br />
+          มหาวิทยาลัยทักษิณ
+        </p>
+      </div>
+
+    </div>
+  );
 }
 
-function formatThaiDateTimeRange(certificate: CertificateData) {
-  const startDate = formatThaiDate(certificate.date);
-  const startTime = formatThaiTime(certificate.time);
-  const endDate = formatThaiDate(certificate.endDate);
-  const endTime = formatThaiTime(certificate.endTime);
-
-  if (!startTime && !endTime) {
-    return certificate.endDate && certificate.endDate !== certificate.date
-      ? `${startDate} - ${endDate}`
-      : startDate;
-  }
-
-  if (certificate.endDate && certificate.endDate !== certificate.date) {
-    return `${startDate} เวลา ${startTime || "-"} น. - ${endDate} เวลา ${endTime || "-"} น.`;
-  }
-
-  return `${startDate} เวลา ${startTime || "-"}${endTime ? ` - ${endTime}` : ""} น.`;
-}
+// ============================================================
+// Main Page Component
+// ============================================================
 
 export default function StudentCertificatePage() {
   const params = useParams();
   const router = useRouter();
   const { user } = useAuth();
+
   const activityId = params.activityId as string;
 
   const [loading, setLoading] = useState(true);
@@ -76,34 +156,69 @@ export default function StudentCertificatePage() {
   useEffect(() => {
     if (!user?.studentId) return;
 
-    const fetchData = async () => {
+    const fetchCertificate = async () => {
       try {
         setLoading(true);
-        // ดึงข้อมูลกิจกรรมและข้อมูลนิสิต
-        const res = await fetch(`/api/activities/${activityId}?studentId=${user.studentId}`);
-        if (!res.ok) throw new Error("ไม่สามารถโหลดข้อมูลกิจกรรม");
-        const data = await res.json();
+        setError("");
 
-        // ตรวจสอบว่านิสิตเข้าร่วมกิจกรรมนี้แล้ว
-        if (!data.participationStatus || data.participationStatus !== "completed") {
-          throw new Error("คุณยังไม่ได้เข้าร่วมกิจกรรมนี้");
+const studentId = user.studentId;
+if (!studentId) return;
+
+const res = await fetch(
+  `/api/activities/${activityId}/certificate?studentId=${encodeURIComponent(studentId)}`
+);
+
+        if (!res.ok) {
+          const errorData = await res.json().catch(() => ({}));
+          throw new Error(errorData.message || "ไม่สามารถโหลดใบรับรองได้");
         }
 
-        setCertificate({
-          studentName: `${user.firstName} ${user.lastName}`,
-          activityName: data.title,
-          date: data.date || null,
-          time: data.time || null,
-          endDate: data.endDate || null,
-          endTime: data.endTime || null,
-          hours: data.hours || 0,
-          organizer: data.organizer || "-",
-          templateImageUrl: data.template?.imageUrl || "/certificate-placeholder.png",
-          templateName: data.template?.name || "แม่แบบมาตรฐาน",
-          score: data.participationScore || undefined,
-        });
+        const data = await res.json();
 
-        setError("");
+        if (data.participationStatus && data.participationStatus !== "completed") {
+          throw new Error("คุณยังไม่ได้รับการรับรองทักษะนี้");
+        }
+
+        const skills: Skill[] = Array.isArray(data.skills) ? data.skills : [];
+
+        const certifiedDate =
+          data.certifiedDate ||
+          data.certificateDate ||
+          data.completedAt ||
+          data.issuedDate ||
+          data.date ||
+          null;
+
+        const signerName =
+          data.signerName ||
+          data.deanName ||
+          data.certificate?.signerName ||
+          "ผศ.ดร.นพมาศ ปักเข็ม";
+
+        const studentName =
+          data.studentName ||
+          `${user.firstName || ""} ${user.lastName || ""}`.trim();
+
+        const templateImageUrl =
+          data.imageUrl ||
+          data.template?.imageUrl ||
+          data.templateImageUrl ||
+          "/certificate-placeholder.png";
+
+        const templateName =
+          data.templateName ||
+          data.template?.name ||
+          "ใบรับรองทักษะ";
+
+        setCertificate({
+          studentName,
+          skills,
+          certifiedDate,
+          signerName,
+          deanSignatureUrl: data.deanSignatureUrl || null,
+          templateImageUrl,
+          templateName,
+        });
       } catch (err) {
         setError(err instanceof Error ? err.message : "เกิดข้อผิดพลาด");
       } finally {
@@ -111,16 +226,36 @@ export default function StudentCertificatePage() {
       }
     };
 
-    fetchData();
-  }, [activityId, user]);
+    fetchCertificate();
+  }, [activityId, user?.studentId]);
 
-  const handlePrint = () => {
-    window.print();
-  };
+  const handlePrint = () => window.print();
 
-  const handleDownload = () => {
-    // ใช้ html2canvas หรือ window.print เพื่อบันทึกเป็น PDF
-    alert("ฟังก์ชันดาวน์โหลดกำลังพัฒนา (ใช้ Print to PDF แทน)");
+  const handleDownload = async () => {
+    try {
+      const element = document.getElementById("certificate-preview");
+      if (!element) {
+        alert("ไม่พบใบรับรองสำหรับดาวน์โหลด");
+        return;
+      }
+
+      const html2canvas = (await import("html2canvas")).default;
+      const canvas = await html2canvas(element, {
+        scale: 3,
+        useCORS: true,
+        allowTaint: false,
+        backgroundColor: "#ffffff",
+        logging: false,
+      });
+
+      const link = document.createElement("a");
+      link.download = `ใบรับรองทักษะ_${certificate?.studentName || "certificate"}.png`;
+      link.href = canvas.toDataURL("image/png");
+      link.click();
+    } catch (err) {
+      console.error("Download certificate error:", err);
+      alert("ไม่สามารถดาวน์โหลดใบรับรองได้ กรุณาลองใหม่อีกครั้ง");
+    }
   };
 
   if (loading) {
@@ -128,7 +263,7 @@ export default function StudentCertificatePage() {
       <StudentShell activePath="/student/activities">
         <div className="flex min-h-[400px] items-center justify-center">
           <Loader2 className="h-8 w-8 animate-spin text-[#1565C0]" />
-          <span className="ml-3 text-slate-500">กำลังโหลดเกียรติบัตร...</span>
+          <span className="ml-3 text-slate-500">กำลังโหลดใบรับรอง...</span>
         </div>
       </StudentShell>
     );
@@ -139,7 +274,7 @@ export default function StudentCertificatePage() {
       <StudentShell activePath="/student/activities">
         <div className="p-6">
           <div className="rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-600">
-            {error || "ไม่พบข้อมูลเกียรติบัตร"}
+            {error || "ไม่พบข้อมูลใบรับรอง"}
           </div>
           <button
             type="button"
@@ -156,62 +291,34 @@ export default function StudentCertificatePage() {
 
   return (
     <StudentShell activePath="/student/activities">
-      <section className="p-4 sm:p-6 lg:p-7">
-        <div className="min-h-[calc(100vh-8.5rem)] rounded-2xl border border-blue-100 bg-white/95 p-4 shadow-[0_18px_50px_rgba(15,23,42,0.08)] sm:p-6">
+      <section className="p-4 sm:p-6 lg:p-7 print:p-0">
+        <div className="min-h-[calc(100vh-8.5rem)] rounded-2xl border border-blue-100 bg-white/95 p-4 shadow-[0_18px_50px_rgba(15,23,42,0.08)] sm:p-6 print:min-h-0 print:border-0 print:bg-white print:p-0 print:shadow-none">
+          {/* Back button */}
           <button
             type="button"
             onClick={() => router.back()}
-            className="mb-4 inline-flex items-center gap-2 text-sm font-medium text-[#1565C0] transition hover:text-blue-700"
+            className="mb-4 inline-flex items-center gap-2 text-sm font-medium text-[#1565C0] transition hover:text-blue-700 print:hidden"
           >
             <ArrowLeft className="h-4 w-4" />
             กลับ
           </button>
 
-          <div className="text-center">
-            <h1 className="text-2xl font-semibold text-slate-950 sm:text-3xl">เกียรติบัตร</h1>
+          {/* Header */}
+          <div className="text-center print:hidden">
+            <h1 className="text-2xl font-semibold text-slate-950 sm:text-3xl">
+              ใบรับรองทักษะ
+            </h1>
             <div className="mx-auto mt-2 h-1 w-20 rounded-full bg-[#FFC107]" />
+            <p className="mt-2 text-sm text-slate-500">{certificate.skills.map((skill) => skill.name).join(", ")}</p>
           </div>
 
-          {/* แสดงเกียรติบัตร */}
-          <div className="mt-6 flex justify-center">
-            <div className="w-full max-w-3xl overflow-hidden rounded-2xl border border-blue-100 bg-white shadow-lg">
-              {/* ภาพแม่แบบเป็นพื้นหลัง */}
-              <div className="relative">
-                <img
-                  src={certificate.templateImageUrl}
-                  alt={certificate.templateName}
-                  className="w-full rounded-t-2xl"
-                  onError={(e) => {
-                    (e.target as HTMLImageElement).src = "/certificate-placeholder.png";
-                  }}
-                />
-                <div className="absolute inset-0 flex flex-col items-center justify-center px-8 text-center">
-                  <p className="text-sm font-medium text-slate-700 sm:text-base">
-                    ผู้จัดกิจกรรม: {certificate.organizer}
-                  </p>
-                  <p className="mt-8 text-2xl font-semibold text-[#1565C0] sm:text-4xl">
-                    {certificate.studentName}
-                  </p>
-                  <p className="mt-5 text-sm text-slate-600 sm:text-base">
-                    ได้เข้าร่วมกิจกรรม/อบรม
-                  </p>
-                  <p className="mt-2 max-w-2xl text-lg font-semibold text-slate-900 sm:text-2xl">
-                    {certificate.activityName}
-                  </p>
-                  <p className="mt-5 text-xs font-medium text-slate-600 sm:text-sm">
-                    วันที่และเวลาที่จัดกิจกรรม: {formatThaiDateTimeRange(certificate)}
-                  </p>
-                  <div className="mt-10 w-56 text-center">
-                    <div className="border-t border-slate-500 pt-2 text-sm font-medium text-slate-700">
-                      ลายเซ็นคณบดี
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
+          {/* Certificate */}
+          <div className="mt-6 flex justify-center print:mt-0">
+            <CertificatePreview certificate={certificate} />
           </div>
 
-          <div className="mt-6 flex justify-center gap-4">
+          {/* Action buttons */}
+          <div className="mt-6 flex justify-center gap-4 print:hidden">
             <button
               type="button"
               onClick={handlePrint}

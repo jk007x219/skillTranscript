@@ -17,6 +17,7 @@ import {
   UserPlus,
   X,
   Plus,
+  Calendar,
 } from "lucide-react";
 import StaffShell from "@/components/staff/StaffShell";
 
@@ -30,10 +31,8 @@ type TeacherOption = {
   program: string;
 };
 
-// ค่าคงที่
 const FACULTY = "คณะวิทยาศาสตร์และนวัตกรรมดิจิทัล";
 
-// ✅ แยกหลักสูตรและวิชาเอก
 const PROGRAM_OPTIONS = [
   "วิทยาการคอมพิวเตอร์และสารสนเทศ",
   "วิทยาศาสตร์และนวัตกรรม",
@@ -79,6 +78,39 @@ const TEACHER_POSITIONS = [
   "ศาสตราจารย์",
 ];
 
+// ฟังก์ชันคำนวณปีการศึกษาและชั้นปี
+function getCurrentAcademicYear(): number {
+  const now = new Date();
+  const currentYear = now.getFullYear();
+  const currentMonth = now.getMonth() + 1;
+  return currentMonth < 6 ? currentYear - 1 : currentYear;
+}
+
+function calculateYearOfStudy(admissionYear: number): number {
+  const currentAcademicYear = getCurrentAcademicYear();
+  let year = currentAcademicYear - admissionYear + 1;
+  if (year < 1) year = 1;
+  if (year > 6) year = 6;
+  return year;
+}
+
+function toBuddhistYear(ce: number): number {
+  return ce + 543;
+}
+function toChristianYear(be: number): number {
+  return be - 543;
+}
+
+// ✅ ตรวจสอบเบอร์โทร (10 หลัก ตัวเลขเท่านั้น)
+function isValidPhone(phone: string): boolean {
+  return /^[0-9]{10}$/.test(phone);
+}
+
+// ✅ ตรวจสอบรหัสนิสิต (ตัวเลขเท่านั้น)
+function isValidStudentId(id: string): boolean {
+  return /^[0-9]+$/.test(id);
+}
+
 export default function StaffAddUserPage() {
   const router = useRouter();
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -91,8 +123,8 @@ export default function StaffAddUserPage() {
     email: "",
     role: "student",
     studentId: "",
-    program: "", // ✅ หลักสูตร
-    major: "", // ✅ วิชาเอก
+    program: "",
+    major: "",
     year: "",
     phone: "",
     faculty: FACULTY,
@@ -101,6 +133,26 @@ export default function StaffAddUserPage() {
     isExecutive: false,
     status: "active",
   });
+
+  // state สำหรับ admissionYear (พ.ศ.)
+  const [admissionYearBE, setAdmissionYearBE] = useState<number>(() => {
+    const currentYear = new Date().getFullYear();
+    return toBuddhistYear(currentYear - 1);
+  });
+  // admissionYear ใน ค.ศ.
+  const admissionYearCE = toChristianYear(admissionYearBE);
+
+  // คำนวณชั้นปีอัตโนมัติ
+  const computedYear = admissionYearCE ? calculateYearOfStudy(admissionYearCE) : null;
+
+  // อัปเดต year ใน formData เมื่อ computedYear เปลี่ยน
+  useEffect(() => {
+    if (computedYear !== null) {
+      setFormData((prev) => ({ ...prev, year: String(computedYear) }));
+    } else {
+      setFormData((prev) => ({ ...prev, year: "" }));
+    }
+  }, [computedYear]);
 
   // state สำหรับตำแหน่งแยก (เมื่อเป็นผู้บริหาร)
   const [academicPosition, setAcademicPosition] = useState("");
@@ -127,7 +179,6 @@ export default function StaffAddUserPage() {
     fetchTeachers();
   }, []);
 
-  // ✅ แสดงอาจารย์ทั้งหมด (ไม่กรองตามหลักสูตร) พร้อมหลักกำกับ
   const displayTeachers = useMemo(() => {
     return teachers.map((teacher) => ({
       ...teacher,
@@ -135,7 +186,6 @@ export default function StaffAddUserPage() {
     }));
   }, [teachers]);
 
-  // วิชาเอกที่แสดงตามหลักสูตรที่เลือก
   const majorOptions = formData.program ? MAJOR_OPTIONS_BY_PROGRAM[formData.program] || [] : [];
 
   const handleChange = (
@@ -143,9 +193,19 @@ export default function StaffAddUserPage() {
   ) => {
     const { name, value, type } = e.target as HTMLInputElement;
     const checked = type === "checkbox" ? (e.target as HTMLInputElement).checked : undefined;
+    
+    // กรองเฉพาะตัวเลขสำหรับ studentId และ phone
+    let newValue = value;
+    if (name === "studentId") {
+      newValue = value.replace(/\D/g, "");
+    }
+    if (name === "phone") {
+      newValue = value.replace(/\D/g, "").slice(0, 10);
+    }
+
     setFormData((prev) => ({
       ...prev,
-      [name]: type === "checkbox" ? checked : value,
+      [name]: type === "checkbox" ? checked : newValue,
     }));
     if (formErrors[name]) {
       setFormErrors((prev) => ({ ...prev, [name]: "" }));
@@ -155,10 +215,24 @@ export default function StaffAddUserPage() {
       setExecutivePosition("");
       setFormErrors((prev) => ({ ...prev, academicPosition: "", executivePosition: "" }));
     }
-    // เมื่อเปลี่ยนหลักสูตรให้ clear major
     if (name === "program") {
       setFormData((prev) => ({ ...prev, major: "" }));
     }
+  };
+
+  const handleAdmissionYearChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = parseInt(e.target.value);
+    if (!isNaN(value) && value > 0) {
+      const minBE = 2500;
+      const maxBE = new Date().getFullYear() + 543 + 10;
+      if (value >= minBE && value <= maxBE) {
+        setAdmissionYearBE(value);
+        setFormErrors((prev) => ({ ...prev, admissionYear: "" }));
+        return;
+      }
+    }
+    // ถ้าไม่ถูกต้องให้ตั้งค่าเป็น 0 หรือล้าง
+    setAdmissionYearBE(0);
   };
 
   const addAdvisor = () => {
@@ -192,9 +266,16 @@ export default function StaffAddUserPage() {
 
     if (formData.role === "student") {
       if (!formData.studentId.trim()) errors.studentId = "กรุณากรอกรหัสนิสิต";
+      else if (!isValidStudentId(formData.studentId)) errors.studentId = "รหัสนิสิตต้องเป็นตัวเลขเท่านั้น";
       if (!formData.program) errors.program = "กรุณาเลือกหลักสูตร";
       if (majorOptions.length > 0 && !formData.major) {
         errors.major = "กรุณาเลือกวิชาเอก";
+      }
+      if (!admissionYearBE || admissionYearBE < 2500) {
+        errors.admissionYear = "กรุณากรอกปีที่เข้าเรียน (พ.ศ.)";
+      }
+      if (formData.phone && !isValidPhone(formData.phone)) {
+        errors.phone = "เบอร์โทรต้องเป็นตัวเลข 10 หลัก";
       }
     }
 
@@ -266,11 +347,6 @@ export default function StaffAddUserPage() {
     { value: "teacher", label: "อาจารย์", icon: Users },
     { value: "officer", label: "เจ้าหน้าที่", icon: Briefcase },
   ];
-
-  const getTeacherName = (userId: string) => {
-    const teacher = teachers.find((t) => t.userId === userId);
-    return teacher ? teacher.name : userId;
-  };
 
   const getTeacherDisplay = (userId: string) => {
     const teacher = teachers.find((t) => t.userId === userId);
@@ -447,6 +523,7 @@ export default function StaffAddUserPage() {
                 <div>
                   <label htmlFor="studentId" className="block text-sm font-medium text-slate-700">
                     รหัสนิสิต <span className="text-red-500">*</span>
+                    <span className="ml-2 text-xs text-slate-400">(ตัวเลขเท่านั้น)</span>
                   </label>
                   <input
                     type="text"
@@ -517,40 +594,68 @@ export default function StaffAddUserPage() {
                   </div>
                 )}
 
+                {/* ✅ ปีที่เข้าเรียน (พ.ศ.) + ชั้นปีที่คำนวณอัตโนมัติ */}
                 <div className="mt-4 grid gap-4 sm:grid-cols-2">
                   <div>
-                    <label htmlFor="year" className="block text-sm font-medium text-slate-700">
-                      ชั้นปี
+                    <label htmlFor="admissionYear" className="block text-sm font-medium text-slate-700">
+                      ปีที่เข้าเรียน (พ.ศ.) <span className="text-red-500">*</span>
                     </label>
                     <input
                       type="number"
-                      id="year"
-                      name="year"
-                      value={formData.year}
-                      onChange={handleChange}
-                      min="1"
-                      max="6"
-                      className="mt-1.5 h-11 w-full rounded-xl border border-blue-200 bg-white px-4 text-sm outline-none transition focus:border-[#1565C0] focus:ring-4 focus:ring-blue-100"
-                      placeholder="4"
+                      id="admissionYear"
+                      name="admissionYear"
+                      value={admissionYearBE || ""}
+                      onChange={handleAdmissionYearChange}
+                      required
+                      min={2500}
+                      max={new Date().getFullYear() + 543 + 10}
+                      className={`mt-1.5 h-11 w-full rounded-xl border ${
+                        formErrors.admissionYear ? "border-red-300" : "border-blue-200"
+                      } bg-white px-4 text-sm outline-none transition focus:border-[#1565C0] focus:ring-4 focus:ring-blue-100`}
+                      placeholder="2565"
                     />
+                    {formErrors.admissionYear && (
+                      <p className="mt-1 text-xs text-red-500">{formErrors.admissionYear}</p>
+                    )}
                   </div>
                   <div>
-                    <label htmlFor="phone" className="block text-sm font-medium text-slate-700">
-                      เบอร์โทร
+                    <label htmlFor="yearDisplay" className="block text-sm font-medium text-slate-700">
+                      ชั้นปีปัจจุบัน <span className="text-xs text-slate-400">(คำนวณอัตโนมัติ)</span>
                     </label>
-                    <div className="relative mt-1.5">
-                      <Phone className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-                      <input
-                        type="tel"
-                        id="phone"
-                        name="phone"
-                        value={formData.phone}
-                        onChange={handleChange}
-                        className="h-11 w-full rounded-xl border border-blue-200 bg-white pl-11 pr-4 text-sm outline-none transition focus:border-[#1565C0] focus:ring-4 focus:ring-blue-100"
-                        placeholder="088-667-7302"
-                      />
-                    </div>
+                    <input
+                      id="yearDisplay"
+                      type="text"
+                      value={computedYear ? `ชั้นปีที่ ${computedYear}` : "-"}
+                      readOnly
+                      disabled
+                      className="mt-1.5 h-11 w-full rounded-xl border border-blue-200 bg-blue-50/50 px-4 text-sm text-slate-700 outline-none cursor-not-allowed"
+                    />
+                    <input type="hidden" name="year" value={formData.year} />
                   </div>
+                </div>
+
+                <div className="mt-4">
+                  <label htmlFor="phone" className="block text-sm font-medium text-slate-700">
+                    เบอร์โทร <span className="text-xs text-slate-400">(10 หลัก ตัวเลขเท่านั้น)</span>
+                  </label>
+                  <div className="relative mt-1.5">
+                    <Phone className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                    <input
+                      type="text"
+                      id="phone"
+                      name="phone"
+                      value={formData.phone}
+                      onChange={handleChange}
+                      maxLength={10}
+                      className={`h-11 w-full rounded-xl border ${
+                        formErrors.phone ? "border-red-300" : "border-blue-200"
+                      } bg-white pl-11 pr-4 text-sm outline-none transition focus:border-[#1565C0] focus:ring-4 focus:ring-blue-100`}
+                      placeholder="0812345678"
+                    />
+                  </div>
+                  {formErrors.phone && (
+                    <p className="mt-1 text-xs text-red-500">{formErrors.phone}</p>
+                  )}
                 </div>
 
                 {/* ✅ อาจารย์ที่ปรึกษา - เลือกได้ทุกหลักสูตร */}

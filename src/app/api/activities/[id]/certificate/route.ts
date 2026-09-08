@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import type { RowDataPacket } from "mysql2";
 import { httpError, jsonError } from "@/lib/api-error";
+import { getDeanSettings } from "@/lib/certificate-settings";
 import { pool } from "@/lib/db";
 
 export const runtime = "nodejs";
@@ -61,6 +62,15 @@ export async function GET(request: NextRequest, context: RouteContext) {
       throw httpError(400, "กิจกรรมนี้ยังไม่มีแม่แบบเกียรติบัตรที่พร้อมใช้งาน");
     }
 
+    const deanSettings = await getDeanSettings();
+    const [skillRows] = await pool.query<RowDataPacket[]>(
+      `SELECT skillname AS name, level
+       FROM activityskill
+       WHERE activityId = ?
+       ORDER BY ActivitySkillId`,
+      [row.activityId],
+    );
+
     return NextResponse.json({
       activityId: row.activityId,
       activityName: row.activityName,
@@ -75,6 +85,12 @@ export async function GET(request: NextRequest, context: RouteContext) {
       templateName: row.templateName,
       imageUrl: row.imageUrl,
       score: row.score === null ? null : Number(row.score),
+      skills: skillRows.map((skill) => ({
+        name: skill.name || "ไม่ระบุทักษะ",
+        level: skill.level || "ไม่ระบุระดับ",
+      })),
+      deanName: deanSettings.deanName,
+      deanSignatureUrl: deanSettings.deanSignatureUrl,
     });
   } catch (error) {
     return jsonError(error);

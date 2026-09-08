@@ -14,13 +14,12 @@ type AdvisorStudentRow = RowDataPacket & {
   phone: string | null;
   faculty: string | null;
   major: string | null;
+  program: string | null;   // ✅ เพิ่มหลักสูตร
   year: number | null;
 };
 
 export async function GET(request: NextRequest) {
   try {
-    // ดึง advisorUserId จาก query parameter (จะส่งมาจากหน้า client)
-    // ในอนาคตควรใช้ session/jWT แทน
     const advisorUserId = request.nextUrl.searchParams.get("advisorUserId");
 
     if (!advisorUserId) {
@@ -39,6 +38,7 @@ export async function GET(request: NextRequest) {
          s.phone,
          s.faculty,
          s.major,
+         s.program,   -- ✅ เพิ่มหลักสูตรใน SELECT
          s.year
        FROM students s
        INNER JOIN advisor a ON a.studentId = s.studentId
@@ -57,6 +57,7 @@ export async function GET(request: NextRequest) {
       phone: row.phone,
       faculty: row.faculty,
       major: row.major,
+      program: row.program || null,   
       year: row.year,
     }));
 

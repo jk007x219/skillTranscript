@@ -7,6 +7,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { ArrowLeft, Eye, LogIn, Mail, UserPlus } from "lucide-react";
 import { useAuth } from "@/context/auth-context";
+import { AlertBanner } from "@/components/ui/AlertBanner";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -14,11 +15,12 @@ export default function LoginPage() {
   const { login } = useAuth();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
+  const [successMessage, setSuccessMessage] = useState("");
 
-  // components/auth/LoginPage.tsx (เฉพาะส่วน handleSubmit)
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setErrorMessage("");
+    setSuccessMessage("");
     setIsSubmitting(true);
 
     const formData = new FormData(event.currentTarget);
@@ -26,30 +28,33 @@ export default function LoginPage() {
     const password = String(formData.get("password") || "");
 
     try {
-      // components/auth/LoginPage.tsx (เฉพาะ redirect)
       const user = await login(email, password);
       const callbackUrl = searchParams.get("callbackUrl");
 
-      if (callbackUrl?.startsWith("/")) {
-        router.push(callbackUrl);
-      } else if (user.role === "teacher") {
-        router.push(
-          user.isExecutive ? "/executive/dashboard" : "/teacher/students",
-        );
-      } else if (user.role === "student") {
-        router.push("/student/dashboard");
-      } else if (user.role === "officer") {
-        router.push("/staff/dashboard");
-      } else if (user.role === "executive") {
-        router.push("/executive/dashboard");
-      } else {
-        router.push("/student/dashboard");
-      }
+      // ✅ แจ้งเตือนสำเร็จก่อน แล้วค่อยพาไปหน้าถัดไป เพื่อให้ผู้ใช้เห็น feedback ที่ชัดเจน
+      setSuccessMessage("เข้าสู่ระบบสำเร็จ กำลังพาคุณไปยังหน้าถัดไป...");
+
+      const destination = callbackUrl?.startsWith("/")
+        ? callbackUrl
+        : user.role === "teacher"
+        ? user.isExecutive
+          ? "/executive/dashboard"
+          : "/teacher/students"
+        : user.role === "student"
+        ? "/student/dashboard"
+        : user.role === "officer"
+        ? "/staff/dashboard"
+        : user.role === "executive"
+        ? "/executive/dashboard"
+        : "/student/dashboard";
+
+      setTimeout(() => {
+        router.push(destination);
+      }, 700);
     } catch (error) {
       setErrorMessage(
-        error instanceof Error ? error.message : "ไม่สามารถเข้าสู่ระบบได้",
+        error instanceof Error ? error.message : "ไม่สามารถเข้าสู่ระบบได้"
       );
-    } finally {
       setIsSubmitting(false);
     }
   };
@@ -131,7 +136,24 @@ export default function LoginPage() {
                 <div className="mx-auto mt-2 h-1 w-16 rounded-full bg-[#FFC107]" />
               </div>
 
-              <form onSubmit={handleSubmit} className="mt-7 space-y-4">
+              {successMessage && (
+                <AlertBanner
+                  variant="success"
+                  message={successMessage}
+                  onDismiss={() => setSuccessMessage("")}
+                  className="mt-5"
+                />
+              )}
+              {errorMessage && (
+                <AlertBanner
+                  variant="error"
+                  message={errorMessage}
+                  onDismiss={() => setErrorMessage("")}
+                  className="mt-5"
+                />
+              )}
+
+              <form onSubmit={handleSubmit} noValidate className="mt-7 space-y-4">
                 <label htmlFor="email" className="block">
                   <span className="text-sm font-medium text-[#1565C0]">
                     อีเมล
@@ -180,12 +202,6 @@ export default function LoginPage() {
                     ลืมรหัสผ่าน?
                   </Link>
                 </div>
-
-                {errorMessage && (
-                  <p className="rounded-xl border border-red-100 bg-red-50 px-4 py-2 text-sm text-red-600">
-                    {errorMessage}
-                  </p>
-                )}
 
                 <button
                   type="submit"

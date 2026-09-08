@@ -1,3 +1,4 @@
+// auth.ts
 import bcrypt from "bcryptjs";
 import NextAuth from "next-auth";
 import Credentials from "next-auth/providers/credentials";
@@ -18,17 +19,16 @@ type LoginUserRow = RowDataPacket & {
   studentMajor: string | null;
   year: number | null;
   studentPhone: string | null;
-  studentProfileImageUrl: string | null; // ✅ เพิ่ม
+  profileImageUrl: string | null;
+  admissionYear: number | null;
   teacherFirstName: string | null;
   teacherLastName: string | null;
   teacherFaculty: string | null;
   teacherProgram: string | null;
   isExecutive: number | null;
-  teacherProfileImageUrl: string | null; // ✅ เพิ่ม
   officerFirstName: string | null;
   officerLastName: string | null;
   officerFaculty: string | null;
-  officerProfileImageUrl: string | null; // ✅ เพิ่ม
   advisorNames: string | null;
 };
 
@@ -43,9 +43,11 @@ export const {
   },
   trustHost: true,
   secret: process.env.AUTH_SECRET || process.env.NEXTAUTH_SECRET,
+
   pages: {
     signIn: "/login",
   },
+
   providers: [
     Credentials({
       name: "Email and password",
@@ -76,17 +78,16 @@ export const {
              s.major AS studentMajor,
              s.year,
              s.phone AS studentPhone,
-             s.profileImageUrl AS studentProfileImageUrl,
+             s.profileImageUrl,
+             s.admissionYear,
              t.firstname AS teacherFirstName,
              t.lastname AS teacherLastName,
              t.faculty AS teacherFaculty,
              t.program AS teacherProgram,
              t.isExecutive,
-             t.profileImageUrl AS teacherProfileImageUrl,
              o.firstname AS officerFirstName,
              o.lastname AS officerLastName,
              o.faculty AS officerFaculty,
-             o.profileImageUrl AS officerProfileImageUrl,
              GROUP_CONCAT(DISTINCT CONCAT(ta.firstname, ' ', ta.lastname) ORDER BY ta.firstname SEPARATOR '||') AS advisorNames
            FROM users u
            LEFT JOIN students s ON s.userId = u.userId
@@ -96,10 +97,10 @@ export const {
            LEFT JOIN teacher ta ON ta.userId = a.advisorUserId
            WHERE LOWER(u.email) = ?
            GROUP BY u.userId, u.email, u.password, u.role, u.status, u.must_change_password,
-                    s.studentId, s.firstname, s.lastname, s.faculty, s.major, s.year, s.phone, s.profileImageUrl,
-                    t.firstname, t.lastname, t.faculty, t.program, t.isExecutive, t.profileImageUrl,
-                    o.firstname, o.lastname, o.faculty, o.profileImageUrl`,
-          [email],
+                    s.studentId, s.firstname, s.lastname, s.faculty, s.major, s.year, s.phone, s.profileImageUrl, s.admissionYear,
+                    t.firstname, t.lastname, t.faculty, t.program, t.isExecutive,
+                    o.firstname, o.lastname, o.faculty`,
+          [email]
         );
 
         if (users.length === 0) {
@@ -112,11 +113,21 @@ export const {
           return null;
         }
 
-        const firstName = user.studentFirstName || user.teacherFirstName || user.officerFirstName || "";
-        const lastName = user.studentLastName || user.teacherLastName || user.officerLastName || "";
-        const faculty = user.studentFaculty || user.teacherFaculty || user.officerFaculty || null;
-        const profileImageUrl = user.studentProfileImageUrl || user.teacherProfileImageUrl || user.officerProfileImageUrl || null;
-        const advisorNames = user.advisorNames ? String(user.advisorNames).split("||") : [];
+        const firstName =
+          user.studentFirstName ||
+          user.teacherFirstName ||
+          user.officerFirstName ||
+          "";
+        const lastName =
+          user.studentLastName ||
+          user.teacherLastName ||
+          user.officerLastName ||
+          "";
+        const faculty =
+          user.studentFaculty || user.teacherFaculty || user.officerFaculty || null;
+        const advisorNames = user.advisorNames
+          ? String(user.advisorNames).split("||")
+          : [];
 
         return {
           id: user.userId,
@@ -130,9 +141,10 @@ export const {
           major: user.studentMajor,
           program: user.teacherProgram || user.studentMajor,
           year: user.year,
+          admissionYear: user.admissionYear,
           phone: user.studentPhone,
           status: user.status,
-          profileImageUrl, // ✅ ส่ง profileImageUrl ที่รวมจากทุกตาราง
+          profileImageUrl: user.profileImageUrl,
           isExecutive: user.role === "executive" || user.isExecutive === 1,
           advisorNames,
           mustChangePassword: Boolean(user.mustChangePassword),
@@ -140,6 +152,7 @@ export const {
       },
     }),
   ],
+
   callbacks: {
     async jwt({ token, user, trigger, session }) {
       if (user) {
@@ -152,9 +165,10 @@ export const {
         token.major = user.major;
         token.program = user.program;
         token.year = user.year;
+        token.admissionYear = user.admissionYear;
         token.phone = user.phone;
         token.status = user.status;
-        token.profileImageUrl = user.profileImageUrl; // ✅ เก็บ profileImageUrl
+        token.profileImageUrl = user.profileImageUrl;
         token.isExecutive = user.isExecutive;
         token.advisorNames = user.advisorNames;
         token.mustChangePassword = user.mustChangePassword;
@@ -167,14 +181,21 @@ export const {
         token.major = session.user.major ?? token.major;
         token.program = session.user.program ?? token.program;
         token.year = session.user.year ?? token.year;
+        token.admissionYear = session.user.admissionYear ?? token.admissionYear;
         token.phone = session.user.phone ?? token.phone;
         token.profileImageUrl = session.user.profileImageUrl ?? token.profileImageUrl;
         token.advisorNames = session.user.advisorNames ?? token.advisorNames;
-        token.mustChangePassword = session.user.mustChangePassword ?? token.mustChangePassword;
+        token.mustChangePassword =
+          session.user.mustChangePassword ?? token.mustChangePassword;
+
+          if (session.user.mustChangePassword !== undefined) {
+    token.mustChangePassword = session.user.mustChangePassword;
+  }
       }
 
       return token;
     },
+
     async session({ session, token }) {
       session.user = {
         ...session.user,
@@ -188,11 +209,17 @@ export const {
         major: token.major ? String(token.major) : null,
         program: token.program ? String(token.program) : null,
         year: typeof token.year === "number" ? token.year : null,
+        admissionYear:
+          typeof token.admissionYear === "number" ? token.admissionYear : null,
         phone: token.phone ? String(token.phone) : null,
         status: token.status ? String(token.status) : undefined,
-        profileImageUrl: token.profileImageUrl ? String(token.profileImageUrl) : null, // ✅ ส่งต่อไป session
+        profileImageUrl: token.profileImageUrl
+          ? String(token.profileImageUrl)
+          : null,
         isExecutive: Boolean(token.isExecutive),
-        advisorNames: Array.isArray(token.advisorNames) ? token.advisorNames : [],
+        advisorNames: Array.isArray(token.advisorNames)
+          ? token.advisorNames
+          : [],
         mustChangePassword: Boolean(token.mustChangePassword),
       };
 

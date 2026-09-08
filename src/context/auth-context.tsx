@@ -2,7 +2,7 @@
 "use client";
 
 import { SessionProvider, getSession, signIn, signOut, useSession } from "next-auth/react";
-import { createContext, useContext, useMemo } from "react";
+import { createContext, useContext, useEffect, useMemo } from "react";
 import { authAPI } from "@/services/auth";
 import type { AuthUser, RegisterPayload, StudentProfilePayload } from "@/types/auth";
 
@@ -12,7 +12,9 @@ type AuthContextValue = {
   register: (userData: RegisterPayload) => Promise<AuthUser>;
   login: (email: string, password: string) => Promise<AuthUser>;
   updateStudentProfile: (profile: StudentProfilePayload | FormData) => Promise<AuthUser>;
+  updateProfile: (profile: { firstName?: string; lastName?: string; profileImageUrl?: string }) => Promise<void>;
   logout: () => void;
+  refreshUser: () => Promise<void>;
 };
 
 type AuthProviderProps = {
@@ -23,21 +25,24 @@ const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
 function mapSessionUser(user: NonNullable<ReturnType<typeof useSession>["data"]>["user"]): AuthUser {
   return {
-    id: user.id,
-    firstName: user.firstName || "",
-    lastName: user.lastName || "",
-    email: user.email || "",
-    role: user.role as AuthUser["role"],
-    studentId: user.studentId || null,
-    faculty: user.faculty || null,
-    major: user.major || null,
-    program: user.program || null,
-    year: user.year || null,
-    phone: user.phone || null,
-    status: user.status,
-    profileImageUrl: user.profileImageUrl || null,
-    advisorNames: user.advisorNames || [],
-    isExecutive: Boolean(user.isExecutive),
+    id: user?.id || "",
+    firstName: user?.firstName || "",
+    lastName: user?.lastName || "",
+    email: user?.email || "",
+    role: user?.role as AuthUser["role"] || "student",
+    studentId: user?.studentId || null,
+    faculty: user?.faculty || null,
+    major: user?.major || null,
+    program: user?.program || null,
+    year: user?.year || null,
+    phone: user?.phone || null,
+    status: user?.status,
+    profileImageUrl: user?.profileImageUrl || null,
+    admissionYear: user?.admissionYear || null,
+    advisorNames: user?.advisorNames || [],
+    isExecutive: Boolean(user?.isExecutive),
+
+    mustChangePassword: Boolean(user?.mustChangePassword),
   };
 }
 
@@ -45,6 +50,19 @@ function AuthContextProvider({ children }: AuthProviderProps) {
   const { data: session, status, update } = useSession();
   const user = session?.user ? mapSessionUser(session.user) : null;
   const loading = status === "loading";
+
+const refreshUser = async () => {
+  await update({
+    user: {
+      mustChangePassword: false,
+    },
+  });
+};
+
+  // ✅ ฟังก์ชันอัปเดตโปรไฟล์และ refresh session
+  const updateProfile = async (profile: { firstName?: string; lastName?: string; profileImageUrl?: string }) => {
+    await update({ user: profile });
+  };
 
   const register = async (userData: RegisterPayload) => {
     const response = await authAPI.register(userData);
@@ -96,7 +114,16 @@ function AuthContextProvider({ children }: AuthProviderProps) {
   };
 
   const value = useMemo(
-    () => ({ user, loading, register, login, updateStudentProfile, logout }),
+    () => ({
+      user,
+      loading,
+      register,
+      login,
+      updateStudentProfile,
+      updateProfile,
+      logout,
+      refreshUser,
+    }),
     [user, loading],
   );
 

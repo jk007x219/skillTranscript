@@ -1,320 +1,393 @@
-// components/student/StudentEvaluatePage.tsx
 "use client";
 
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import StudentShell from "@/components/student/StudentShell";
-import { useAuth } from "@/context/auth-context";
+import { useAuth } from "@/context/auth-context"; // ✅ เพิ่ม import useAuth
 
 type EvaluationQuestion = {
   id: string;
   question: string;
   options: string[];
   correctAnswer: number;
-  skillName: string;
+  skillNames: string[];
 };
 
-type ActivityData = {
+type ActivitySkill = {
+  name: string;
+  level: string;
+};
+
+type Activity = {
   id: string;
   title: string;
-  description: string;
-  evaluation: EvaluationQuestion[];
-  alreadySubmitted?: boolean;
+  description?: string;
+  evaluation?: EvaluationQuestion[];
+  skills?: ActivitySkill[];
 };
 
-type SkillScore = {
+type SkillResult = {
   skillName: string;
-  level: string;
-  maxScore: number;
-  questions: number;
-  scorePerQuestion: number;
+  level?: string;
+  questions?: number;
   earnedScore: number;
+  maxScore: number;
+  normalizedScore: number;
+};
+
+type EvaluationResult = {
+  score: number;
+  totalScore?: number;
+  skillScores: SkillResult[];
+};
+
+type Answer = {
+  questionId: string;
+  selectedOption: number;
 };
 
 export default function StudentEvaluatePage() {
-  const { user, loading: authLoading } = useAuth();
   const params = useParams();
   const router = useRouter();
-  const activityId = params.id as string;
+  const { user } = useAuth(); // ✅ ดึง user จาก Auth Context
 
-  const [activity, setActivity] = useState<ActivityData | null>(null);
-  const [answers, setAnswers] = useState<Record<string, number>>({});
+  const activityId = params?.id as string;
+
+  const [activity, setActivity] = useState<Activity | null>(null);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
+  const [answers, setAnswers] = useState<Record<string, number>>({});
+  const [result, setResult] = useState<EvaluationResult | null>(null);
   const [alreadySubmitted, setAlreadySubmitted] = useState(false);
-  const [result, setResult] = useState<{
-    passed: boolean;
-    totalScore: number;
-    details: any[];
-    skillScores: SkillScore[];
-  } | null>(null);
 
+  // =========================================================
+  // โหลดกิจกรรม
+  // =========================================================
   useEffect(() => {
+    if (!activityId) return;
+
     const fetchActivity = async () => {
-      if (authLoading) return;
-
-      if (!user?.studentId) {
-        setLoading(false);
-        setError("ไม่พบข้อมูลนิสิต กรุณาเข้าสู่ระบบใหม่");
-        return;
-      }
-
       try {
         setLoading(true);
-        setAlreadySubmitted(false);
         setError("");
-        // ส่ง studentId ไปด้วยเพื่อตรวจสอบสถานะ
-        const url = `/api/activities/${activityId}?studentId=${encodeURIComponent(user.studentId)}`;
-        const res = await fetch(url);
-        if (!res.ok) throw new Error("ไม่สามารถโหลดข้อมูลกิจกรรม");
-        const data = await res.json();
-        if (!data.hasEvaluation || !data.evaluation) {
-          throw new Error("กิจกรรมนี้ยังไม่มีแบบประเมิน");
-        }
 
-        // ตรวจสอบว่าเคยส่งแล้วหรือยัง
-        if (data.alreadySubmitted) {
-          setAlreadySubmitted(true);
-          setActivity(data);
-          setLoading(false);
-          return;
-        }
-
-        setActivity(data);
-        setError("");
-        const initialAnswers: Record<string, number> = {};
-        data.evaluation.forEach((q: EvaluationQuestion) => {
-          initialAnswers[q.id] = -1;
+        const response = await fetch(`/api/activities/${activityId}`, {
+          cache: "no-store",
         });
-        setAnswers(initialAnswers);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "เกิดข้อผิดพลาด");
+
+        const data = await response.json();
+
+        if (!response.ok) {
+          throw new Error(data?.error || "ไม่สามารถโหลดกิจกรรมได้");
+        }
+
+        setActivity(data.activity || data);
+      } catch (err: any) {
+        console.error(err);
+        setError(err?.message || "ไม่สามารถโหลดกิจกรรมได้");
       } finally {
         setLoading(false);
       }
     };
 
-    if (activityId) {
-      fetchActivity();
-    }
-  }, [activityId, authLoading, user?.studentId]);
+    fetchActivity();
+  }, [activityId]);
 
-  const handleAnswer = (questionId: string, optionIndex: number) => {
-    if (alreadySubmitted) return;
-    setAnswers((prev) => ({ ...prev, [questionId]: optionIndex }));
+  // =========================================================
+  // เลือกคำตอบ
+  // =========================================================
+  const handleAnswerChange = (questionId: string, answerIndex: number) => {
+    setAnswers((prev) => ({
+      ...prev,
+      [questionId]: answerIndex,
+    }));
+
+    if (error) {
+      setError("");
+    }
   };
 
+  // =========================================================
+  // ส่งแบบประเมิน
+  // =========================================================
   const handleSubmit = async () => {
-    if (alreadySubmitted) {
-      alert("คุณเคยทำแบบประเมินนี้แล้ว");
-      return;
-    }
-    if (!activity) return;
-
-    const allAnswered = activity.evaluation.every((q) => answers[q.id] !== undefined && answers[q.id] >= 0);
-    if (!allAnswered) {
-      alert("กรุณาตอบคำถามทุกข้อ");
+    if (!activity?.evaluation || activity.evaluation.length === 0) {
+      setError("กิจกรรมนี้ไม่มีแบบประเมิน");
       return;
     }
 
+    // ตรวจสอบว่าตอบครบทุกข้อ
+    const unanswered = activity.evaluation.filter(
+      (question) => answers[question.id] === undefined
+    );
+
+    if (unanswered.length > 0) {
+      setError(`กรุณาตอบคำถามให้ครบทุกข้อ (ยังไม่ได้ตอบ ${unanswered.length} ข้อ)`);
+      return;
+    }
+
+    // ✅ ตรวจสอบว่า user มี studentId
     if (!user?.studentId) {
-      alert("ไม่พบข้อมูลนิสิต กรุณาเข้าสู่ระบบใหม่");
+      setError("ไม่พบข้อมูลนิสิต กรุณาเข้าสู่ระบบใหม่");
       return;
     }
-
-    setSubmitting(true);
-    setError("");
 
     try {
-      const res = await fetch(`/api/activities/${activityId}/submit-evaluation`, {
+      setSubmitting(true);
+      setError("");
+
+      const answerArray: Answer[] = activity.evaluation.map((question) => ({
+        questionId: question.id,
+        selectedOption: answers[question.id],
+      }));
+
+      const response = await fetch(`/api/activities/${activityId}/submit-evaluation`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+        },
         body: JSON.stringify({
-          studentId: user.studentId,
-          answers: Object.entries(answers).map(([questionId, selectedOption]) => ({
-            questionId,
-            selectedOption,
-          })),
+          studentId: user.studentId, // ✅ ส่ง studentId ไปด้วย
+          answers: answerArray,
         }),
       });
 
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.message || "ส่งคำตอบไม่สำเร็จ");
+      const data = await response.json();
 
-      setResult(data);
-      setAlreadySubmitted(false);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "เกิดข้อผิดพลาด");
+      if (!response.ok) {
+        throw new Error(data?.error || "ไม่สามารถส่งแบบประเมินได้");
+      }
+
+      setResult({
+        score: data.score ?? data.totalScore ?? 0,
+        totalScore: data.totalScore ?? data.score ?? 0,
+        skillScores: data.skillScores ?? [],
+      });
+
+      setAlreadySubmitted(true);
+    } catch (err: any) {
+      console.error(err);
+      setError(err?.message || "เกิดข้อผิดพลาดในการส่งแบบประเมิน");
     } finally {
       setSubmitting(false);
     }
   };
 
+  // =========================================================
+  // กลับหน้ากิจกรรม
+  // =========================================================
   const handleBack = () => {
     router.push("/student/activities");
   };
 
+  // =========================================================
+  // Loading
+  // =========================================================
   if (loading) {
     return (
-      <StudentShell activePath="/student/activities">
-        <div className="p-6 text-center">กำลังโหลดแบบประเมิน...</div>
-      </StudentShell>
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="text-gray-600">กำลังโหลดแบบประเมิน...</div>
+      </div>
     );
   }
 
-  if (error || !activity) {
+  // =========================================================
+  // Error ตอนโหลด Activity
+  // =========================================================
+  if (error && !activity) {
     return (
-      <StudentShell activePath="/student/activities">
-        <div className="p-6">
-          <div className="rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-600">
-            {error || "ไม่พบข้อมูลกิจกรรม"}
-          </div>
+      <div className="min-h-screen flex items-center justify-center bg-gray-50 p-6">
+        <div className="w-full max-w-lg rounded-2xl bg-white p-8 shadow">
+          <h1 className="text-xl font-bold text-red-600 mb-4">เกิดข้อผิดพลาด</h1>
+          <p className="text-gray-700 mb-6">{error}</p>
           <button
-            type="button"
             onClick={handleBack}
-            className="mt-4 rounded-xl bg-[#1565C0] px-6 py-2 text-white hover:bg-[#0D47A1]"
+            className="rounded-lg bg-gray-900 px-5 py-2.5 text-white hover:bg-gray-800"
           >
-            กลับหน้ากิจกรรม
+            กลับ
           </button>
         </div>
-      </StudentShell>
+      </div>
     );
   }
 
-  if (alreadySubmitted) {
+  // =========================================================
+  // ไม่พบ Activity
+  // =========================================================
+  if (!activity) {
     return (
-      <StudentShell activePath="/student/activities">
-        <div className="p-6">
-          <div className="rounded-2xl border border-blue-100 bg-white p-6 shadow-md text-center">
-            <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-blue-50 text-[#1565C0]">
-              <svg className="h-8 w-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-            </div>
-            <h2 className="mt-4 text-xl font-semibold text-slate-950">บันทึกเสร็จสิ้น</h2>
-            <p className="mt-2 text-sm text-slate-500">ไม่สามารถทำแบบประเมินซ้ำได้</p>
-            <button
-              type="button"
-              onClick={handleBack}
-              className="mt-6 rounded-xl bg-[#1565C0] px-6 py-2.5 text-white shadow-md transition hover:bg-[#0D47A1]"
-            >
-              กลับหน้ากิจกรรม
-            </button>
-          </div>
-        </div>
-      </StudentShell>
+      <div className="min-h-screen flex items-center justify-center">ไม่พบกิจกรรม</div>
     );
   }
 
+  // =========================================================
+  // หน้าผลลัพธ์
+  // =========================================================
   if (result) {
     return (
-      <StudentShell activePath="/student/activities">
-        <div className="p-6">
-          <div className="rounded-2xl border border-blue-100 bg-white p-6 shadow-md">
-            <h2 className="text-2xl font-semibold text-slate-950">ผลการประเมิน</h2>
-            <div className="mt-4 space-y-4">
-              {result.skillScores && result.skillScores.length > 0 ? (
-                <div className="space-y-3">
-                  <p className="text-sm font-medium text-slate-700">คะแนนที่ได้รับในแต่ละทักษะ:</p>
-                  {result.skillScores.map((skill, idx) => (
-                    <div key={idx} className="rounded-lg border border-blue-100 bg-blue-50/30 p-3">
-                      <div className="flex items-center justify-between">
+      <div className="min-h-screen bg-gray-50 px-4 py-8">
+        <div className="mx-auto max-w-4xl">
+          <div className="rounded-2xl bg-white p-6 shadow-sm md:p-8">
+            <div className="text-center">
+              <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-green-100">
+                <span className="text-3xl">✓</span>
+              </div>
+              <h1 className="text-2xl font-bold text-gray-900">ส่งแบบประเมินเรียบร้อยแล้ว</h1>
+              <p className="mt-2 text-gray-500">{activity.title}</p>
+            </div>
+
+            <div className="mt-8">
+              <h2 className="mb-4 text-lg font-bold text-gray-900">ผลคะแนนแต่ละทักษะ</h2>
+              <div className="space-y-4">
+                {result.skillScores.map((skill) => {
+                  const percent =
+                    skill.maxScore > 0 ? (skill.earnedScore / skill.maxScore) * 100 : 0;
+
+                  return (
+                    <div key={skill.skillName} className="rounded-xl border border-gray-200 p-4">
+                      <div className="mb-2 flex items-center justify-between gap-4">
                         <div>
-                          <p className="font-medium text-slate-800">{skill.skillName}</p>
-                          <p className="text-xs text-slate-500">
-                            ระดับ: {skill.level} • {skill.questions} ข้อ
-                          </p>
+                          <div className="font-semibold text-gray-900">{skill.skillName}</div>
+                          <div className="mt-1 text-sm text-gray-500">
+                            {skill.level && (
+                              <>
+                                ระดับ: {skill.level} {" • "}
+                              </>
+                            )}
+                            {skill.earnedScore} / {skill.maxScore} คะแนน
+                          </div>
                         </div>
-                        <div className="text-right">
-                          <p className="text-lg font-semibold text-[#1565C0]">
-                            {skill.earnedScore.toFixed(2)}
-                          </p>
-                          <p className="text-xs text-slate-400">
-                            จาก {skill.maxScore.toFixed(2)} คะแนน
-                          </p>
+                        <div className="text-lg font-bold text-gray-900">
+                          {percent.toFixed(2)}%
                         </div>
                       </div>
-                      <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-blue-100">
+                      <div className="h-3 overflow-hidden rounded-full bg-gray-100">
                         <div
-                          className="h-full rounded-full bg-[#1565C0] transition-all duration-500"
+                          className="h-full rounded-full bg-blue-500 transition-all"
                           style={{
-                            width: `${Math.min(100, (skill.earnedScore / skill.maxScore) * 100)}%`,
+                            width: `${Math.min(Math.max(percent, 0), 100)}%`,
                           }}
                         />
                       </div>
                     </div>
-                  ))}
-                </div>
-              ) : (
-                <p className="text-sm text-slate-500">ไม่พบข้อมูลคะแนนแยกตามทักษะ</p>
-              )}
-
-              <div className="mt-4 rounded-lg border border-slate-200 bg-slate-50 p-3 text-center">
-                <p className="text-sm text-slate-600">คะแนนรวมที่ได้</p>
-                <p className="text-2xl font-bold text-[#1565C0]">
-                  {result.totalScore.toFixed(2)}
-                </p>
+                  );
+                })}
               </div>
+            </div>
 
+            <div className="mt-8 flex justify-center">
               <button
-                type="button"
                 onClick={handleBack}
-                className="mt-4 w-full rounded-xl bg-[#1565C0] px-6 py-2.5 text-white shadow-md transition hover:bg-[#0D47A1]"
+                className="rounded-xl bg-gray-900 px-6 py-3 font-medium text-white hover:bg-gray-800"
               >
-                กลับไปหน้ากิจกรรม
+                กลับหน้ากิจกรรม
               </button>
             </div>
           </div>
         </div>
-      </StudentShell>
+      </div>
     );
   }
 
-  return (
-    <StudentShell activePath="/student/activities">
-      <div className="p-6">
-        <div className="rounded-2xl border border-blue-100 bg-white p-6 shadow-md">
-          <h1 className="text-2xl font-semibold text-slate-950">{activity.title}</h1>
-          <p className="mt-2 text-sm text-slate-500">{activity.description}</p>
-          <div className="mt-2 h-0.5 w-24 rounded-full bg-[#FFC107]" />
+  // =========================================================
+  // แบบประเมิน
+  // =========================================================
+  const evaluation = activity.evaluation || [];
 
-          <div className="mt-6 space-y-6">
-            {activity.evaluation.map((q, qIndex) => (
-              <div key={q.id} className="rounded-xl border border-blue-100 p-4">
-                <p className="font-medium text-slate-800">
-                  {qIndex + 1}. {q.question}
-                </p>
-                <p className="text-xs text-slate-400">ทักษะ: {q.skillName}</p>
-                <div className="mt-3 space-y-2">
-                  {q.options.map((opt, optIndex) => (
-                    <label key={optIndex} className="flex items-center gap-3">
-                      <input
-                        type="radio"
-                        name={q.id}
-                        value={optIndex}
-                        checked={answers[q.id] === optIndex}
-                        onChange={() => handleAnswer(q.id, optIndex)}
-                        className="h-4 w-4 text-[#1565C0]"
-                      />
-                      <span className="text-sm text-slate-700">{opt}</span>
-                    </label>
-                  ))}
+  if (evaluation.length === 0) {
+    return (
+      <div className="min-h-screen bg-gray-50 p-6">
+        <div className="mx-auto max-w-3xl rounded-2xl bg-white p-8 shadow-sm">
+          <h1 className="text-2xl font-bold text-gray-900">{activity.title}</h1>
+          <p className="mt-4 text-gray-600">กิจกรรมนี้ยังไม่มีแบบประเมิน</p>
+          <button onClick={handleBack} className="mt-6 rounded-xl bg-gray-900 px-5 py-2.5 text-white">
+            กลับ
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // =========================================================
+  // Render แบบประเมิน
+  // =========================================================
+  return (
+    <div className="min-h-screen bg-gray-50 px-4 py-8">
+      <div className="mx-auto max-w-4xl">
+        <div className="rounded-2xl bg-white p-6 shadow-sm md:p-8">
+          <div className="border-b border-gray-200 pb-6">
+            <h1 className="text-2xl font-bold text-gray-900">{activity.title}</h1>
+            {activity.description && <p className="mt-2 text-gray-600">{activity.description}</p>}
+            <p className="mt-4 text-sm text-gray-500">กรุณาตอบคำถามให้ครบทุกข้อ</p>
+            <p className="mt-1 text-sm text-gray-400">จำนวน {evaluation.length} ข้อ</p>
+          </div>
+
+          {error && (
+            <div className="mt-6 rounded-xl border border-red-200 bg-red-50 p-4 text-red-700">
+              {error}
+            </div>
+          )}
+
+          <div className="mt-8 space-y-8">
+            {evaluation.map((question, index) => (
+              <div key={question.id} className="rounded-2xl border border-gray-200 p-5">
+                <div className="mb-4">
+                  <div className="font-semibold text-gray-900">
+                    {index + 1}. {question.question}
+                  </div>
+                  {question.skillNames?.length > 0 && (
+                    <div className="mt-2 text-sm text-gray-500">
+                      ทักษะ: {question.skillNames.join(", ")}
+                    </div>
+                  )}
+                </div>
+
+                <div className="space-y-3">
+                  {question.options.map((option, optionIndex) => {
+                    const checked = answers[question.id] === optionIndex;
+
+                    return (
+                      <label
+                        key={optionIndex}
+                        className={`flex cursor-pointer items-center gap-3 rounded-xl border p-4 transition ${
+                          checked ? "border-blue-500 bg-blue-50" : "border-gray-200 hover:bg-gray-50"
+                        }`}
+                      >
+                        <input
+                          type="radio"
+                          name={`question-${question.id}`}
+                          value={optionIndex}
+                          checked={checked}
+                          onChange={() => handleAnswerChange(question.id, optionIndex)}
+                          className="h-4 w-4"
+                        />
+                        <span className="text-gray-800">{option}</span>
+                      </label>
+                    );
+                  })}
                 </div>
               </div>
             ))}
           </div>
 
-          <button
-            type="button"
-            onClick={handleSubmit}
-            disabled={submitting}
-            className="mt-6 w-full rounded-xl bg-[#4598D0] px-8 py-3 text-white shadow-md transition hover:bg-[#1565C0] disabled:opacity-50"
-          >
-            {submitting ? "กำลังส่ง..." : "ส่งคำตอบ"}
-          </button>
+          <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:justify-between">
+            <button
+              onClick={handleBack}
+              disabled={submitting}
+              className="rounded-xl border border-gray-300 px-6 py-3 font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+            >
+              ยกเลิก
+            </button>
+            <button
+              onClick={handleSubmit}
+              disabled={submitting || alreadySubmitted}
+              className="rounded-xl bg-blue-600 px-6 py-3 font-medium text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {submitting ? "กำลังส่ง..." : "ส่งแบบประเมิน"}
+            </button>
+          </div>
         </div>
       </div>
-    </StudentShell>
+    </div>
   );
 }
