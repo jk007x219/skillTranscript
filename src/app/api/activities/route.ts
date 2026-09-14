@@ -4,6 +4,7 @@ import { pool } from "@/lib/db";
 import { jsonError, httpError } from "@/lib/api-error";
 import { nanoid } from "nanoid";
 import { auth } from "@/auth";
+import { ensureActivityRegistrationColumns, toMySqlDateTime } from "@/lib/activity-registration";
 
 function splitDateTime(value: string) {
   const [date, time] = value.split("T");
@@ -19,6 +20,7 @@ function calculateHours(start: Date, end: Date) {
 
 export async function GET(request: NextRequest) {
   try {
+    await ensureActivityRegistrationColumns();
     const { searchParams } = new URL(request.url);
     const visible = searchParams.get("visible") === "true";
     const studentId = searchParams.get("studentId");
@@ -33,7 +35,9 @@ export async function GET(request: NextRequest) {
         a.location, a.organizer, a.term, a.status, 
         a.confirmationEnabled, a.hasEvaluation, a.evaluation,
         a.verification_code, a.code_expires_at, a.createdBy, a.templateId,
+        a.registrationStart, a.registrationEnd, a.registrationEnabled,
         COUNT(p.ParticipationId) as attendeeCount,
+        MAX(CASE WHEN p.status = 'completed' THEN 1 ELSE 0 END) as hasConfirmedParticipants,
         MAX(sp.status) as participationStatus,
         MAX(sp.score) as participationScore
       FROM activity a
@@ -59,9 +63,8 @@ export async function GET(request: NextRequest) {
 
     if (visible) {
       if (studentId) {
-        conditions.push(`a.hasEvaluation = 1`);
-        conditions.push(`a.confirmationEnabled = 1`);
         conditions.push(`a.status = 'active'`);
+        conditions.push(`(a.registrationEnabled = 1 OR sp.status = 'registered')`);
         conditions.push(`(sp.ParticipationId IS NULL OR sp.status <> 'completed' OR sp.score IS NULL)`);
       } else {
         conditions.push(`a.confirmationEnabled = 1`);
@@ -111,10 +114,15 @@ export async function GET(request: NextRequest) {
       term: act.term,
       status: act.status || "active",
       attendeeCount: act.attendeeCount || 0,
+      hasConfirmedParticipants: Boolean(act.hasConfirmedParticipants),
       confirmationEnabled: Boolean(act.confirmationEnabled),
+      registrationEnabled: Boolean(act.registrationEnabled),
       hasEvaluation: Boolean(act.hasEvaluation),
       participationStatus: act.participationStatus || null,
       participationScore: act.participationScore === null ? null : Number(act.participationScore),
+      registrationStart: act.registrationStart,
+      registrationEnd: act.registrationEnd,
+      registrationOpen: Boolean(act.registrationEnabled),
       evaluation: act.evaluation ? JSON.parse(act.evaluation) : undefined,
       skills: skillMap[act.activityId] || [],
       verificationCode: act.verification_code,
@@ -131,6 +139,7 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
+    await ensureActivityRegistrationColumns();
     const session = await auth();
     const role = session?.user?.role;
     const isExecutive = Boolean(session?.user?.isExecutive);
@@ -150,6 +159,8 @@ export async function POST(request: NextRequest) {
       selectedSkills,
       organizer,
       templateId,
+      registrationStart,
+      registrationEnd,
     } = body;
 
     if (!title || !dateTime || !endDateTime) {
@@ -181,6 +192,15 @@ export async function POST(request: NextRequest) {
     if (finishDateTime <= startDateTime) {
       throw httpError(400, "วันที่เวลาสิ้นสุดต้องมากกว่าวันที่เวลาเริ่มต้น");
     }
+    if ((registrationStart && !registrationEnd) || (!registrationStart && registrationEnd)) {
+      throw httpError(400, "กรุณาระบุเวลาเริ่มและสิ้นสุดลงทะเบียนให้ครบ");
+    }
+    if (registrationStart && registrationEnd) {
+      const registrationFinish = new Date(registrationEnd);
+      if (Number.isNaN(registrationFinish.getTime()) || registrationFinish >= startDateTime) {
+        throw httpError(400, "เวลาสิ้นสุดลงทะเบียนต้องอยู่ก่อนเวลาเริ่มกิจกรรม");
+      }
+    }
 
     const activityId = nanoid(20);
     const start = splitDateTime(dateTime);
@@ -189,8 +209,8 @@ export async function POST(request: NextRequest) {
 
     await pool.query(
       `INSERT INTO activity 
-        (activityId, activityName, description, date, time, endDate, endTime, hours, location, organizer, term, status, confirmationEnabled, hasEvaluation, createdBy, templateId)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'active', 0, 0, ?, ?)`,
+        (activityId, activityName, description, date, time, endDate, endTime, hours, location, organizer, term, status, confirmationEnabled, hasEvaluation, createdBy, templateId, registrationStart, registrationEnd)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'active', 0, 0, ?, ?, ?, ?)`,
       [
         activityId,
         title,
@@ -205,6 +225,8 @@ export async function POST(request: NextRequest) {
         term || "1",
         session.user.id,
         finalTemplateId,
+        toMySqlDateTime(registrationStart),
+        toMySqlDateTime(registrationEnd),
       ]
     );
 

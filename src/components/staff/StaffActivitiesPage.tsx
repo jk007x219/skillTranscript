@@ -63,7 +63,9 @@ type StaffActivity = {
   location: string;
   organizer: string;
   attendeeCount: number;
+  hasConfirmedParticipants?: boolean;
   confirmationEnabled: boolean;
+  registrationEnabled: boolean;
   hasEvaluation: boolean;
   status: ActivityStatus;
   skills: ActivitySkill[];
@@ -71,6 +73,8 @@ type StaffActivity = {
   verificationCode?: string | null;
   codeExpiresAt?: string | null;
   templateId?: string | null;
+  registrationStart?: string | null;
+  registrationEnd?: string | null;
 };
 
 type ActivityForm = {
@@ -85,6 +89,8 @@ type ActivityForm = {
   organizer: string;
   selectedSkills: { skillId: string; name: string; level: string }[];
   templateId?: string;
+  registrationStart: string;
+  registrationEnd: string;
 };
 
 type SkillOption = {
@@ -106,6 +112,8 @@ const emptyForm: ActivityForm = {
   organizer: "คณะวิทยาศาสตร์และนวัตกรรมดิจิทัล",
   selectedSkills: [],
   templateId: "",
+  registrationStart: "",
+  registrationEnd: "",
 };
 
 // ===== Helper functions =====
@@ -377,6 +385,19 @@ function AddActivityModal({
               placeholder="คณะวิทยาศาสตร์และนวัตกรรมดิจิทัล"
             />
           </Field>
+
+          <div className="rounded-lg border border-blue-100 bg-white/60 p-4">
+            <p className="text-sm font-semibold text-slate-800">ช่วงเวลาลงทะเบียน</p>
+            <p className="mt-1 text-xs text-slate-500">นิสิตต้องลงทะเบียนในช่วงเวลานี้ก่อนจึงจะยืนยันการเข้าร่วมได้</p>
+            <div className="mt-3 grid gap-4 sm:grid-cols-2">
+              <Field label="เริ่มลงทะเบียน">
+                <input type="datetime-local" value={form.registrationStart} onChange={(e) => onChange("registrationStart", e.target.value)} className="staff-activity-input" required />
+              </Field>
+              <Field label="สิ้นสุดลงทะเบียน">
+                <input type="datetime-local" value={form.registrationEnd} onChange={(e) => onChange("registrationEnd", e.target.value)} min={form.registrationStart || undefined} max={form.startDate && form.startTime ? `${form.startDate}T${form.startTime}` : undefined} className="staff-activity-input" required />
+              </Field>
+            </div>
+          </div>
 
           <Field label="แม่แบบเกียรติบัตร (ใบเซอร์)">
             <select
@@ -967,6 +988,23 @@ export default function StaffActivitiesPage() {
     }
   };
 
+  const updateRegistration = async (activityId: string) => {
+    const activity = activities.find((item) => item.id === activityId);
+    if (!activity) return;
+
+    try {
+      const res = await fetch(`/api/activities/${activityId}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ registrationEnabled: !activity.registrationEnabled }),
+      });
+      if (!res.ok) throw new Error("อัปเดตการลงทะเบียนไม่สำเร็จ");
+      await fetchActivities();
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "เกิดข้อผิดพลาด");
+    }
+  };
+
   // ===== สร้างกิจกรรม (ปรับ payload) =====
   const createActivity = async () => {
     try {
@@ -987,6 +1025,12 @@ export default function StaffActivitiesPage() {
       if (endDateObj <= startDateObj) {
         throw new Error("วันที่เวลาสิ้นสุดต้องมากกว่าวันที่เวลาเริ่มต้น");
       }
+      if (!form.registrationStart || !form.registrationEnd) {
+        throw new Error("กรุณาระบุช่วงเวลาลงทะเบียน");
+      }
+      if (new Date(form.registrationEnd) <= new Date(form.registrationStart) || new Date(form.registrationEnd) >= startDateObj) {
+        throw new Error("เวลาสิ้นสุดลงทะเบียนต้องอยู่หลังเวลาเริ่มลงทะเบียนและก่อนเวลาเริ่มกิจกรรม");
+      }
 
       const payload = {
         title: form.title,
@@ -998,6 +1042,8 @@ export default function StaffActivitiesPage() {
         organizer: form.organizer,
         selectedSkills: form.selectedSkills,
         templateId: form.templateId || undefined,
+        registrationStart: form.registrationStart,
+        registrationEnd: form.registrationEnd,
       };
 
       const res = await fetch("/api/activities", {
@@ -1059,6 +1105,12 @@ export default function StaffActivitiesPage() {
       if (endDateObj <= startDateObj) {
         throw new Error("วันที่เวลาสิ้นสุดต้องมากกว่าวันที่เวลาเริ่มต้น");
       }
+      if (!editForm.registrationStart || !editForm.registrationEnd) {
+        throw new Error("กรุณาระบุช่วงเวลาลงทะเบียน");
+      }
+      if (new Date(editForm.registrationEnd) <= new Date(editForm.registrationStart) || new Date(editForm.registrationEnd) >= startDateObj) {
+        throw new Error("เวลาสิ้นสุดลงทะเบียนต้องอยู่หลังเวลาเริ่มลงทะเบียนและก่อนเวลาเริ่มกิจกรรม");
+      }
 
       const updatedSkills = editForm.selectedSkills.map((skill) => {
         const matched = skillOptions.find((s) => s.skillname === skill.name);
@@ -1075,6 +1127,8 @@ export default function StaffActivitiesPage() {
         organizer: editForm.organizer,
         selectedSkills: updatedSkills,
         templateId: editForm.templateId || undefined,
+        registrationStart: editForm.registrationStart,
+        registrationEnd: editForm.registrationEnd,
       };
 
       const res = await fetch(`/api/activities/${editingActivity.id}`, {
@@ -1180,6 +1234,8 @@ export default function StaffActivitiesPage() {
       organizer: activity.organizer || "คณะวิทยาศาสตร์และนวัตกรรมดิจิทัล",
       selectedSkills: activity.skills.map((skill) => ({ skillId: skill.skillId || "", name: skill.name, level: skill.level })),
       templateId: activity.templateId || "",
+      registrationStart: toDateTimeInputValue(activity.registrationStart?.slice(0, 10), activity.registrationStart?.slice(11, 16)),
+      registrationEnd: toDateTimeInputValue(activity.registrationEnd?.slice(0, 10), activity.registrationEnd?.slice(11, 16)),
     });
     setIsEditModalOpen(true);
   };
@@ -1351,7 +1407,7 @@ export default function StaffActivitiesPage() {
                 filteredActivities.map((activity) => (
                   <article
                     key={activity.id}
-                    className="grid gap-4 rounded-xl border border-blue-100 bg-white px-8 py-4 shadow-[0_8px_18px_rgba(21,101,192,0.16)] lg:grid-cols-[1.05fr_1.18fr_0.75fr_1.05fr]"
+                    className="grid gap-4 rounded-xl border border-blue-100 bg-white px-8 py-4 shadow-[0_8px_18px_rgba(21,101,192,0.16)] lg:grid-cols-[1.05fr_1.18fr_0.75fr_0.8fr_1.05fr]"
                   >
                     <div className="flex min-h-[96px] flex-col justify-center">
                       <h2 className="text-sm font-bold text-slate-950">{activity.title}</h2>
@@ -1452,6 +1508,14 @@ export default function StaffActivitiesPage() {
                     </div>
 
                     <div className="border-blue-100 lg:border-l lg:pl-5">
+                      <p className="mb-2 text-sm font-bold text-slate-950">เปิดลงทะเบียน</p>
+                      <ToggleSwitch enabled={activity.registrationEnabled} onClick={() => updateRegistration(activity.id)} />
+                      <p className="mt-2 text-xs text-slate-500">
+                        {activity.registrationEnabled ? "เปิดให้ลงทะเบียนได้ทันที (ไม่อิงช่วงเวลา)" : "ปิดการลงทะเบียน"}
+                      </p>
+                    </div>
+
+                    <div className="border-blue-100 lg:border-l lg:pl-5">
                       <p className="mb-2 text-sm font-bold text-slate-950">ยืนยันการเข้าร่วม</p>
                       <ToggleSwitch enabled={activity.confirmationEnabled} onClick={() => updateConfirmation(activity.id)} />
                       <button
@@ -1487,7 +1551,9 @@ export default function StaffActivitiesPage() {
                         <button
                           type="button"
                           onClick={() => handleEdit(activity)}
-                          className="inline-flex h-8 flex-1 items-center justify-center gap-1 rounded-lg border border-[#1565C0] bg-white px-2 text-xs font-medium text-[#1565C0] transition hover:bg-blue-50"
+                          disabled={activity.hasConfirmedParticipants}
+                          title={activity.hasConfirmedParticipants ? "มีนิสิตยืนยันการเข้าร่วมแล้ว" : undefined}
+                          className="inline-flex h-8 flex-1 items-center justify-center gap-1 rounded-lg border border-[#1565C0] bg-white px-2 text-xs font-medium text-[#1565C0] transition hover:bg-blue-50 disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-slate-100 disabled:text-slate-400"
                         >
                           <Edit className="h-3.5 w-3.5" /> แก้ไข
                         </button>

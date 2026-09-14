@@ -100,6 +100,9 @@ export async function POST(request: NextRequest, context: RouteContext) {
     if (existingParticipation && existingParticipation.status === "completed") {
       throw httpError(409, "คุณเคยทำแบบประเมินนี้แล้ว ไม่สามารถทำซ้ำได้");
     }
+    if (!existingParticipation || existingParticipation.status !== "registered") {
+      throw httpError(403, "กรุณาลงทะเบียนและยืนยันการเข้าร่วมกิจกรรมก่อนทำแบบประเมิน");
+    }
 
     // =========================================================
     // 4. ตรวจสอบว่าตอบครบทุกข้อ

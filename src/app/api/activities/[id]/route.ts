@@ -4,6 +4,7 @@ import { pool } from "@/lib/db";
 import { jsonError, httpError } from "@/lib/api-error";
 import { nanoid } from "nanoid";
 import { auth } from "@/auth";
+import { ensureActivityRegistrationColumns, toMySqlDateTime } from "@/lib/activity-registration";
 
 // helper: แยกวันที่และเวลาจาก datetime-local string
 function splitDateTime(value: string) {
@@ -128,6 +129,7 @@ export async function PUT(
   const connection = await pool.getConnection();
   try {
     const { id } = await params;
+    await ensureActivityRegistrationColumns();
     const session = await auth();
     const role = session?.user?.role;
     const isExecutive = Boolean(session?.user?.isExecutive);
@@ -148,6 +150,17 @@ export async function PUT(
 
     const body = await request.json();
 
+    const [activityRows] = await connection.query<any[]>(
+      `SELECT a.date, a.time,
+         EXISTS(SELECT 1 FROM participation p WHERE p.activityId = a.activityId AND p.status = 'completed') AS hasCompleted
+       FROM activity a WHERE a.activityId = ? LIMIT 1`,
+      [id],
+    );
+    if (activityRows.length === 0) throw httpError(404, "ไม่พบกิจกรรม");
+    if (activityRows[0].hasCompleted) {
+      throw httpError(409, "กิจกรรมนี้มีนิสิตยืนยันการเข้าร่วมแล้ว จึงไม่สามารถแก้ไขได้");
+    }
+
     const {
       title,
       description,
@@ -163,7 +176,23 @@ export async function PUT(
       evaluation,
       verificationCode,
       codeExpiresAt,
+      registrationStart,
+      registrationEnd,
+      registrationEnabled,
     } = body;
+
+    if (registrationEnd !== undefined) {
+      const registrationFinish = registrationEnd ? new Date(registrationEnd) : null;
+      const activityStart = dateTime
+        ? new Date(dateTime)
+        : new Date(`${String(activityRows[0].date).slice(0, 10)}T${String(activityRows[0].time).slice(0, 5)}`);
+      if (!registrationFinish || Number.isNaN(registrationFinish.getTime())) {
+        throw httpError(400, "รูปแบบเวลาสิ้นสุดลงทะเบียนไม่ถูกต้อง");
+      }
+      if (registrationFinish >= activityStart) {
+        throw httpError(400, "เวลาสิ้นสุดลงทะเบียนต้องอยู่ก่อนเวลาเริ่มกิจกรรม");
+      }
+    }
 
     const updates: string[] = [];
     const values: any[] = [];
@@ -193,6 +222,9 @@ export async function PUT(
     addUpdate("location", location);
     addUpdate("organizer", organizer);
     addUpdate("status", status);
+    if (registrationStart !== undefined) addUpdate("registrationStart", toMySqlDateTime(registrationStart));
+    if (registrationEnd !== undefined) addUpdate("registrationEnd", toMySqlDateTime(registrationEnd));
+    addUpdate("registrationEnabled", registrationEnabled, (value: boolean) => (value ? 1 : 0));
 
     // จัดการวันที่และเวลา
     if (dateTime !== undefined) {

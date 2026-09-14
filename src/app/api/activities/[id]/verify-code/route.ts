@@ -2,6 +2,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { pool } from "@/lib/db";
 import { jsonError, httpError } from "@/lib/api-error";
+import { auth } from "@/auth";
 
 export async function POST(
   request: NextRequest,
@@ -9,6 +10,10 @@ export async function POST(
 ) {
   try {
     const { id } = await params;
+    const session = await auth();
+    if (!session?.user?.studentId || session.user.role !== "student") {
+      throw httpError(403, "กรุณาเข้าสู่ระบบด้วยบัญชีนิสิต");
+    }
     const body = await request.json();
     const { code } = body;
 
@@ -38,6 +43,16 @@ export async function POST(
 
     if (storedCode !== code) {
       throw httpError(400, "รหัสยืนยันไม่ถูกต้อง");
+    }
+
+    const [registrations] = await pool.query<any[]>(
+      `SELECT ParticipationId FROM participation
+       WHERE studentId = ? AND activityId = ? AND status = 'registered'
+       LIMIT 1`,
+      [session.user.studentId, id],
+    );
+    if (!registrations[0]) {
+      throw httpError(403, "กรุณาลงทะเบียนกิจกรรมก่อนยืนยันการเข้าร่วม");
     }
 
     return NextResponse.json({
