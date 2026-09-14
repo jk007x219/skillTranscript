@@ -16,6 +16,7 @@ interface FileItem {
 export default function RequestActivityPage() {
   const router = useRouter();
   const { user, loading: authLoading } = useAuth();
+
   const [formData, setFormData] = useState({
     activityName: "",
     organizer: "",
@@ -37,9 +38,11 @@ export default function RequestActivityPage() {
         ...prev,
         [name]: value,
       };
+
       if (name === "date" && next.endDate && next.endDate < value) {
         next.endDate = "";
       }
+
       return next;
     });
   };
@@ -58,11 +61,13 @@ export default function RequestActivityPage() {
 
     const selectedArray = Array.from(selectedFiles).slice(0, remainingSlots);
 
-    const newFiles: FileItem[] = selectedArray.map((file) => ({
-      id: crypto.randomUUID(),
-      file,
-      name: file.name,
-    }));
+const newFiles: FileItem[] = selectedArray.map((file) => ({
+  id: `${Date.now()}-${Math.random()
+    .toString(36)
+    .slice(2, 10)}`,
+  file,
+  name: file.name,
+}));
 
     setFiles((prev) => [...prev, ...newFiles]);
 
@@ -77,7 +82,6 @@ export default function RequestActivityPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    // ✅ บังคับให้แนบไฟล์หลักฐาน
     if (files.length === 0) {
       alert("กรุณาแนบเอกสารหลักฐานอย่างน้อย 1 ไฟล์");
       return;
@@ -90,13 +94,16 @@ export default function RequestActivityPage() {
 
     try {
       setSubmitting(true);
+
       const requestFormData = new FormData();
+
       requestFormData.append("studentId", user.studentId);
       requestFormData.append("activityName", formData.activityName);
       requestFormData.append("organizer", formData.organizer);
       requestFormData.append("activityDate", formData.date);
       requestFormData.append("activityEndDate", formData.endDate);
       requestFormData.append("description", formData.summary);
+
       files.forEach((item) => {
         requestFormData.append("evidenceFiles", item.file);
       });
@@ -107,11 +114,15 @@ export default function RequestActivityPage() {
       });
 
       const data = await res.json();
+
       if (!res.ok) {
         throw new Error(data.message || "ส่งคำขอไม่สำเร็จ");
       }
 
-      alert("ส่งคำขอเพิ่มกิจกรรมเรียบร้อยแล้ว");
+      alert(
+        "ส่งคำขอเพิ่มกิจกรรมเรียบร้อยแล้ว\n\nเจ้าหน้าที่จะตรวจสอบหลักฐานและกำหนดทักษะพร้อมระดับให้ภายหลัง",
+      );
+
       setFormData({
         activityName: "",
         organizer: "",
@@ -119,7 +130,9 @@ export default function RequestActivityPage() {
         endDate: "",
         summary: "",
       });
+
       setFiles([]);
+
       router.push("/student/request-status");
     } catch (err) {
       alert(err instanceof Error ? err.message : "เกิดข้อผิดพลาด");
@@ -145,7 +158,6 @@ export default function RequestActivityPage() {
                 <div className="mt-2 h-[2px] w-20 rounded-full bg-[#FFC107]" />
               </div>
 
-              {/* จำนวนไฟล์ */}
               <div className="hidden rounded-full bg-blue-50 px-3 py-1.5 text-xs font-medium text-[#1565C0] sm:block">
                 เอกสาร {files.length}/5
               </div>
@@ -163,10 +175,9 @@ export default function RequestActivityPage() {
           <form onSubmit={handleSubmit}>
             <div className="grid grid-cols-1 gap-5 lg:grid-cols-[1.35fr_0.9fr]">
               {/* ================================================= */}
-              {/* LEFT : ACTIVITY INFORMATION */}
+              {/* LEFT */}
               {/* ================================================= */}
               <div className="rounded-2xl border border-[#DCEBFA] bg-white p-5 shadow-[0_8px_30px_rgba(15,23,42,0.05)] sm:p-6">
-                {/* Section Header */}
                 <div className="mb-5 flex items-center gap-3">
                   <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-[#EAF5FF] text-sm font-semibold text-[#1565C0]">
                     01
@@ -190,8 +201,7 @@ export default function RequestActivityPage() {
                       htmlFor="activityName"
                       className="mb-1.5 block text-[13px] font-medium text-[#334155]"
                     >
-                      ชื่อกิจกรรม{" "}
-                      <span className="text-red-500">*</span>
+                      ชื่อกิจกรรม <span className="text-red-500">*</span>
                     </label>
 
                     <input
@@ -308,11 +318,10 @@ export default function RequestActivityPage() {
               </div>
 
               {/* ================================================= */}
-              {/* RIGHT : EVIDENCE */}
+              {/* RIGHT */}
               {/* ================================================= */}
               <div className="flex flex-col gap-5">
                 <div className="rounded-2xl border border-[#DCEBFA] bg-white p-5 shadow-[0_8px_30px_rgba(15,23,42,0.05)] sm:p-6">
-                  {/* Section Header */}
                   <div className="mb-5 flex items-center justify-between">
                     <div className="flex items-center gap-3">
                       <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-[#EAF5FF] text-sm font-semibold text-[#1565C0]">
@@ -341,7 +350,6 @@ export default function RequestActivityPage() {
                     </span>
                   </div>
 
-                  {/* Upload Box */}
                   <label
                     htmlFor="file-upload"
                     className={`group flex cursor-pointer flex-col items-center justify-center rounded-xl border border-dashed px-4 py-7 text-center transition ${
@@ -375,7 +383,6 @@ export default function RequestActivityPage() {
                     />
                   </label>
 
-                  {/* File List */}
                   {files.length > 0 ? (
                     <div className="mt-4 space-y-2">
                       {files.map((item, index) => (
@@ -418,7 +425,51 @@ export default function RequestActivityPage() {
                 </div>
 
                 {/* ================================================= */}
-                {/* SUBMIT CARD */}
+                {/* SCORING INFO */}
+                {/* ================================================= */}
+                <div className="rounded-2xl border border-[#DCEBFA] bg-white p-5 shadow-[0_8px_30px_rgba(15,23,42,0.05)] sm:p-6">
+                  <div className="mb-3">
+                    <h3 className="text-[13px] font-semibold text-[#334155]">
+                      การพิจารณาทักษะ
+                    </h3>
+
+                    <p className="mt-1 text-[10px] leading-5 text-slate-500">
+                      หลังจากส่งคำขอ เจ้าหน้าที่จะตรวจสอบหลักฐาน
+                      และกำหนดทักษะพร้อมระดับที่ได้รับ
+                    </p>
+                  </div>
+
+                  <div className="space-y-1.5 text-[11px]">
+                    <div className="flex items-center justify-between rounded-lg bg-slate-50 px-3 py-2">
+                      <span className="text-slate-600">ระดับพื้นฐาน</span>
+                      <span className="font-semibold text-[#1565C0]">
+                        1 / 1 คะแนน
+                      </span>
+                    </div>
+
+                    <div className="flex items-center justify-between rounded-lg bg-slate-50 px-3 py-2">
+                      <span className="text-slate-600">ระดับปานกลาง</span>
+                      <span className="font-semibold text-[#1565C0]">
+                        2 / 2 คะแนน
+                      </span>
+                    </div>
+
+                    <div className="flex items-center justify-between rounded-lg bg-slate-50 px-3 py-2">
+                      <span className="text-slate-600">ระดับสูง</span>
+                      <span className="font-semibold text-[#1565C0]">
+                        3 / 3 คะแนน
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="mt-3 rounded-lg bg-[#FFF9E6] px-3 py-2 text-[10px] leading-5 text-[#856404]">
+                    คะแนนจะถูกบันทึกให้อัตโนมัติตามระดับที่เจ้าหน้าที่กำหนด
+                    โดยไม่ต้องทำแบบประเมินเพิ่มเติม
+                  </div>
+                </div>
+
+                {/* ================================================= */}
+                {/* SUBMIT */}
                 {/* ================================================= */}
                 <div className="rounded-2xl border border-[#DCEBFA] bg-[#F8FCFF] p-5 sm:p-6">
                   <div className="flex items-start gap-3">
@@ -434,6 +485,7 @@ export default function RequestActivityPage() {
                       <p className="mt-1 text-[10px] leading-5 text-slate-500">
                         กรุณาตรวจสอบข้อมูลและเอกสารหลักฐานให้ถูกต้อง
                         หลังจากส่งคำขอแล้ว เจ้าหน้าที่จะดำเนินการตรวจสอบ
+                        และกำหนดทักษะที่ได้รับ
                       </p>
                     </div>
                   </div>
@@ -441,7 +493,7 @@ export default function RequestActivityPage() {
                   <button
                     type="submit"
                     disabled={submitting || authLoading}
-                    className="mt-4 inline-flex h-10 w-full items-center justify-center gap-2 rounded-lg bg-[#4598D0] px-5 text-[13px] font-semibold text-white shadow-sm transition hover:bg-[#1565C0] active:scale-[0.99]"
+                    className="mt-4 inline-flex h-10 w-full items-center justify-center gap-2 rounded-lg bg-[#4598D0] px-5 text-[13px] font-semibold text-white shadow-sm transition hover:bg-[#1565C0] active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-60"
                   >
                     <Upload className="h-4 w-4" />
                     {submitting ? "กำลังส่งคำขอ..." : "ส่งคำขอเพิ่มกิจกรรม"}

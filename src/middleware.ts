@@ -3,7 +3,18 @@ import { NextResponse, type NextRequest } from "next/server";
 import { getToken } from "next-auth/jwt";
 
 const protectedPagePrefixes = ["/student", "/teacher", "/staff", "/executive"];
-const publicPaths = ["/api/auth", "/api/health", "/api/users/teachers", "/login", "/register", "/forgot-password", "/reset-password", "/change-password"];
+const publicPaths = [
+  "/api/auth",
+  "/api/health",
+  "/api/users/teachers",
+  "/api/certificate-settings/signature",
+  "/api/activity-requests/evidence",
+  "/login",
+  "/register",
+  "/forgot-password",
+  "/reset-password",
+  "/change-password",
+];
 
 function isApiRequest(pathname: string) {
   return pathname.startsWith("/api/");

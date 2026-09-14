@@ -20,20 +20,25 @@ function sanitizeFileName(fileName: string) {
 
 async function requireOfficer() {
   const session = await auth();
+
   if (!session?.user?.id || session.user.role !== "officer") {
     throw httpError(403, "ไม่มีสิทธิ์จัดการข้อมูลคณบดี");
   }
+
   return session.user;
 }
 
-// ✅ GET: อนุญาตให้ทุกคนที่ login อ่านได้ (ไม่ต้องเป็น officer)
+// GET: ผู้ที่ login แล้วสามารถอ่านข้อมูลได้
 export async function GET() {
   try {
     const session = await auth();
+
     if (!session?.user?.id) {
       throw httpError(401, "กรุณาเข้าสู่ระบบ");
     }
+
     const settings = await getDeanSettings();
+
     return NextResponse.json({ settings });
   } catch (error) {
     return jsonError(error);
@@ -44,51 +49,97 @@ export async function GET() {
 export async function PUT(request: NextRequest) {
   try {
     const user = await requireOfficer();
+
     const formData = await request.formData();
-    const deanName = String(formData.get("deanName") || "").trim();
+
+    const deanName = String(
+      formData.get("deanName") || "",
+    ).trim();
+
     const signature = formData.get("signature");
-    const removeSignature = formData.get("removeSignature") === "true";
+
+    const removeSignature =
+      formData.get("removeSignature") === "true";
 
     if (!deanName) {
       throw httpError(400, "กรุณาระบุชื่อคณบดี");
     }
 
-    let deanSignatureUrl = (await getDeanSettings()).deanSignatureUrl;
+    let deanSignatureUrl =
+      (await getDeanSettings()).deanSignatureUrl;
 
     if (signature instanceof File && signature.size > 0) {
       if (!signature.type.startsWith("image/")) {
-        throw httpError(400, "รองรับเฉพาะไฟล์รูปภาพลายเซ็น");
-      }
-      if (signature.size > MAX_SIGNATURE_SIZE) {
-        throw httpError(400, "ไฟล์ลายเซ็นต้องมีขนาดไม่เกิน 2 MB");
+        throw httpError(
+          400,
+          "รองรับเฉพาะไฟล์รูปภาพลายเซ็น",
+        );
       }
 
-      const uploadDir = path.join(process.cwd(), "public", "uploads", "certificate-settings");
-      await mkdir(uploadDir, { recursive: true });
-      const fileName = `${nanoid(8)}-${sanitizeFileName(signature.name)}`;
+      if (signature.size > MAX_SIGNATURE_SIZE) {
+        throw httpError(
+          400,
+          "ไฟล์ลายเซ็นต้องมีขนาดไม่เกิน 2 MB",
+        );
+      }
+
+      const uploadDir = path.join(
+        process.cwd(),
+        "public",
+        "uploads",
+        "certificate-settings",
+      );
+
+      await mkdir(uploadDir, {
+        recursive: true,
+      });
+
+      const fileName = `${nanoid(8)}-${sanitizeFileName(
+        signature.name,
+      )}`;
+
+      const filePath = path.join(
+        uploadDir,
+        fileName,
+      );
+
       await writeFile(
-        path.join(uploadDir, fileName),
+        filePath,
         Buffer.from(await signature.arrayBuffer()),
       );
-      deanSignatureUrl = `/uploads/certificate-settings/${fileName}`;
+
+      // ใช้ API สำหรับเสิร์ฟไฟล์
+      deanSignatureUrl =
+        `/api/certificate-settings/signature/${encodeURIComponent(
+          fileName,
+        )}`;
     } else if (removeSignature) {
       deanSignatureUrl = null;
     }
 
     await ensureCertificateSettingsTable();
+
     await pool.query(
-      `INSERT INTO certificate_settings (settingId, deanName, deanSignatureUrl, updatedBy)
+      `INSERT INTO certificate_settings
+        (settingId, deanName, deanSignatureUrl, updatedBy)
        VALUES (1, ?, ?, ?)
        ON DUPLICATE KEY UPDATE
          deanName = VALUES(deanName),
          deanSignatureUrl = VALUES(deanSignatureUrl),
          updatedBy = VALUES(updatedBy)`,
-      [deanName, deanSignatureUrl, user.id],
+      [
+        deanName,
+        deanSignatureUrl,
+        user.id,
+      ],
     );
 
     return NextResponse.json({
       message: "บันทึกข้อมูลคณบดีเรียบร้อยแล้ว",
-      settings: { deanName, deanSignatureUrl },
+      settings: {
+        deanName,
+        deanSignatureUrl,
+      },
     });
   } catch (error) {
     return jsonError(error);

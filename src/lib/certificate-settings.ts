@@ -6,6 +6,31 @@ export type DeanSettings = {
   deanSignatureUrl: string | null;
 };
 
+const SIGNATURE_API_PREFIX = "/api/certificate-settings/signature";
+
+function normalizeDeanSignatureUrl(
+  value: string | null | undefined,
+): string | null {
+  if (!value) return null;
+
+  // รองรับข้อมูลเก่าที่เก็บเป็น /uploads/... อยู่ในฐานข้อมูล
+  if (value.startsWith("/uploads/certificate-settings/")) {
+    const fileName = value.replace(
+      "/uploads/certificate-settings/",
+      "",
+    );
+
+    return `${SIGNATURE_API_PREFIX}/${encodeURIComponent(fileName)}`;
+  }
+
+  // ถ้าเป็น URL แบบใหม่อยู่แล้ว
+  if (value.startsWith(`${SIGNATURE_API_PREFIX}/`)) {
+    return value;
+  }
+
+  return value;
+}
+
 export async function ensureCertificateSettingsTable() {
   await pool.query(`
     CREATE TABLE IF NOT EXISTS certificate_settings (
@@ -24,10 +49,13 @@ export async function getDeanSettings(): Promise<DeanSettings> {
   const [rows] = await pool.query<RowDataPacket[]>(
     "SELECT deanName, deanSignatureUrl FROM certificate_settings WHERE settingId = 1 LIMIT 1",
   );
+
   const row = rows[0];
 
   return {
     deanName: row?.deanName || "",
-    deanSignatureUrl: row?.deanSignatureUrl || null,
+    deanSignatureUrl: normalizeDeanSignatureUrl(
+      row?.deanSignatureUrl || null,
+    ),
   };
 }

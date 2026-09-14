@@ -1,11 +1,15 @@
 // app/api/staff/dashboard/route.ts
 import { NextResponse } from "next/server";
-import { pool } from "@/lib/db";
+import type { RowDataPacket } from "mysql2";
 import { jsonError } from "@/lib/api-error";
+import { pool } from "@/lib/db";
 
 export const runtime = "nodejs";
 
-// ✅ รายชื่อทักษะทั้งหมด (11 ทักษะ) - ใช้เป็นค่าตั้งต้น
+// =========================================================
+// รายชื่อทักษะทั้งหมด 11 ทักษะ
+// ต้องเรียงให้เหมือน Student Dashboard
+// =========================================================
 const ALL_SKILLS = [
   "ทักษะการสร้างนวัตกรรมสังคม",
   "ทักษะการใช้ห้องปฏิบัติการและความปลอดภัยในห้องปฏิบัติการ",
@@ -20,7 +24,9 @@ const ALL_SKILLS = [
   "ทักษะดิจิทัล",
 ];
 
-// ✅ รายชื่อทักษะที่นิสิตคณะวิทย์ต้องมี (Faculty Skills) - 6 ทักษะ
+// =========================================================
+// ทักษะเฉพาะของคณะวิทยาศาสตร์และนวัตกรรมดิจิทัล
+// =========================================================
 const FACULTY_SKILL_NAMES = [
   "การสร้างนวัตกรรมสังคม",
   "การคิดเชิงออกแบบนวัตกรรม",
@@ -30,109 +36,376 @@ const FACULTY_SKILL_NAMES = [
   "การใช้ห้องปฏิบัติการ",
 ];
 
-export async function GET() {
+type StudentRow = RowDataPacket & {
+  studentId: string;
+};
+
+type AcademicYearRow = RowDataPacket & {
+  admissionYear: number;
+};
+
+type SkillScoreRow = RowDataPacket & {
+  skillName: string;
+  studentId: string;
+  totalEarned: number | string;
+  totalMax: number | string;
+};
+
+type StudentOverallRow = RowDataPacket & {
+  studentId: string;
+  totalEarned: number | string;
+  totalMax: number | string;
+};
+
+function round2(value: number) {
+  return Math.round(value * 100) / 100;
+}
+
+export async function GET(request: Request) {
   try {
-    // 1. จำนวนนิสิตทั้งหมด
-    const [totalStudentsResult] = await pool.query(
-      "SELECT COUNT(*) AS total FROM students"
-    );
-    const totalStudents = (totalStudentsResult as any[])[0]?.total || 0;
+    const { searchParams } = new URL(request.url);
 
-    // 2. จำนวนกิจกรรมทั้งหมด (แยกตามสถานะ)
-    const [activeActivitiesResult] = await pool.query(
-      "SELECT COUNT(*) AS total FROM activity WHERE status = 'active'"
-    );
-    const [pastActivitiesResult] = await pool.query(
-      "SELECT COUNT(*) AS total FROM activity WHERE status = 'past'"
-    );
-    const activeActivities = (activeActivitiesResult as any[])[0]?.total || 0;
-    const pastActivities = (pastActivitiesResult as any[])[0]?.total || 0;
+    // =========================================================
+    // รับปีการศึกษาจาก query
+    //
+    // /api/staff/dashboard
+    // /api/staff/dashboard?academicYear=all
+    // /api/staff/dashboard?academicYear=2567
+    // =========================================================
+    const academicYearParam = searchParams.get("academicYear");
 
-    // 3. คะแนนเฉลี่ยทักษะรวม (จาก participation ที่ completed)
-    const [avgScoreResult] = await pool.query(
-      "SELECT COALESCE(AVG(score), 0) AS avg FROM participation WHERE status = 'completed'"
-    );
-    const avgScore = (avgScoreResult as any[])[0]?.avg || 0;
-    const averageOverallScore = Math.round(avgScore * 100) / 100;
+    const isAllAcademicYears =
+      !academicYearParam ||
+      academicYearParam === "all" ||
+      academicYearParam === "ทุกปีการศึกษา";
 
-    // ✅ 4. คำนวณคะแนนเฉลี่ยทักษะแบบใหม่:
-    //    - คำนวณคะแนนเฉลี่ยของแต่ละนิสิตก่อน (จาก participation_skill)
-    //    - แล้วนำค่าเฉลี่ยของนิสิตมาหาค่าเฉลี่ยรวมอีกที
-    //    เพื่อป้องกัน bias จากนิสิตที่ทำแบบประเมินเยอะกว่า
-    
-    // 4.1 ดึงคะแนน normalized ของแต่ละทักษะของแต่ละนิสิต
-    const [studentSkillScores] = await pool.query(
-      `SELECT 
-         ps.skillName,
-         p.studentId,
-         AVG(ps.normalizedScore) AS normalizedScore
-       FROM participation_skill ps
-       INNER JOIN participation p ON p.ParticipationId = ps.participationId
-       WHERE p.status = 'completed'
-       GROUP BY p.studentId, ps.skillName`
-    );
+    let academicYear: number | null = null;
 
-    // 4.2 สร้าง Map: skillName -> array ของ normalizedScore ของแต่ละนิสิต
-    const skillScoresMap: Record<string, number[]> = {};
-    const studentScoreMap: Record<string, { skillName: string; normalizedScore: number }[]> = {};
+    if (!isAllAcademicYears) {
+      const parsedYear = Number(academicYearParam);
 
-    (studentSkillScores as any[]).forEach((row) => {
-      const skillName = row.skillName;
-      const score = parseFloat(row.normalizedScore) || 0;
-      const studentId = row.studentId;
-
-      // เก็บตามทักษะ
-      if (!skillScoresMap[skillName]) {
-        skillScoresMap[skillName] = [];
+      if (!Number.isInteger(parsedYear)) {
+        return NextResponse.json(
+          {
+            message: "ปีการศึกษาไม่ถูกต้อง",
+          },
+          { status: 400 }
+        );
       }
-      skillScoresMap[skillName].push(score);
 
-      // เก็บตามนิสิต (สำหรับคำนวณค่าเฉลี่ยรายบุคคล)
-      if (!studentScoreMap[studentId]) {
-        studentScoreMap[studentId] = [];
-      }
-      studentScoreMap[studentId].push({ skillName, normalizedScore: score });
+      academicYear = parsedYear;
+    }
+
+    // =========================================================
+    // 1. ดึงรายการปีการศึกษาที่มีอยู่จริง
+    // =========================================================
+    const [academicYearRows] = await pool.query<AcademicYearRow[]>(
+      `
+      SELECT DISTINCT admissionYear
+      FROM students
+      WHERE admissionYear IS NOT NULL
+      ORDER BY admissionYear DESC
+      `
+    );
+
+    const academicYears = academicYearRows
+      .map((row) => Number(row.admissionYear))
+      .filter((year) => Number.isInteger(year));
+
+    // =========================================================
+    // 2. ดึงนิสิตตามปีการศึกษา
+    //
+    // ถ้าเลือก all -> นิสิตทั้งหมด
+    // ถ้าเลือกปี -> admissionYear ตรงกับปีที่เลือก
+    // =========================================================
+    let studentQuery = `
+      SELECT studentId
+      FROM students
+    `;
+
+    const studentParams: number[] = [];
+
+    if (academicYear !== null) {
+      studentQuery += `
+        WHERE admissionYear = ?
+      `;
+      studentParams.push(academicYear);
+    }
+
+    const [studentRows] = await pool.query<StudentRow[]>(
+      studentQuery,
+      studentParams
+    );
+
+    const studentIds = studentRows.map((row) => String(row.studentId));
+
+    const totalStudents = studentIds.length;
+
+    // =========================================================
+    // ถ้าไม่มีนิสิตในปีที่เลือก
+    // ยังต้องส่งโครงสร้างข้อมูลกลับไปให้หน้าเว็บ
+    // =========================================================
+    if (studentIds.length === 0) {
+      const emptySkills = ALL_SKILLS.map((skillName) => ({
+        skillName,
+        average: 0,
+      }));
+
+      const facultySkills = emptySkills.filter((skill) =>
+        FACULTY_SKILL_NAMES.some((name) =>
+          skill.skillName.includes(name)
+        )
+      );
+
+      const essentialSkills = emptySkills.filter(
+        (skill) =>
+          !FACULTY_SKILL_NAMES.some((name) =>
+            skill.skillName.includes(name)
+          )
+      );
+
+      const radarData = emptySkills.map((skill) => ({
+        skill: skill.skillName,
+        score: skill.average,
+      }));
+
+      // จำนวนกิจกรรมยังเป็นของระบบทั้งหมด
+      const [activeActivitiesResult] = await pool.query<RowDataPacket[]>(
+        `
+        SELECT COUNT(*) AS total
+        FROM activity
+        WHERE status = 'active'
+        `
+      );
+
+      const [pastActivitiesResult] = await pool.query<RowDataPacket[]>(
+        `
+        SELECT COUNT(*) AS total
+        FROM activity
+        WHERE status = 'past'
+        `
+      );
+
+      return NextResponse.json({
+        academicYear,
+        academicYears,
+        totalStudents: 0,
+        activeActivities: Number(
+          activeActivitiesResult[0]?.total || 0
+        ),
+        pastActivities: Number(
+          pastActivitiesResult[0]?.total || 0
+        ),
+        averageOverallScore: 0,
+        facultySkills,
+        essentialSkills,
+        radarData,
+      });
+    }
+
+    // =========================================================
+    // สร้าง placeholders สำหรับ IN (?, ?, ?, ...)
+    // =========================================================
+    const placeholders = studentIds.map(() => "?").join(",");
+
+    // =========================================================
+    // 3. จำนวนกิจกรรม
+    //
+    // กิจกรรมเป็นข้อมูลของระบบ ไม่ได้ขึ้นกับ admissionYear
+    // =========================================================
+    const [activeActivitiesResult] = await pool.query<RowDataPacket[]>(
+      `
+      SELECT COUNT(*) AS total
+      FROM activity
+      WHERE status = 'active'
+      `
+    );
+
+    const [pastActivitiesResult] = await pool.query<RowDataPacket[]>(
+      `
+      SELECT COUNT(*) AS total
+      FROM activity
+      WHERE status = 'past'
+      `
+    );
+
+    const activeActivities = Number(
+      activeActivitiesResult[0]?.total || 0
+    );
+
+    const pastActivities = Number(
+      pastActivitiesResult[0]?.total || 0
+    );
+
+    // =========================================================
+    // 4. ดึงคะแนนแต่ละทักษะของแต่ละนิสิต
+    //
+    // ใช้สูตรเดียวกับ Student Dashboard:
+    //
+    // SUM(earnedScore)
+    // ---------------- × 100
+    // SUM(maxScore)
+    //
+    // สำคัญ:
+    // ต้องรวม earnedScore และ maxScore ก่อน
+    // แล้วจึงคำนวณเปอร์เซ็นต์
+    // =========================================================
+    const [skillScoreRows] = await pool.query<SkillScoreRow[]>(
+      `
+      SELECT
+        ps.skillName,
+        p.studentId,
+        SUM(COALESCE(ps.earnedScore, 0)) AS totalEarned,
+        SUM(COALESCE(ps.maxScore, 0)) AS totalMax
+      FROM participation_skill ps
+      INNER JOIN participation p
+        ON p.ParticipationId = ps.participationId
+      WHERE p.status = 'completed'
+        AND p.studentId IN (${placeholders})
+      GROUP BY
+        p.studentId,
+        ps.skillName
+      `,
+      studentIds
+    );
+
+    // =========================================================
+    // 5. Map คะแนน
+    //
+    // studentSkillPercentMap[studentId][skillName] = percent
+    // =========================================================
+    const studentSkillPercentMap: Record<
+      string,
+      Record<string, number>
+    > = {};
+
+    // เตรียมข้อมูลนิสิตทุกคน
+    studentIds.forEach((studentId) => {
+      studentSkillPercentMap[studentId] = {};
     });
 
-    // 4.3 คำนวณค่าเฉลี่ยของแต่ละทักษะ: 
-    //    - หาค่าเฉลี่ยของแต่ละนิสิตก่อน (normalizedScore ของนิสิตในแต่ละทักษะ)
-    //    - แล้วนำค่าเฉลี่ยของนิสิตมาหาค่าเฉลี่ยรวม
-    const skillAverageMap: Record<string, number> = {};
-    
-    // คำนวณค่าเฉลี่ยของแต่ละนิสิตต่อทักษะ แล้วหาค่าเฉลี่ยรวม
-    Object.keys(skillScoresMap).forEach((skillName) => {
-      const scores = skillScoresMap[skillName] || [];
-      if (scores.length === 0) {
-        skillAverageMap[skillName] = 0;
-        return;
+    skillScoreRows.forEach((row) => {
+      const studentId = String(row.studentId);
+      const skillName = String(row.skillName);
+
+      const earned = Number(row.totalEarned) || 0;
+      const max = Number(row.totalMax) || 0;
+
+      const percent =
+        max > 0
+          ? round2((earned / max) * 100)
+          : 0;
+
+      if (!studentSkillPercentMap[studentId]) {
+        studentSkillPercentMap[studentId] = {};
       }
-      // ค่าเฉลี่ยของทักษะนี้ = (ผลรวม normalizedScore ของนิสิตทั้งหมด) / (จำนวนนิสิต)
-      const sum = scores.reduce((a, b) => a + b, 0);
-      skillAverageMap[skillName] = Math.round((sum / scores.length) * 100) / 100;
+
+      studentSkillPercentMap[studentId][skillName] = percent;
     });
 
-    // 4.4 สร้าง allSkillAverages จาก ALL_SKILLS (เพื่อให้ครบ 11 ทักษะ)
-    const allSkillAverages = ALL_SKILLS.map((skillName) => ({
-      skillName,
-      average: Math.round((skillAverageMap[skillName] || 0) * 100) / 100,
-    }));
+    // =========================================================
+    // 6. ค่าเฉลี่ยของแต่ละทักษะ
+    //
+    // สำคัญ:
+    // ต้องเฉลี่ย "นิสิตทั้งหมดในกลุ่ม"
+    //
+    // ถ้านิสิตไม่มีคะแนนทักษะนั้น -> 0
+    //
+    // เช่น:
+    // นิสิต A = 100%
+    // นิสิต B = 50%
+    // นิสิต C = ไม่มีคะแนน = 0%
+    //
+    // ค่าเฉลี่ย = (100 + 50 + 0) / 3 = 50%
+    // =========================================================
+    const allSkillAverages = ALL_SKILLS.map((skillName) => {
+      let totalPercent = 0;
 
-    // 5. แยกทักษะตามหมวดหมู่
+      studentIds.forEach((studentId) => {
+        const percent =
+          studentSkillPercentMap[studentId]?.[skillName] ?? 0;
+
+        totalPercent += percent;
+      });
+
+      const average =
+        studentIds.length > 0
+          ? round2(totalPercent / studentIds.length)
+          : 0;
+
+      return {
+        skillName,
+        average,
+      };
+    });
+
+    // =========================================================
+    // 7. ค่าเฉลี่ย Overall ของนิสิต
+    //
+    // Student Dashboard:
+    //
+    // overallPercent =
+    // average ของ percent ทั้ง 11 ทักษะ
+    //
+    // สำหรับ Staff:
+    // คำนวณ Overall ของนิสิตแต่ละคนก่อน
+    // แล้วนำ Overall ของนิสิตทั้งหมดมาเฉลี่ย
+    //
+    // เพื่อให้นิสิตทุกคนมีน้ำหนักเท่ากัน
+    // =========================================================
+    let overallScoreSum = 0;
+
+    studentIds.forEach((studentId) => {
+      let studentSkillTotal = 0;
+
+      ALL_SKILLS.forEach((skillName) => {
+        studentSkillTotal +=
+          studentSkillPercentMap[studentId]?.[skillName] ?? 0;
+      });
+
+      const studentOverall =
+        ALL_SKILLS.length > 0
+          ? studentSkillTotal / ALL_SKILLS.length
+          : 0;
+
+      overallScoreSum += studentOverall;
+    });
+
+    const averageOverallScore =
+      studentIds.length > 0
+        ? round2(overallScoreSum / studentIds.length)
+        : 0;
+
+    // =========================================================
+    // 8. แยก Faculty Skills / Essential Skills
+    // =========================================================
     const facultySkills = allSkillAverages.filter((skill) =>
-      FACULTY_SKILL_NAMES.some((name) => skill.skillName.includes(name))
+      FACULTY_SKILL_NAMES.some((name) =>
+        skill.skillName.includes(name)
+      )
     );
+
     const essentialSkills = allSkillAverages.filter(
       (skill) =>
-        !FACULTY_SKILL_NAMES.some((name) => skill.skillName.includes(name))
+        !FACULTY_SKILL_NAMES.some((name) =>
+          skill.skillName.includes(name)
+        )
     );
 
-    // 6. Radar Chart Data (ทุกทักษะ) ✅ ใช้ค่าจาก allSkillAverages
+    // =========================================================
+    // 9. Radar Chart
+    // =========================================================
     const radarData = allSkillAverages.map((skill) => ({
       skill: skill.skillName,
       score: skill.average,
     }));
 
+    // =========================================================
+    // 10. ส่งข้อมูลกลับ
+    // =========================================================
     return NextResponse.json({
+      academicYear,
+      academicYears,
       totalStudents,
       activeActivities,
       pastActivities,
@@ -142,6 +415,7 @@ export async function GET() {
       radarData,
     });
   } catch (error) {
+    console.error("GET /api/staff/dashboard error:", error);
     return jsonError(error);
   }
 }
