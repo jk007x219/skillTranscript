@@ -14,6 +14,11 @@ export async function ensureActivityRegistrationColumns() {
   if (!columns.has("registrationEnd")) await pool.query("ALTER TABLE activity ADD COLUMN registrationEnd DATETIME NULL");
   if (!columns.has("registrationEnabled")) await pool.query("ALTER TABLE activity ADD COLUMN registrationEnabled TINYINT(1) NOT NULL DEFAULT 0");
   if (!columns.has("applicationEnabled")) await pool.query("ALTER TABLE activity ADD COLUMN applicationEnabled TINYINT(1) NOT NULL DEFAULT 0");
+
+  // กิจกรรมที่สร้างใหม่ต้องรอเจ้าหน้าที่เปิดการมองเห็นก่อน
+  if (columns.has("applicationEnabled")) {
+    await pool.query("ALTER TABLE activity ALTER COLUMN applicationEnabled SET DEFAULT 0");
+  }
 }
 
 export async function ensureParticipationStatusWorkflow() {
