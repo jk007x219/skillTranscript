@@ -34,7 +34,6 @@ type SkillScore = {
   earnedScore: number;
   maxScore: number;
 };
-
 type Activity = {
   id: string;
   title: string;
@@ -50,13 +49,24 @@ type Activity = {
   status: "active" | "past";
   attendeeCount: number;
   confirmationEnabled: boolean;
+
   registrationStart?: string | null;
   registrationEnd?: string | null;
+
+  registrationEnabled?: boolean;
   registrationOpen?: boolean;
+
+  normalRegistrationOpen?: boolean;
+  emergencyRegistrationOpen?: boolean;
+  activityStarted?: boolean;
+
   hasEvaluation: boolean;
+
   participationStatus?: string | null;
   participationScore?: number | null;
+
   skills: Skill[];
+
   templateId?: string | null;
 };
 
@@ -140,21 +150,13 @@ function ActivityDetailModal({
 
   const isActive = "title" in activity;
 
-  const title = isActive
-    ? activity.title
-    : activity.activityName;
+  const title = isActive ? activity.title : activity.activityName;
 
-  const skills = isActive
-    ? activity.skills
-    : activity.skills || [];
+  const skills = isActive ? activity.skills : activity.skills || [];
 
-  const attendeeCount = isActive
-    ? activity.attendeeCount
-    : 0;
+  const attendeeCount = isActive ? activity.attendeeCount : 0;
 
-  const skillScores = !isActive
-    ? activity.skillScores || []
-    : [];
+  const skillScores = !isActive ? activity.skillScores || [] : [];
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/40 px-4 backdrop-blur-sm">
@@ -168,9 +170,7 @@ function ActivityDetailModal({
         </button>
 
         <div className="mb-5">
-          <h2 className="text-2xl font-semibold text-slate-950">
-            {title}
-          </h2>
+          <h2 className="text-2xl font-semibold text-slate-950">{title}</h2>
 
           <div className="mt-2 h-0.5 w-20 rounded-full bg-[#FFC107]" />
         </div>
@@ -178,21 +178,15 @@ function ActivityDetailModal({
         <div className="space-y-4 text-sm">
           {activity.description && (
             <div>
-              <p className="font-medium text-slate-700">
-                คำอธิบาย
-              </p>
+              <p className="font-medium text-slate-700">คำอธิบาย</p>
 
-              <p className="mt-1 text-slate-600">
-                {activity.description}
-              </p>
+              <p className="mt-1 text-slate-600">{activity.description}</p>
             </div>
           )}
 
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <p className="font-medium text-slate-700">
-                วันที่เริ่มต้น
-              </p>
+              <p className="font-medium text-slate-700">วันที่เริ่มต้น</p>
 
               <p className="mt-1 text-slate-600">
                 {formatThaiDate(activity.date)}
@@ -200,88 +194,65 @@ function ActivityDetailModal({
             </div>
 
             <div>
-              <p className="font-medium text-slate-700">
-                เวลา
-              </p>
+              <p className="font-medium text-slate-700">เวลา</p>
 
               <p className="mt-1 text-slate-600">
-                {activity.time
-                  ? formatThaiTime(activity.time)
-                  : "-"}
+                {activity.time ? formatThaiTime(activity.time) : "-"}
 
-                {activity.endTime &&
-                  ` - ${formatThaiTime(activity.endTime)}`}
+                {activity.endTime && ` - ${formatThaiTime(activity.endTime)}`}
               </p>
             </div>
           </div>
 
-          {activity.endDate &&
-            activity.endDate !== activity.date && (
-              <div>
-                <p className="font-medium text-slate-700">
-                  วันที่สิ้นสุด
-                </p>
+          {activity.endDate && activity.endDate !== activity.date && (
+            <div>
+              <p className="font-medium text-slate-700">วันที่สิ้นสุด</p>
 
-                <p className="mt-1 text-slate-600">
-                  {formatThaiDate(activity.endDate)}
-                </p>
-              </div>
-            )}
+              <p className="mt-1 text-slate-600">
+                {formatThaiDate(activity.endDate)}
+              </p>
+            </div>
+          )}
 
-          {activity.hours !== null &&
-            activity.hours !== undefined && (
-              <div>
-                <p className="font-medium text-slate-700">
-                  จำนวนชั่วโมง
-                </p>
+          {activity.hours !== null && activity.hours !== undefined && (
+            <div>
+              <p className="font-medium text-slate-700">จำนวนชั่วโมง</p>
 
-                <p className="mt-1 text-slate-600">
-                  {Number(activity.hours).toFixed(2)} ชั่วโมง
-                </p>
-              </div>
-            )}
+              <p className="mt-1 text-slate-600">
+                {Number(activity.hours).toFixed(2)} ชั่วโมง
+              </p>
+            </div>
+          )}
 
           <div>
-            <p className="font-medium text-slate-700">
-              สถานที่
-            </p>
+            <p className="font-medium text-slate-700">สถานที่</p>
 
-            <p className="mt-1 text-slate-600">
-              {activity.location || "-"}
-            </p>
+            <p className="mt-1 text-slate-600">{activity.location || "-"}</p>
           </div>
 
           <div>
-            <p className="font-medium text-slate-700">
-              ผู้จัด
-            </p>
+            <p className="font-medium text-slate-700">ผู้จัด</p>
 
-            <p className="mt-1 text-slate-600">
-              {activity.organizer || "-"}
-            </p>
+            <p className="mt-1 text-slate-600">{activity.organizer || "-"}</p>
           </div>
 
           <div>
-            <p className="font-medium text-slate-700">
-              ภาคเรียน
-            </p>
+            <p className="font-medium text-slate-700">ภาคเรียน</p>
 
             <p className="mt-1 text-slate-600">
               {activity.term === "1"
                 ? "ภาคเรียนที่ 1"
                 : activity.term === "2"
-                ? "ภาคเรียนที่ 2"
-                : activity.term === "3"
-                ? "ภาคเรียนที่ 3"
-                : activity.term || "-"}
+                  ? "ภาคเรียนที่ 2"
+                  : activity.term === "3"
+                    ? "ภาคเรียนที่ 3"
+                    : activity.term || "-"}
             </p>
           </div>
 
           {skills.length > 0 && (
             <div>
-              <p className="font-medium text-slate-700">
-                ทักษะที่เกี่ยวข้อง
-              </p>
+              <p className="font-medium text-slate-700">ทักษะที่เกี่ยวข้อง</p>
 
               <div className="mt-2 flex flex-wrap gap-2">
                 {skills.map((skill, index) => (
@@ -298,13 +269,9 @@ function ActivityDetailModal({
 
           {isActive && (
             <div>
-              <p className="font-medium text-slate-700">
-                จำนวนผู้เข้าร่วม
-              </p>
+              <p className="font-medium text-slate-700">จำนวนผู้เข้าร่วม</p>
 
-              <p className="mt-1 text-slate-600">
-                {attendeeCount} คน
-              </p>
+              <p className="mt-1 text-slate-600">{attendeeCount} คน</p>
             </div>
           )}
 
@@ -313,9 +280,7 @@ function ActivityDetailModal({
           {/* ==================================================== */}
           {!isActive && (
             <div>
-              <p className="font-medium text-slate-700">
-                คะแนนที่ได้
-              </p>
+              <p className="font-medium text-slate-700">คะแนนที่ได้</p>
 
               {skillScores.length > 0 ? (
                 <div className="mt-2 space-y-2">
@@ -324,9 +289,7 @@ function ActivityDetailModal({
                       key={`${skill.name}-${index}`}
                       className="flex flex-col gap-1 rounded-lg border border-blue-100 bg-slate-50 px-3 py-2.5 sm:flex-row sm:items-center sm:justify-between"
                     >
-                      <span className="text-slate-700">
-                        {skill.name}
-                      </span>
+                      <span className="text-slate-700">{skill.name}</span>
 
                       <span className="shrink-0 font-semibold text-[#1565C0]">
                         คะแนน: {skill.earnedScore}/{skill.maxScore}
@@ -335,9 +298,7 @@ function ActivityDetailModal({
                   ))}
                 </div>
               ) : (
-                <p className="mt-1 text-slate-500">
-                  -
-                </p>
+                <p className="mt-1 text-slate-500">-</p>
               )}
             </div>
           )}
@@ -380,10 +341,7 @@ function ConfirmationCodeModal({
 }) {
   if (!activity) return null;
 
-  const digits = Array.from(
-    { length: 6 },
-    (_, index) => code[index] ?? "",
-  );
+  const digits = Array.from({ length: 6 }, (_, index) => code[index] ?? "");
 
   return (
     <div className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-950/35 px-4 py-6 backdrop-blur-sm">
@@ -423,18 +381,12 @@ function ConfirmationCodeModal({
           )}
 
           <label className="relative mt-10 block w-full">
-            <span className="sr-only">
-              รหัสยืนยัน 6 หลัก
-            </span>
+            <span className="sr-only">รหัสยืนยัน 6 หลัก</span>
 
             <input
               value={code}
               onChange={(event) =>
-                onCodeChange(
-                  event.target.value
-                    .replace(/\D/g, "")
-                    .slice(0, 6),
-                )
+                onCodeChange(event.target.value.replace(/\D/g, "").slice(0, 6))
               }
               inputMode="numeric"
               autoFocus
@@ -447,9 +399,7 @@ function ConfirmationCodeModal({
                 <span
                   key={index}
                   className={`flex h-9 items-center justify-center border-b-2 text-lg font-semibold text-[#0D47A1] transition ${
-                    digit
-                      ? "border-[#1565C0]"
-                      : "border-[#4AA3D8]"
+                    digit ? "border-[#1565C0]" : "border-[#4AA3D8]"
                   }`}
                 >
                   {digit}
@@ -494,13 +444,8 @@ function CertificatePreview({
         onError={(e) => {
           const target = e.currentTarget;
 
-          if (
-            !target.src.endsWith(
-              "/certificate-placeholder.png",
-            )
-          ) {
-            target.src =
-              "/certificate-placeholder.png";
+          if (!target.src.endsWith("/certificate-placeholder.png")) {
+            target.src = "/certificate-placeholder.png";
           }
         }}
       />
@@ -514,20 +459,15 @@ function CertificatePreview({
       </div>
 
       <div className="absolute left-[10%] right-[10%] top-[20%] text-center text-[#173F70]">
-        <p className="text-[18px] font-bold sm:text-2xl">
-          ใบรับรองทักษะ
-        </p>
+        <p className="text-[18px] font-bold sm:text-2xl">ใบรับรองทักษะ</p>
 
         <p className="mt-1 text-[8px] font-medium sm:text-xs">
-          คณะวิทยาศาสตร์และนวัตกรรมดิจิทัล
-          มหาวิทยาลัยทักษิณ
+          คณะวิทยาศาสตร์และนวัตกรรมดิจิทัล มหาวิทยาลัยทักษิณ
         </p>
       </div>
 
       <div className="absolute left-[15%] right-[15%] top-[38%] text-center text-[#24466D]">
-        <p className="text-[10px] font-medium sm:text-sm">
-          ขอรับรองว่า
-        </p>
+        <p className="text-[10px] font-medium sm:text-sm">ขอรับรองว่า</p>
       </div>
 
       <div className="absolute left-[15%] right-[15%] top-[44%] flex justify-center">
@@ -548,9 +488,7 @@ function CertificatePreview({
               className="text-[7px] font-medium leading-tight text-[#173F70] sm:text-[10px]"
             >
               {skill.name}{" "}
-              <span className="text-slate-600">
-                ระดับ{skill.level}
-              </span>
+              <span className="text-slate-600">ระดับ{skill.level}</span>
             </p>
           ))}
         </div>
@@ -614,14 +552,25 @@ function ActivityCard({
               <Tag className="h-3.5 w-3.5" />
               {activity.skills[0].name}
 
-              {activity.skills.length > 1 &&
-                ` +${activity.skills.length - 1}`}
+              {activity.skills.length > 1 && ` +${activity.skills.length - 1}`}
             </p>
           )}
         </div>
 
-        <span className={`shrink-0 rounded-full px-2.5 py-1 text-[10px] font-semibold ${activity.participationStatus === "registered" ? "bg-blue-50 text-[#1565C0]" : "bg-emerald-50 text-emerald-700"}`}>
-          {activity.participationStatus === "registered" ? "ลงทะเบียนแล้ว" : "เปิดลงทะเบียน"}
+        <span
+          className={`shrink-0 rounded-full px-2.5 py-1 text-[10px] font-semibold ${
+            activity.participationStatus === "registered"
+              ? "bg-blue-50 text-[#1565C0]"
+              : activity.registrationOpen
+                ? "bg-emerald-50 text-emerald-700"
+                : "bg-slate-100 text-slate-500"
+          }`}
+        >
+          {activity.participationStatus === "registered"
+            ? "ลงทะเบียนแล้ว"
+            : activity.registrationOpen
+              ? "เปิดลงทะเบียน"
+              : "ปิดลงทะเบียน"}
         </span>
       </div>
 
@@ -638,20 +587,29 @@ function ActivityCard({
 
         <p className="flex items-center gap-2">
           <MapPin className="h-4 w-4 text-slate-400" />
-          <span className="line-clamp-1">
-            {activity.location}
-          </span>
+          <span className="line-clamp-1">{activity.location}</span>
         </p>
       </div>
 
       <div className="mt-5 flex gap-2">
-        {activity.participationStatus === "registered" && activity.confirmationEnabled ? (
-          <button type="button" onClick={() => onConfirm(activity)} className="inline-flex h-11 flex-1 items-center justify-center gap-2 rounded-xl border border-[#1565C0] bg-white px-4 text-sm font-semibold text-[#1565C0] shadow-sm transition hover:-translate-y-0.5 hover:bg-[#1565C0] hover:text-white">
+        {activity.participationStatus === "registered" &&
+        activity.confirmationEnabled ? (
+          <button
+            type="button"
+            onClick={() => onConfirm(activity)}
+            className="inline-flex h-11 flex-1 items-center justify-center gap-2 rounded-xl border border-[#1565C0] bg-white px-4 text-sm font-semibold text-[#1565C0] shadow-sm transition hover:-translate-y-0.5 hover:bg-[#1565C0] hover:text-white"
+          >
             <CheckCircle2 className="h-4 w-4" /> ยืนยัน
           </button>
         ) : (
-          <button type="button" onClick={() => onRegister(activity)} disabled={!activity.registrationOpen} className="inline-flex h-11 flex-1 items-center justify-center gap-2 rounded-xl bg-[#1565C0] px-4 text-sm font-semibold text-white shadow-sm transition hover:bg-[#0D47A1] disabled:cursor-not-allowed disabled:bg-slate-300">
-            <CheckCircle2 className="h-4 w-4" /> {activity.registrationOpen ? "ลงทะเบียน" : "ปิดลงทะเบียน"}
+          <button
+            type="button"
+            onClick={() => onRegister(activity)}
+            disabled={!activity.registrationOpen}
+            className="inline-flex h-11 flex-1 items-center justify-center gap-2 rounded-xl bg-[#1565C0] px-4 text-sm font-semibold text-white shadow-sm transition hover:bg-[#0D47A1] disabled:cursor-not-allowed disabled:bg-slate-300"
+          >
+            <CheckCircle2 className="h-4 w-4" />{" "}
+            {activity.registrationOpen ? "ลงทะเบียน" : "ปิดลงทะเบียน"}
           </button>
         )}
 
@@ -689,16 +647,14 @@ function PastActivityCard({
             {activity.activityName}
           </p>
 
-          {activity.skills &&
-            activity.skills.length > 0 && (
-              <p className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-blue-50 px-2.5 py-1 text-[11px] font-medium text-[#1565C0]">
-                <Tag className="h-3.5 w-3.5" />
-                {activity.skills[0].name}
+          {activity.skills && activity.skills.length > 0 && (
+            <p className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-blue-50 px-2.5 py-1 text-[11px] font-medium text-[#1565C0]">
+              <Tag className="h-3.5 w-3.5" />
+              {activity.skills[0].name}
 
-                {activity.skills.length > 1 &&
-                  ` +${activity.skills.length - 1}`}
-              </p>
-            )}
+              {activity.skills.length > 1 && ` +${activity.skills.length - 1}`}
+            </p>
+          )}
         </div>
 
         <span className="shrink-0 rounded-full bg-emerald-50 px-2.5 py-1 text-[10px] font-semibold text-emerald-700">
@@ -719,18 +675,15 @@ function PastActivityCard({
 
         <p className="flex items-center gap-2">
           <MapPin className="h-4 w-4 text-slate-400" />
-          <span className="line-clamp-1">
-            {activity.location}
-          </span>
+          <span className="line-clamp-1">{activity.location}</span>
         </p>
 
-        {activity.score !== null &&
-          activity.score !== undefined && (
-            <p className="flex items-center gap-2 text-[#1565C0]">
-              <CheckCircle2 className="h-4 w-4" />
-              คะแนนรวม: {activity.score}
-            </p>
-          )}
+        {activity.score !== null && activity.score !== undefined && (
+          <p className="flex items-center gap-2 text-[#1565C0]">
+            <CheckCircle2 className="h-4 w-4" />
+            คะแนนรวม: {activity.score}
+          </p>
+        )}
       </div>
 
       <div className="mt-5 flex gap-2">
@@ -779,42 +732,38 @@ export default function StudentActivitiesPage() {
   const [activeTab, setActiveTab] = useState<"active" | "past">("active");
 
   // Confirmation Modal
-  const [selectedActivity, setSelectedActivity] =
-    useState<Activity | null>(null);
+  const [selectedActivity, setSelectedActivity] = useState<Activity | null>(
+    null,
+  );
 
-  const [confirmationCode, setConfirmationCode] =
-    useState("");
+  const [confirmationCode, setConfirmationCode] = useState("");
 
-  const [isVerifying, setIsVerifying] =
-    useState(false);
+  const [isVerifying, setIsVerifying] = useState(false);
 
-  const [verifyError, setVerifyError] =
-    useState("");
+  const [verifyError, setVerifyError] = useState("");
 
   // Detail Modal
-  const [detailActivity, setDetailActivity] =
-    useState<Activity | PastActivity | null>(null);
+  const [detailActivity, setDetailActivity] = useState<
+    Activity | PastActivity | null
+  >(null);
 
-  const [isDetailModalOpen, setIsDetailModalOpen] =
-    useState(false);
+  const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
 
   // Certificate Modal
-  const [certificateModal, setCertificateModal] =
-    useState<{
-      isOpen: boolean;
-      certificate: CertificatePreviewData | null;
-      activityName: string;
-      loading: boolean;
-    }>({
-      isOpen: false,
-      certificate: null,
-      activityName: "",
-      loading: false,
-    });
+  const [certificateModal, setCertificateModal] = useState<{
+    isOpen: boolean;
+    certificate: CertificatePreviewData | null;
+    activityName: string;
+    loading: boolean;
+  }>({
+    isOpen: false,
+    certificate: null,
+    activityName: "",
+    loading: false,
+  });
 
   // Ref for certificate download
-  const certificateRef =
-    useRef<HTMLDivElement>(null);
+  const certificateRef = useRef<HTMLDivElement>(null);
 
   // ==========================================================
   // Fetch Active Activities
@@ -830,37 +779,22 @@ export default function StudentActivitiesPage() {
         });
 
         if (user?.studentId) {
-          params.set(
-            "studentId",
-            user.studentId,
-          );
+          params.set("studentId", user.studentId);
         }
 
-        const res = await fetch(
-          `/api/activities?${params.toString()}`,
-        );
+        const res = await fetch(`/api/activities?${params.toString()}`);
 
         if (!res.ok) {
-          throw new Error(
-            "ไม่สามารถโหลดกิจกรรมได้",
-          );
+          throw new Error("ไม่สามารถโหลดกิจกรรมได้");
         }
 
         const data = await res.json();
 
-        setActivities(
-          Array.isArray(data)
-            ? data
-            : [],
-        );
+        setActivities(Array.isArray(data) ? data : []);
 
         setError("");
       } catch (err) {
-        setError(
-          err instanceof Error
-            ? err.message
-            : "เกิดข้อผิดพลาด",
-        );
+        setError(err instanceof Error ? err.message : "เกิดข้อผิดพลาด");
       } finally {
         setLoading(false);
       }
@@ -874,10 +808,7 @@ export default function StudentActivitiesPage() {
   // ==========================================================
 
   useEffect(() => {
-    if (
-      activeTab !== "past" ||
-      !user?.studentId
-    ) {
+    if (activeTab !== "past" || !user?.studentId) {
       return;
     }
 
@@ -890,135 +821,143 @@ export default function StudentActivitiesPage() {
         );
 
         if (!res.ok) {
-          throw new Error(
-            "ไม่สามารถโหลดกิจกรรมที่เคยเข้าร่วม",
-          );
+          throw new Error("ไม่สามารถโหลดกิจกรรมที่เคยเข้าร่วม");
         }
 
         const data = await res.json();
 
-        const participations: PastActivity[] =
-          Array.isArray(data.participations)
-            ? data.participations
-            : [];
+        const participations: PastActivity[] = Array.isArray(
+          data.participations,
+        )
+          ? data.participations
+          : [];
 
-        const pastWithData =
-          await Promise.all(
-            participations.map(
-              async (p: PastActivity) => {
-                try {
-                  const activityRes =
-                    await fetch(
-                      `/api/activities/${p.activityId}`,
-                    );
+        const pastWithData = await Promise.all(
+          participations.map(async (p: PastActivity) => {
+            try {
+              const activityRes = await fetch(
+                `/api/activities/${p.activityId}`,
+              );
 
-                  if (!activityRes.ok) {
-                    return {
-                      ...p,
-                      templateId: null,
-                      skills: [],
-                      skillScores: Array.isArray(
-                        p.skillScores,
-                      )
-                        ? p.skillScores
-                        : [],
-                    };
-                  }
+              if (!activityRes.ok) {
+                return {
+                  ...p,
+                  templateId: null,
+                  skills: [],
+                  skillScores: Array.isArray(p.skillScores)
+                    ? p.skillScores
+                    : [],
+                };
+              }
 
-                  const activityData =
-                    await activityRes.json();
+              const activityData = await activityRes.json();
 
-                  return {
-                    ...p,
+              return {
+                ...p,
 
-                    templateId:
-                      activityData.templateId ||
-                      activityData.template?.id ||
-                      null,
+                templateId:
+                  activityData.templateId || activityData.template?.id || null,
 
-                    skills:
-                      activityData.skills ||
-                      activityData.activity?.skills ||
-                      [],
+                skills:
+                  activityData.skills || activityData.activity?.skills || [],
 
-                    // เก็บคะแนนรายทักษะจาก API
-                    skillScores: Array.isArray(
-                      p.skillScores,
-                    )
-                      ? p.skillScores
-                      : [],
-                  };
-                } catch {
-                  return {
-                    ...p,
-                    templateId: null,
-                    skills: [],
-                    skillScores: Array.isArray(
-                      p.skillScores,
-                    )
-                      ? p.skillScores
-                      : [],
-                  };
-                }
-              },
-            ),
-          );
+                // เก็บคะแนนรายทักษะจาก API
+                skillScores: Array.isArray(p.skillScores) ? p.skillScores : [],
+              };
+            } catch {
+              return {
+                ...p,
+                templateId: null,
+                skills: [],
+                skillScores: Array.isArray(p.skillScores) ? p.skillScores : [],
+              };
+            }
+          }),
+        );
 
         setPastActivities(pastWithData);
         setErrorPast("");
       } catch (err) {
-        setErrorPast(
-          err instanceof Error
-            ? err.message
-            : "เกิดข้อผิดพลาด",
-        );
+        setErrorPast(err instanceof Error ? err.message : "เกิดข้อผิดพลาด");
       } finally {
         setLoadingPast(false);
       }
     };
 
     fetchPastActivities();
-  }, [
-    user?.studentId,
-    activeTab,
-  ]);
+  }, [user?.studentId, activeTab]);
 
   // ==========================================================
   // Search
   // ==========================================================
 
-  const filteredActivities =
-    activities.filter((activity) =>
-      activity.title
-        .toLowerCase()
-        .includes(
-          searchTerm.toLowerCase(),
-        ),
-    );
+  const filteredActivities = activities.filter((activity) =>
+    activity.title.toLowerCase().includes(searchTerm.toLowerCase()),
+  );
 
   // ==========================================================
   // Confirmation
   // ==========================================================
 
-  const openConfirmationModal = (
-    activity: Activity,
-  ) => {
+  const openConfirmationModal = (activity: Activity) => {
     setSelectedActivity(activity);
     setConfirmationCode("");
     setVerifyError("");
     setIsVerifying(false);
   };
 
-  const handleRegister = async (activity: Activity) => {
-    try {
-      const res = await fetch(`/api/activities/${activity.id}/register`, { method: "POST" });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.message || "ลงทะเบียนไม่สำเร็จ");
-      setActivities((previous) => previous.map((item) => item.id === activity.id ? { ...item, participationStatus: "registered", registrationOpen: false } : item));
-    } catch (err) {
-      alert(err instanceof Error ? err.message : "เกิดข้อผิดพลาด");
+const handleRegister = async (
+  activity: Activity,
+) => {
+  if (!activity.registrationOpen) {
+    alert(
+      "ขณะนี้ยังไม่อยู่ในช่วงเวลาที่เปิดลงทะเบียน",
+    );
+    return;
+  }
+
+  try {
+    const res = await fetch(
+      `/api/activities/${activity.id}/register`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+      },
+    );
+
+    const data =
+      await res.json();
+
+    if (!res.ok) {
+      throw new Error(
+        data.message ||
+          "ลงทะเบียนไม่สำเร็จ",
+      );
     }
-  };
+
+    setActivities(
+      (previous) =>
+        previous.map(
+          (item) =>
+            item.id === activity.id
+              ? {
+                  ...item,
+                  participationStatus:
+                    "registered",
+                }
+              : item,
+        ),
+    );
+  } catch (err) {
+    alert(
+      err instanceof Error
+        ? err.message
+        : "เกิดข้อผิดพลาด",
+    );
+  }
+};
 
   const closeConfirmationModal = () => {
     setSelectedActivity(null);
@@ -1031,9 +970,7 @@ export default function StudentActivitiesPage() {
   // Detail
   // ==========================================================
 
-  const openDetailModal = (
-    activity: Activity | PastActivity,
-  ) => {
+  const openDetailModal = (activity: Activity | PastActivity) => {
     setDetailActivity(activity);
     setIsDetailModalOpen(true);
   };
@@ -1048,10 +985,7 @@ export default function StudentActivitiesPage() {
   // ==========================================================
 
   const handleConfirmCode = async () => {
-    if (
-      !selectedActivity ||
-      confirmationCode.length !== 6
-    ) {
+    if (!selectedActivity || confirmationCode.length !== 6) {
       return;
     }
 
@@ -1064,8 +998,7 @@ export default function StudentActivitiesPage() {
         {
           method: "POST",
           headers: {
-            "Content-Type":
-              "application/json",
+            "Content-Type": "application/json",
           },
           body: JSON.stringify({
             code: confirmationCode,
@@ -1076,21 +1009,12 @@ export default function StudentActivitiesPage() {
       const data = await res.json();
 
       if (!res.ok) {
-        throw new Error(
-          data.message ||
-            "รหัสยืนยันไม่ถูกต้อง",
-        );
+        throw new Error(data.message || "รหัสยืนยันไม่ถูกต้อง");
       }
 
-      router.push(
-        `/student/evaluate/${selectedActivity.id}`,
-      );
+      router.push(`/student/evaluate/${selectedActivity.id}`);
     } catch (err) {
-      setVerifyError(
-        err instanceof Error
-          ? err.message
-          : "เกิดข้อผิดพลาด",
-      );
+      setVerifyError(err instanceof Error ? err.message : "เกิดข้อผิดพลาด");
     } finally {
       setIsVerifying(false);
     }
@@ -1100,13 +1024,9 @@ export default function StudentActivitiesPage() {
   // Open Certificate
   // ==========================================================
 
-  const handleViewCertificate = async (
-    activity: PastActivity,
-  ) => {
+  const handleViewCertificate = async (activity: PastActivity) => {
     if (!user?.studentId) {
-      alert(
-        "ไม่พบข้อมูลนิสิต กรุณาเข้าสู่ระบบใหม่",
-      );
+      alert("ไม่พบข้อมูลนิสิต กรุณาเข้าสู่ระบบใหม่");
       return;
     }
 
@@ -1125,21 +1045,16 @@ export default function StudentActivitiesPage() {
       );
 
       if (!res.ok) {
-        const errorData =
-          await res.json().catch(() => ({}));
+        const errorData = await res.json().catch(() => ({}));
 
-        throw new Error(
-          errorData.message ||
-            "ไม่สามารถสร้างใบรับรองได้",
-        );
+        throw new Error(errorData.message || "ไม่สามารถสร้างใบรับรองได้");
       }
 
       const data = await res.json();
 
-      const skills: Skill[] =
-        Array.isArray(data.skills)
-          ? data.skills
-          : activity.skills || [];
+      const skills: Skill[] = Array.isArray(data.skills)
+        ? data.skills
+        : activity.skills || [];
 
       const certifiedDate =
         data.certifiedDate ||
@@ -1157,9 +1072,7 @@ export default function StudentActivitiesPage() {
 
       const studentName =
         data.studentName ||
-        `${user.firstName || ""} ${
-          user.lastName || ""
-        }`.trim();
+        `${user.firstName || ""} ${user.lastName || ""}`.trim();
 
       const imageUrl =
         data.imageUrl ||
@@ -1168,9 +1081,7 @@ export default function StudentActivitiesPage() {
         "/certificate-placeholder.png";
 
       const templateName =
-        data.templateName ||
-        data.template?.name ||
-        "ใบรับรองทักษะ";
+        data.templateName || data.template?.name || "ใบรับรองทักษะ";
 
       setCertificateModal({
         isOpen: true,
@@ -1181,19 +1092,13 @@ export default function StudentActivitiesPage() {
           skills,
           certifiedDate,
           signerName,
-          deanSignatureUrl:
-            data.deanSignatureUrl || null,
+          deanSignatureUrl: data.deanSignatureUrl || null,
         },
-        activityName:
-          activity.activityName,
+        activityName: activity.activityName,
         loading: false,
       });
     } catch (err) {
-      alert(
-        err instanceof Error
-          ? err.message
-          : "เกิดข้อผิดพลาด",
-      );
+      alert(err instanceof Error ? err.message : "เกิดข้อผิดพลาด");
 
       setCertificateModal({
         isOpen: false,
@@ -1217,85 +1122,61 @@ export default function StudentActivitiesPage() {
   // Download Certificate
   // ==========================================================
 
-  const handleDownloadCertificate =
-    async () => {
-      if (!certificateModal.certificate) {
-        alert("ไม่พบข้อมูลใบรับรอง");
-        return;
-      }
+  const handleDownloadCertificate = async () => {
+    if (!certificateModal.certificate) {
+      alert("ไม่พบข้อมูลใบรับรอง");
+      return;
+    }
 
-      const element =
-        certificateRef.current;
+    const element = certificateRef.current;
 
-      if (!element) {
-        alert(
-          "ไม่พบใบรับรองสำหรับดาวน์โหลด",
-        );
-        return;
-      }
+    if (!element) {
+      alert("ไม่พบใบรับรองสำหรับดาวน์โหลด");
+      return;
+    }
 
-      try {
-        const originalOverflow =
-          element.style.overflow;
+    try {
+      const originalOverflow = element.style.overflow;
 
-        const originalMaxHeight =
-          element.style.maxHeight;
+      const originalMaxHeight = element.style.maxHeight;
 
-        element.style.overflow =
-          "visible";
+      element.style.overflow = "visible";
 
-        element.style.maxHeight =
-          "none";
+      element.style.maxHeight = "none";
 
-        await new Promise((resolve) =>
-          setTimeout(resolve, 100),
-        );
+      await new Promise((resolve) => setTimeout(resolve, 100));
 
-        const html2canvas = (
-          await import("html2canvas")
-        ).default;
+      const html2canvas = (await import("html2canvas")).default;
 
-        const canvas =
-          await html2canvas(element, {
-            scale: 2,
-            useCORS: true,
-            allowTaint: false,
-            backgroundColor: "#ffffff",
-            logging: false,
-            width: element.scrollWidth,
-            height: element.scrollHeight,
-          });
+      const canvas = await html2canvas(element, {
+        scale: 2,
+        useCORS: true,
+        allowTaint: false,
+        backgroundColor: "#ffffff",
+        logging: false,
+        width: element.scrollWidth,
+        height: element.scrollHeight,
+      });
 
-        element.style.overflow =
-          originalOverflow;
+      element.style.overflow = originalOverflow;
 
-        element.style.maxHeight =
-          originalMaxHeight;
+      element.style.maxHeight = originalMaxHeight;
 
-        const link =
-          document.createElement("a");
+      const link = document.createElement("a");
 
-        link.download =
-          `ใบรับรองทักษะ_${
-            certificateModal.certificate
-              .studentName || "certificate"
-          }.png`;
+      link.download = `ใบรับรองทักษะ_${
+        certificateModal.certificate.studentName || "certificate"
+      }.png`;
 
-        link.href =
-          canvas.toDataURL("image/png");
+      link.href = canvas.toDataURL("image/png");
 
-        link.click();
-      } catch (err) {
-        console.error(
-          "Download certificate error:",
-          err,
-        );
+      link.click();
+    } catch (err) {
+      console.error("Download certificate error:", err);
 
-        alert(
-          "ไม่สามารถดาวน์โหลดใบรับรองได้ กรุณาลองใหม่อีกครั้ง",
-        );
-      }
-    };
+      alert("ไม่สามารถดาวน์โหลดใบรับรองได้ กรุณาลองใหม่อีกครั้ง");
+    }
+  };
 
   // ==========================================================
   // Render
@@ -1315,7 +1196,8 @@ export default function StudentActivitiesPage() {
               <div className="mt-2 h-0.5 w-24 rounded-full bg-[#FFC107]" />
 
               <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-500">
-                ลงทะเบียนกิจกรรมภายในช่วงเวลาที่กำหนดก่อน จึงจะยืนยันการเข้าร่วมและทำแบบประเมินได้
+                ลงทะเบียนกิจกรรมภายในช่วงเวลาที่กำหนดก่อน
+                จึงจะยืนยันการเข้าร่วมและทำแบบประเมินได้
               </p>
             </div>
 
@@ -1327,11 +1209,7 @@ export default function StudentActivitiesPage() {
                   type="search"
                   placeholder="ค้นหากิจกรรม"
                   value={searchTerm}
-                  onChange={(event) =>
-                    setSearchTerm(
-                      event.target.value,
-                    )
-                  }
+                  onChange={(event) => setSearchTerm(event.target.value)}
                   className="h-11 w-full rounded-xl border border-blue-100 bg-blue-50/50 pl-10 pr-3 text-sm outline-none transition placeholder:text-slate-400 focus:border-[#1565C0] focus:bg-white focus:ring-4 focus:ring-blue-100"
                 />
               </label>
@@ -1342,9 +1220,7 @@ export default function StudentActivitiesPage() {
           <div className="mt-6 flex gap-8 border-b border-blue-50">
             <button
               type="button"
-              onClick={() =>
-                setActiveTab("active")
-              }
+              onClick={() => setActiveTab("active")}
               className={`relative pb-2 text-sm font-semibold transition ${
                 activeTab === "active"
                   ? "text-[#1565C0]"
@@ -1352,7 +1228,6 @@ export default function StudentActivitiesPage() {
               }`}
             >
               กิจกรรมและการยืนยัน
-
               {activeTab === "active" && (
                 <span className="absolute inset-x-0 -bottom-px h-0.5 rounded-full bg-[#1565C0]" />
               )}
@@ -1360,9 +1235,7 @@ export default function StudentActivitiesPage() {
 
             <button
               type="button"
-              onClick={() =>
-                setActiveTab("past")
-              }
+              onClick={() => setActiveTab("past")}
               className={`relative pb-2 text-sm font-semibold transition ${
                 activeTab === "past"
                   ? "text-[#1565C0]"
@@ -1370,7 +1243,6 @@ export default function StudentActivitiesPage() {
               }`}
             >
               กิจกรรมที่เคยเข้าร่วม
-
               {activeTab === "past" && (
                 <span className="absolute inset-x-0 -bottom-px h-0.5 rounded-full bg-[#1565C0]" />
               )}
@@ -1386,9 +1258,7 @@ export default function StudentActivitiesPage() {
                   <div className="flex items-center justify-center py-12">
                     <Loader2 className="h-8 w-8 animate-spin text-[#1565C0]" />
 
-                    <span className="ml-3 text-slate-500">
-                      กำลังโหลด...
-                    </span>
+                    <span className="ml-3 text-slate-500">กำลังโหลด...</span>
                   </div>
                 ) : error ? (
                   <div className="rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-600">
@@ -1406,21 +1276,15 @@ export default function StudentActivitiesPage() {
                   </div>
                 ) : (
                   <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-                    {filteredActivities.map(
-                      (activity) => (
-                        <ActivityCard
-                          key={activity.id}
-                          activity={activity}
-                          onConfirm={
-                            openConfirmationModal
-                          }
-                          onRegister={handleRegister}
-                          onDetail={
-                            openDetailModal
-                          }
-                        />
-                      ),
-                    )}
+                    {filteredActivities.map((activity) => (
+                      <ActivityCard
+                        key={activity.id}
+                        activity={activity}
+                        onConfirm={openConfirmationModal}
+                        onRegister={handleRegister}
+                        onDetail={openDetailModal}
+                      />
+                    ))}
                   </div>
                 )}
               </>
@@ -1433,9 +1297,7 @@ export default function StudentActivitiesPage() {
                   <div className="flex items-center justify-center py-12">
                     <Loader2 className="h-8 w-8 animate-spin text-[#1565C0]" />
 
-                    <span className="ml-3 text-slate-500">
-                      กำลังโหลด...
-                    </span>
+                    <span className="ml-3 text-slate-500">กำลังโหลด...</span>
                   </div>
                 ) : errorPast ? (
                   <div className="rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-600">
@@ -1451,22 +1313,14 @@ export default function StudentActivitiesPage() {
                   </div>
                 ) : (
                   <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-                    {pastActivities.map(
-                      (activity) => (
-                        <PastActivityCard
-                          key={
-                            activity.participationId
-                          }
-                          activity={activity}
-                          onViewCertificate={
-                            handleViewCertificate
-                          }
-                          onDetail={
-                            openDetailModal
-                          }
-                        />
-                      ),
-                    )}
+                    {pastActivities.map((activity) => (
+                      <PastActivityCard
+                        key={activity.participationId}
+                        activity={activity}
+                        onViewCertificate={handleViewCertificate}
+                        onDetail={openDetailModal}
+                      />
+                    ))}
                   </div>
                 )}
               </>
@@ -1518,10 +1372,7 @@ export default function StudentActivitiesPage() {
                 {certificateModal.certificate && (
                   <p className="mt-1 text-xs text-slate-500 sm:text-sm">
                     {certificateModal.certificate.skills
-                      .map(
-                        (skill) =>
-                          skill.name,
-                      )
+                      .map((skill) => skill.name)
                       .join(", ")}
                   </p>
                 )}
@@ -1543,39 +1394,32 @@ export default function StudentActivitiesPage() {
                   </div>
                 ) : certificateModal.certificate ? (
                   <CertificatePreview
-                    certificate={
-                      certificateModal.certificate
-                    }
+                    certificate={certificateModal.certificate}
                   />
                 ) : null}
               </div>
 
               {/* Buttons */}
-              {!certificateModal.loading &&
-                certificateModal.certificate && (
-                  <div className="mt-4 flex flex-wrap justify-center gap-3">
-                    <button
-                      type="button"
-                      onClick={
-                        handleDownloadCertificate
-                      }
-                      className="inline-flex items-center gap-2 rounded-xl bg-[#1565C0] px-6 py-2.5 text-sm font-semibold text-white shadow-md transition hover:bg-[#0D47A1]"
-                    >
-                      <Download className="h-4 w-4" />
-                      ดาวน์โหลดใบรับรอง
-                    </button>
+              {!certificateModal.loading && certificateModal.certificate && (
+                <div className="mt-4 flex flex-wrap justify-center gap-3">
+                  <button
+                    type="button"
+                    onClick={handleDownloadCertificate}
+                    className="inline-flex items-center gap-2 rounded-xl bg-[#1565C0] px-6 py-2.5 text-sm font-semibold text-white shadow-md transition hover:bg-[#0D47A1]"
+                  >
+                    <Download className="h-4 w-4" />
+                    ดาวน์โหลดใบรับรอง
+                  </button>
 
-                    <button
-                      type="button"
-                      onClick={
-                        closeCertificateModal
-                      }
-                      className="rounded-xl border border-slate-300 px-6 py-2.5 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
-                    >
-                      ปิด
-                    </button>
-                  </div>
-                )}
+                  <button
+                    type="button"
+                    onClick={closeCertificateModal}
+                    className="rounded-xl border border-slate-300 px-6 py-2.5 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
+                  >
+                    ปิด
+                  </button>
+                </div>
+              )}
             </div>
           </div>
         </div>

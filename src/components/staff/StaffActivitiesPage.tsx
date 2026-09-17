@@ -80,10 +80,10 @@ type StaffActivity = {
 type ActivityForm = {
   title: string;
   description: string;
-  startDate: string;      // YYYY-MM-DD
-  startTime: string;      // HH:mm
-  endDate: string;        // YYYY-MM-DD
-  endTime: string;        // HH:mm
+  startDate: string; // YYYY-MM-DD
+  startTime: string; // HH:mm
+  endDate: string; // YYYY-MM-DD
+  endTime: string; // HH:mm
   term: string;
   location: string;
   organizer: string;
@@ -131,15 +131,26 @@ function combineDateTime(date: string, time: string): string {
   return `${date}T${time}`;
 }
 
-function isValidEndDateTime(startDate: string, startTime: string, endDate: string, endTime: string) {
+function isValidEndDateTime(
+  startDate: string,
+  startTime: string,
+  endDate: string,
+  endTime: string,
+) {
   if (!startDate || !startTime || !endDate || !endTime) return true;
   const start = new Date(`${startDate}T${startTime}`);
   const end = new Date(`${endDate}T${endTime}`);
   return end > start;
 }
 
-function calculateHoursMinutes(startDate: string, startTime: string, endDate: string, endTime: string) {
-  if (!startDate || !startTime || !endDate || !endTime) return { hours: 0, minutes: 0 };
+function calculateHoursMinutes(
+  startDate: string,
+  startTime: string,
+  endDate: string,
+  endTime: string,
+) {
+  if (!startDate || !startTime || !endDate || !endTime)
+    return { hours: 0, minutes: 0 };
   const start = new Date(`${startDate}T${startTime}`);
   const end = new Date(`${endDate}T${endTime}`);
   if (end <= start) return { hours: 0, minutes: 0 };
@@ -161,9 +172,113 @@ function toDateTimeInputValue(date?: string | null, time?: string | null) {
   return `${String(date).slice(0, 10)}T${String(time).slice(0, 5)}`;
 }
 
+function toDateInputValue(value?: string | Date | null): string {
+  if (!value) return "";
+
+  if (value instanceof Date) {
+    const year = value.getFullYear();
+    const month = String(value.getMonth() + 1).padStart(2, "0");
+    const day = String(value.getDate()).padStart(2, "0");
+
+    return `${year}-${month}-${day}`;
+  }
+
+  const text = String(value);
+
+  // รองรับ YYYY-MM-DD
+  if (/^\d{4}-\d{2}-\d{2}$/.test(text)) {
+    return text;
+  }
+
+  // รองรับ YYYY-MM-DDTHH:mm:ss...
+  const match = text.match(/^(\d{4}-\d{2}-\d{2})/);
+
+  if (match) {
+    return match[1];
+  }
+
+  return "";
+}
+
 function toDateTimeLocalValue(date: Date) {
   const local = new Date(date.getTime() - date.getTimezoneOffset() * 60000);
   return local.toISOString().slice(0, 16);
+}
+
+function getActivityStartDateTime(activity: StaffActivity): Date | null {
+  if (!activity.date) return null;
+  const date = String(activity.date).slice(0, 10);
+  const time = String(activity.time || "00:00").slice(0, 5);
+  return new Date(`${date}T${time}`);
+}
+
+function getRegistrationWindowStatus(
+  activity: StaffActivity,
+  now: Date = new Date(),
+) {
+  const activityStart = getActivityStartDateTime(activity);
+  if (!activityStart) {
+    return {
+      normalOpen: false,
+      emergencyOpen: false,
+      open: false,
+      label: "ไม่สามารถตรวจสอบเวลาได้",
+    };
+  }
+
+  if (now >= activityStart) {
+    return {
+      normalOpen: false,
+      emergencyOpen: false,
+      open: false,
+      label: "กิจกรรมเริ่มแล้ว",
+    };
+  }
+
+  const registrationStart = activity.registrationStart
+    ? new Date(String(activity.registrationStart).replace(" ", "T"))
+    : null;
+  const registrationEnd = activity.registrationEnd
+    ? new Date(String(activity.registrationEnd).replace(" ", "T"))
+    : null;
+
+  const normalOpen = Boolean(
+    registrationStart &&
+      registrationEnd &&
+      now >= registrationStart &&
+      now < registrationEnd &&
+      now < activityStart,
+  );
+
+  const emergencyOpen = Boolean(activity.registrationEnabled && now < activityStart);
+
+  return {
+    normalOpen,
+    emergencyOpen,
+    open: normalOpen || emergencyOpen,
+    label: emergencyOpen
+      ? "เปิดด้วย Emergency Override"
+      : normalOpen
+        ? "เปิดตามช่วงเวลาอัตโนมัติ"
+        : registrationStart && now < registrationStart
+          ? "ยังไม่ถึงเวลาเปิด"
+          : registrationEnd && now >= registrationEnd
+            ? "หมดเวลาลงทะเบียน"
+            : "ปิดการลงทะเบียน",
+  };
+}
+
+function formatRegistrationDateTime(value?: string | null): string {
+  if (!value) return "-";
+  const date = new Date(String(value).replace(" ", "T"));
+  if (Number.isNaN(date.getTime())) return "-";
+  return date.toLocaleString("th-TH", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
 }
 
 // ---------- helper components ----------
@@ -175,21 +290,37 @@ function ActivityPill({ skill }: { skill: ActivitySkill }) {
   );
 }
 
-function ToggleSwitch({ enabled, onClick }: { enabled: boolean; onClick: () => void }) {
+function ToggleSwitch({
+  enabled,
+  onClick,
+}: {
+  enabled: boolean;
+  onClick: () => void;
+}) {
   const Icon = enabled ? ToggleRight : ToggleLeft;
   return (
     <button
       type="button"
       onClick={onClick}
       className={`inline-flex items-center rounded-full transition ${enabled ? "text-[#4598D0]" : "text-slate-400"}`}
-      aria-label={enabled ? "ปิดการยืนยันการเข้าร่วม" : "เปิดการยืนยันการเข้าร่วม"}
+      aria-label={
+        enabled ? "ปิดการยืนยันการเข้าร่วม" : "เปิดการยืนยันการเข้าร่วม"
+      }
     >
       <Icon className="h-8 w-14" />
     </button>
   );
 }
 
-function TabButton({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) {
+function TabButton({
+  active,
+  onClick,
+  children,
+}: {
+  active: boolean;
+  onClick: () => void;
+  children: React.ReactNode;
+}) {
   return (
     <button
       type="button"
@@ -199,15 +330,25 @@ function TabButton({ active, onClick, children }: { active: boolean; onClick: ()
       }`}
     >
       {children}
-      {active && <span className="absolute inset-x-0 -bottom-px h-0.5 rounded-full bg-[#1565C0]" />}
+      {active && (
+        <span className="absolute inset-x-0 -bottom-px h-0.5 rounded-full bg-[#1565C0]" />
+      )}
     </button>
   );
 }
 
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
+function Field({
+  label,
+  children,
+}: {
+  label: string;
+  children: React.ReactNode;
+}) {
   return (
     <label className="block">
-      <span className="mb-1 block text-sm font-semibold text-slate-800 sm:mb-2">{label}</span>
+      <span className="mb-1 block text-sm font-semibold text-slate-800 sm:mb-2">
+        {label}
+      </span>
       {children}
     </label>
   );
@@ -244,7 +385,7 @@ function AddActivityModal({
     form.startDate,
     form.startTime,
     form.endDate,
-    form.endTime
+    form.endTime,
   );
   const durationDisplay = formatHoursMinutes(hours, minutes);
 
@@ -269,7 +410,10 @@ function AddActivityModal({
 
         <form
           className="mx-auto mt-5 max-w-[520px] space-y-3 sm:mt-6 sm:space-y-4"
-          onSubmit={(e) => { e.preventDefault(); onSubmit(); }}
+          onSubmit={(e) => {
+            e.preventDefault();
+            onSubmit();
+          }}
         >
           <Field label="ชื่อกิจกรรม/อบรม">
             <input
@@ -334,7 +478,17 @@ function AddActivityModal({
                 value={form.endTime}
                 onChange={(e) => {
                   const val = e.target.value;
-                  if (form.startDate && form.startTime && val && !isValidEndDateTime(form.startDate, form.startTime, form.endDate, val)) {
+                  if (
+                    form.startDate &&
+                    form.startTime &&
+                    val &&
+                    !isValidEndDateTime(
+                      form.startDate,
+                      form.startTime,
+                      form.endDate,
+                      val,
+                    )
+                  ) {
                     // ไม่ต้องตั้งค่า
                     return;
                   }
@@ -387,16 +541,94 @@ function AddActivityModal({
           </Field>
 
           <div className="rounded-lg border border-blue-100 bg-white/60 p-4">
-            <p className="text-sm font-semibold text-slate-800">ช่วงเวลาลงทะเบียน</p>
-            <p className="mt-1 text-xs text-slate-500">นิสิตต้องลงทะเบียนในช่วงเวลานี้ก่อนจึงจะยืนยันการเข้าร่วมได้</p>
-            <div className="mt-3 grid gap-4 sm:grid-cols-2">
-              <Field label="เริ่มลงทะเบียน">
-                <input type="datetime-local" value={form.registrationStart} onChange={(e) => onChange("registrationStart", e.target.value)} className="staff-activity-input" required />
-              </Field>
-              <Field label="สิ้นสุดลงทะเบียน">
-                <input type="datetime-local" value={form.registrationEnd} onChange={(e) => onChange("registrationEnd", e.target.value)} min={form.registrationStart || undefined} max={form.startDate && form.startTime ? `${form.startDate}T${form.startTime}` : undefined} className="staff-activity-input" required />
-              </Field>
-            </div>
+            <p className="text-sm font-semibold text-slate-800">
+              ช่วงเวลาลงทะเบียน
+            </p>
+            <p className="mt-1 text-xs text-slate-500">
+              นิสิตต้องลงทะเบียนในช่วงเวลานี้ก่อนจึงจะยืนยันการเข้าร่วมได้
+            </p>
+<div className="mt-3 grid gap-4 sm:grid-cols-2">
+  <Field label="เริ่มลงทะเบียน">
+    <input
+      type="datetime-local"
+      value={form.registrationStart}
+      onChange={(e) => {
+        const value = e.target.value;
+
+        // เริ่มลงทะเบียนต้องไม่เกินเวลาสิ้นสุดลงทะเบียน
+        if (
+          form.registrationEnd &&
+          value &&
+          value >= form.registrationEnd
+        ) {
+          return;
+        }
+
+        // เริ่มลงทะเบียนต้องก่อนเวลาเริ่มกิจกรรม
+        if (
+          form.startDate &&
+          form.startTime &&
+          value &&
+          value >= `${form.startDate}T${form.startTime}`
+        ) {
+          return;
+        }
+
+        onChange("registrationStart", value);
+      }}
+      min={`${today}T00:00`}
+      max={
+        form.startDate && form.startTime
+          ? form.registrationEnd &&
+            form.registrationEnd < `${form.startDate}T${form.startTime}`
+            ? form.registrationEnd
+            : `${form.startDate}T${form.startTime}`
+          : form.registrationEnd || undefined
+      }
+      className="staff-activity-input"
+    />
+  </Field>
+
+  <Field label="สิ้นสุดลงทะเบียน">
+    <input
+      type="datetime-local"
+      value={form.registrationEnd}
+      onChange={(e) => {
+        const value = e.target.value;
+
+        // สิ้นสุดลงทะเบียนต้องหลังเริ่มลงทะเบียน
+        if (
+          form.registrationStart &&
+          value &&
+          value <= form.registrationStart
+        ) {
+          return;
+        }
+
+        // สิ้นสุดลงทะเบียนต้องก่อนเวลาเริ่มกิจกรรม
+        if (
+          form.startDate &&
+          form.startTime &&
+          value &&
+          value >= `${form.startDate}T${form.startTime}`
+        ) {
+          return;
+        }
+
+        onChange("registrationEnd", value);
+      }}
+      min={
+        form.registrationStart || `${today}T00:00`
+      }
+      max={
+        form.startDate && form.startTime
+          ? `${form.startDate}T${form.startTime}`
+          : undefined
+      }
+      className="staff-activity-input"
+    />
+  </Field>
+</div>
           </div>
 
           <Field label="แม่แบบเกียรติบัตร (ใบเซอร์)">
@@ -407,25 +639,37 @@ function AddActivityModal({
             >
               <option value="">-- ไม่ระบุ --</option>
               {templates.map((t) => (
-                <option key={t.id} value={t.id}>{t.name}</option>
+                <option key={t.id} value={t.id}>
+                  {t.name}
+                </option>
               ))}
             </select>
-            <p className="mt-1 text-xs text-slate-500">เลือกแม่แบบเพื่อใช้สร้างเกียรติบัตรให้ผู้เข้าร่วม</p>
+            <p className="mt-1 text-xs text-slate-500">
+              เลือกแม่แบบเพื่อใช้สร้างเกียรติบัตรให้ผู้เข้าร่วม
+            </p>
           </Field>
 
           <div>
-            <p className="text-sm font-semibold text-slate-800">ทักษะที่ได้รับจากกิจกรรม</p>
-            <p className="mt-1 text-xs text-slate-500">เลือกทักษะที่เกี่ยวข้องกับกิจกรรมนี้</p>
+            <p className="text-sm font-semibold text-slate-800">
+              ทักษะที่ได้รับจากกิจกรรม
+            </p>
+            <p className="mt-1 text-xs text-slate-500">
+              เลือกทักษะที่เกี่ยวข้องกับกิจกรรมนี้
+            </p>
             <div className="mt-3 grid gap-2">
               {skillOptions.map((skill) => {
-                const selected = form.selectedSkills.find((s) => s.skillId === skill.skillId);
+                const selected = form.selectedSkills.find(
+                  (s) => s.skillId === skill.skillId,
+                );
                 const isSelected = !!selected;
                 const level = selected ? selected.level : skill.level;
                 return (
                   <div
                     key={skill.skillId}
                     className={`flex items-center gap-3 rounded-lg border p-3 transition ${
-                      isSelected ? "border-[#1565C0] bg-blue-50" : "border-blue-100 bg-white hover:border-blue-200"
+                      isSelected
+                        ? "border-[#1565C0] bg-blue-50"
+                        : "border-blue-100 bg-white hover:border-blue-200"
                     }`}
                   >
                     <input
@@ -435,17 +679,24 @@ function AddActivityModal({
                       onChange={() => onToggleSkill(skill.skillId)}
                       className="h-4 w-4 rounded border-blue-300 text-[#1565C0] focus:ring-[#1565C0]"
                     />
-                    <label htmlFor={`skill-${skill.skillId}`} className="flex-1 cursor-pointer text-sm font-medium text-slate-700">
+                    <label
+                      htmlFor={`skill-${skill.skillId}`}
+                      className="flex-1 cursor-pointer text-sm font-medium text-slate-700"
+                    >
                       {skill.skillname}
                     </label>
                     {isSelected && (
                       <select
                         value={level}
-                        onChange={(e) => onSkillLevelChange(skill.skillId, e.target.value)}
+                        onChange={(e) =>
+                          onSkillLevelChange(skill.skillId, e.target.value)
+                        }
                         className="h-8 rounded-lg border border-blue-200 bg-white px-2 text-sm outline-none focus:border-[#1565C0]"
                       >
                         {LEVELS.map((l) => (
-                          <option key={l} value={l}>{l}</option>
+                          <option key={l} value={l}>
+                            {l}
+                          </option>
                         ))}
                       </select>
                     )}
@@ -492,9 +743,10 @@ function EvaluationModal({
             question: "",
             options: ["", ""],
             correctAnswer: 0,
-            skillNames: activity.skills.length > 0 ? [activity.skills[0].name] : [],
+            skillNames:
+              activity.skills.length > 0 ? [activity.skills[0].name] : [],
           },
-        ]
+        ],
   );
 
   const skillOptions = activity.skills.map((s) => s.name);
@@ -517,30 +769,40 @@ function EvaluationModal({
     setQuestions((prev) => prev.filter((q) => q.id !== id));
   };
 
-  const updateQuestion = (id: string, field: keyof EvaluationQuestion, value: any) => {
+  const updateQuestion = (
+    id: string,
+    field: keyof EvaluationQuestion,
+    value: any,
+  ) => {
     setQuestions((prev) =>
-      prev.map((q) => (q.id === id ? { ...q, [field]: value } : q))
+      prev.map((q) => (q.id === id ? { ...q, [field]: value } : q)),
     );
   };
 
   const addOption = (questionId: string) => {
     setQuestions((prev) =>
       prev.map((q) =>
-        q.id === questionId ? { ...q, options: [...q.options, ""] } : q
-      )
+        q.id === questionId ? { ...q, options: [...q.options, ""] } : q,
+      ),
     );
   };
 
-  const updateOption = (questionId: string, optionIndex: number, value: string) => {
+  const updateOption = (
+    questionId: string,
+    optionIndex: number,
+    value: string,
+  ) => {
     setQuestions((prev) =>
       prev.map((q) =>
         q.id === questionId
           ? {
               ...q,
-              options: q.options.map((opt, idx) => (idx === optionIndex ? value : opt)),
+              options: q.options.map((opt, idx) =>
+                idx === optionIndex ? value : opt,
+              ),
             }
-          : q
-      )
+          : q,
+      ),
     );
   };
 
@@ -553,20 +815,20 @@ function EvaluationModal({
             q.correctAnswer === optionIndex
               ? 0
               : q.correctAnswer > optionIndex
-              ? q.correctAnswer - 1
-              : q.correctAnswer;
+                ? q.correctAnswer - 1
+                : q.correctAnswer;
           return { ...q, options: newOptions, correctAnswer: newCorrect };
         }
         return q;
-      })
+      }),
     );
   };
 
   const selectCorrectAnswer = (questionId: string, optionIndex: number) => {
     setQuestions((prev) =>
       prev.map((q) =>
-        q.id === questionId ? { ...q, correctAnswer: optionIndex } : q
-      )
+        q.id === questionId ? { ...q, correctAnswer: optionIndex } : q,
+      ),
     );
   };
 
@@ -581,7 +843,7 @@ function EvaluationModal({
           return { ...q, skillNames: newSkillNames };
         }
         return q;
-      })
+      }),
     );
   };
 
@@ -592,10 +854,12 @@ function EvaluationModal({
         q.options.every((opt) => opt.trim() !== "") &&
         q.options.length >= 2 &&
         q.skillNames &&
-        q.skillNames.length > 0
+        q.skillNames.length > 0,
     );
     if (!isValid) {
-      alert("กรุณากรอกข้อมูลให้ครบถ้วน: คำถาม, ตัวเลือก (อย่างน้อย 2 ตัว), และเลือกทักษะอย่างน้อย 1 ตัว");
+      alert(
+        "กรุณากรอกข้อมูลให้ครบถ้วน: คำถาม, ตัวเลือก (อย่างน้อย 2 ตัว), และเลือกทักษะอย่างน้อย 1 ตัว",
+      );
       return;
     }
     onSave(questions);
@@ -624,7 +888,10 @@ function EvaluationModal({
 
         <div className="space-y-4">
           {questions.map((q, qIndex) => (
-            <div key={q.id} className="rounded-xl border border-blue-100 bg-blue-50/30 p-4">
+            <div
+              key={q.id}
+              className="rounded-xl border border-blue-100 bg-blue-50/30 p-4"
+            >
               {/* คำถาม */}
               <div className="flex items-start justify-between gap-2">
                 <div className="flex-1">
@@ -633,7 +900,9 @@ function EvaluationModal({
                   </label>
                   <textarea
                     value={q.question}
-                    onChange={(e) => updateQuestion(q.id, "question", e.target.value)}
+                    onChange={(e) =>
+                      updateQuestion(q.id, "question", e.target.value)
+                    }
                     className="mt-1 w-full rounded-lg border border-blue-200 bg-white px-3 py-2 text-sm outline-none focus:border-[#1565C0] focus:ring-2 focus:ring-blue-100 resize-y min-h-[60px]"
                     placeholder="พิมพ์คำถาม..."
                     rows={2}
@@ -672,7 +941,9 @@ function EvaluationModal({
                     <input
                       type="text"
                       value={opt}
-                      onChange={(e) => updateOption(q.id, optIndex, e.target.value)}
+                      onChange={(e) =>
+                        updateOption(q.id, optIndex, e.target.value)
+                      }
                       onClick={(e) => e.stopPropagation()}
                       className="flex-1 bg-transparent text-sm text-slate-700 outline-none placeholder:text-slate-400"
                       placeholder={`พิมพ์ตัวเลือกข้อ ${optIndex + 1}...`}
@@ -708,7 +979,10 @@ function EvaluationModal({
                 <div className="mt-1 flex flex-wrap gap-3">
                   {skillOptions.length > 0 ? (
                     skillOptions.map((skill) => (
-                      <label key={skill} className="flex items-center gap-1.5 text-sm">
+                      <label
+                        key={skill}
+                        className="flex items-center gap-1.5 text-sm"
+                      >
                         <input
                           type="checkbox"
                           checked={(q.skillNames || []).includes(skill)}
@@ -780,7 +1054,13 @@ function VerificationCodeModal({
   };
   const formatDate = (dateStr: string) => {
     const date = new Date(dateStr);
-    return date.toLocaleString("th-TH", { day: "numeric", month: "long", year: "numeric", hour: "2-digit", minute: "2-digit" });
+    return date.toLocaleString("th-TH", {
+      day: "numeric",
+      month: "long",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
   };
 
   return (
@@ -808,9 +1088,13 @@ function VerificationCodeModal({
           <div className="rounded-xl border border-blue-100 bg-blue-50/50 p-6 text-center">
             <p className="text-sm text-slate-500">รหัสยืนยัน</p>
             {code ? (
-              <p className="mt-2 font-mono text-4xl font-bold tracking-[0.3em] text-[#1565C0]">{code}</p>
+              <p className="mt-2 font-mono text-4xl font-bold tracking-[0.3em] text-[#1565C0]">
+                {code}
+              </p>
             ) : (
-              <p className="mt-2 text-sm text-slate-400">ยังไม่มีรหัส กรุณาสร้างรหัสใหม่</p>
+              <p className="mt-2 text-sm text-slate-400">
+                ยังไม่มีรหัส กรุณาสร้างรหัสใหม่
+              </p>
             )}
           </div>
 
@@ -820,7 +1104,9 @@ function VerificationCodeModal({
                 <Clock className="h-5 w-5 text-slate-400" />
                 <div>
                   <p className="text-xs text-slate-500">หมดอายุ</p>
-                  <p className="text-sm font-medium text-slate-700">{formatDate(expiresAt)}</p>
+                  <p className="text-sm font-medium text-slate-700">
+                    {formatDate(expiresAt)}
+                  </p>
                 </div>
               </div>
               <button
@@ -829,9 +1115,13 @@ function VerificationCodeModal({
                 className="inline-flex items-center gap-2 rounded-lg border border-[#1565C0] bg-white px-4 py-2 text-sm font-medium text-[#1565C0] transition hover:bg-blue-50"
               >
                 {copied ? (
-                  <><Check className="h-4 w-4" /> คัดลอกแล้ว</>
+                  <>
+                    <Check className="h-4 w-4" /> คัดลอกแล้ว
+                  </>
                 ) : (
-                  <><Copy className="h-4 w-4" /> คัดลอก</>
+                  <>
+                    <Copy className="h-4 w-4" /> คัดลอก
+                  </>
                 )}
               </button>
             </div>
@@ -870,8 +1160,10 @@ export default function StaffActivitiesPage() {
   const [activeTab, setActiveTab] = useState<ActivityStatus>("active");
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [form, setForm] = useState<ActivityForm>(emptyForm);
-  const [evaluationActivity, setEvaluationActivity] = useState<StaffActivity | null>(null);
-  const [editingEvaluationActivity, setEditingEvaluationActivity] = useState<StaffActivity | null>(null);
+  const [evaluationActivity, setEvaluationActivity] =
+    useState<StaffActivity | null>(null);
+  const [editingEvaluationActivity, setEditingEvaluationActivity] =
+    useState<StaffActivity | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [generatingId, setGeneratingId] = useState<string | null>(null);
@@ -880,12 +1172,26 @@ export default function StaffActivitiesPage() {
   const [modalActivityId, setModalActivityId] = useState<string | null>(null);
   const [showParticipantsModal, setShowParticipantsModal] = useState(false);
   const [participants, setParticipants] = useState<any[]>([]);
-  const [selectedParticipantActivityId, setSelectedParticipantActivityId] = useState<string | null>(null);
+  const [selectedParticipantActivityId, setSelectedParticipantActivityId] =
+    useState<string | null>(null);
   const [loadingParticipants, setLoadingParticipants] = useState(false);
+
+  // อัปเดตสถานะลงทะเบียนทุก 30 วินาที เพื่อให้หน้าเจ้าหน้าที่สะท้อนเวลาจริง
+  const [registrationNow, setRegistrationNow] = useState(() => new Date());
+
+  useEffect(() => {
+    const timer = window.setInterval(() => {
+      setRegistrationNow(new Date());
+    }, 30_000);
+
+    return () => window.clearInterval(timer);
+  }, []);
 
   // State สำหรับแก้ไขกิจกรรม
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
-  const [editingActivity, setEditingActivity] = useState<StaffActivity | null>(null);
+  const [editingActivity, setEditingActivity] = useState<StaffActivity | null>(
+    null,
+  );
   const [editForm, setEditForm] = useState<ActivityForm>(emptyForm);
 
   const fetchSkills = useCallback(async () => {
@@ -905,7 +1211,9 @@ export default function StaffActivitiesPage() {
       const res = await fetch("/api/staff/templates");
       if (!res.ok) throw new Error("ไม่สามารถโหลดแม่แบบ");
       const data = await res.json();
-      setTemplates(data.templates.filter((t: Template) => t.status === "active") || []);
+      setTemplates(
+        data.templates.filter((t: Template) => t.status === "active") || [],
+      );
     } catch (err) {
       console.error(err);
     }
@@ -935,7 +1243,7 @@ export default function StaffActivitiesPage() {
 
   const filteredActivities = useMemo(
     () => activities.filter((activity) => activity.status === activeTab),
-    [activities, activeTab]
+    [activities, activeTab],
   );
 
   // ---------- กิจกรรม ----------
@@ -946,7 +1254,9 @@ export default function StaffActivitiesPage() {
 
     try {
       if (newVal && activity.hasEvaluation) {
-        const res = await fetch(`/api/activities/${activityId}/generate-code`, { method: "POST" });
+        const res = await fetch(`/api/activities/${activityId}/generate-code`, {
+          method: "POST",
+        });
         if (!res.ok) {
           const err = await res.json();
           throw new Error(err.message || "สร้างรหัสไม่สำเร็จ");
@@ -987,23 +1297,69 @@ export default function StaffActivitiesPage() {
       alert(err instanceof Error ? err.message : "เกิดข้อผิดพลาด");
     }
   };
+const updateRegistration = async (activityId: string) => {
+  const activity = activities.find((item) => item.id === activityId);
+  if (!activity) return;
 
-  const updateRegistration = async (activityId: string) => {
-    const activity = activities.find((item) => item.id === activityId);
-    if (!activity) return;
+  const activityStart = getActivityStartDateTime(activity);
+  if (!activityStart) {
+    alert("ไม่สามารถตรวจสอบเวลาเริ่มกิจกรรมได้");
+    return;
+  }
 
-    try {
-      const res = await fetch(`/api/activities/${activityId}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ registrationEnabled: !activity.registrationEnabled }),
-      });
-      if (!res.ok) throw new Error("อัปเดตการลงทะเบียนไม่สำเร็จ");
-      await fetchActivities();
-    } catch (err) {
-      alert(err instanceof Error ? err.message : "เกิดข้อผิดพลาด");
+  const now = new Date();
+  const newValue = !activity.registrationEnabled;
+
+  // ปิด Emergency Override ได้ตลอด
+  if (!newValue) {
+    const res = await fetch(`/api/activities/${activityId}`, {
+      method: "PUT",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        registrationEnabled: false,
+      }),
+    });
+
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      throw new Error(
+        data.message || "ปิด Emergency Override ไม่สำเร็จ",
+      );
     }
-  };
+
+    await fetchActivities();
+    return;
+  }
+
+  // ห้ามเปิด Emergency Override หลังเริ่มกิจกรรม
+  if (now >= activityStart) {
+    alert(
+      "ไม่สามารถเปิด Emergency Override ได้ เนื่องจากกิจกรรมเริ่มแล้ว",
+    );
+    return;
+  }
+
+  const res = await fetch(`/api/activities/${activityId}`, {
+    method: "PUT",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      registrationEnabled: true,
+    }),
+  });
+
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(
+      data.message || "เปิด Emergency Override ไม่สำเร็จ",
+    );
+  }
+
+  await fetchActivities();
+};
 
   // ===== สร้างกิจกรรม (ปรับ payload) =====
   const createActivity = async () => {
@@ -1028,8 +1384,13 @@ export default function StaffActivitiesPage() {
       if (!form.registrationStart || !form.registrationEnd) {
         throw new Error("กรุณาระบุช่วงเวลาลงทะเบียน");
       }
-      if (new Date(form.registrationEnd) <= new Date(form.registrationStart) || new Date(form.registrationEnd) >= startDateObj) {
-        throw new Error("เวลาสิ้นสุดลงทะเบียนต้องอยู่หลังเวลาเริ่มลงทะเบียนและก่อนเวลาเริ่มกิจกรรม");
+      if (
+        new Date(form.registrationEnd) <= new Date(form.registrationStart) ||
+        new Date(form.registrationEnd) >= startDateObj
+      ) {
+        throw new Error(
+          "เวลาสิ้นสุดลงทะเบียนต้องอยู่หลังเวลาเริ่มลงทะเบียนและก่อนเวลาเริ่มกิจกรรม",
+        );
       }
 
       const payload = {
@@ -1064,7 +1425,10 @@ export default function StaffActivitiesPage() {
   };
 
   // ===== บันทึกแบบประเมิน =====
-  const saveEvaluation = async (evaluation: EvaluationQuestion[], activityId: string) => {
+  const saveEvaluation = async (
+    evaluation: EvaluationQuestion[],
+    activityId: string,
+  ) => {
     try {
       const res = await fetch(`/api/activities/${activityId}`, {
         method: "PUT",
@@ -1088,7 +1452,10 @@ export default function StaffActivitiesPage() {
   const handleUpdateActivity = async () => {
     if (!editingActivity) return;
     try {
-      const startDateTime = combineDateTime(editForm.startDate, editForm.startTime);
+      const startDateTime = combineDateTime(
+        editForm.startDate,
+        editForm.startTime,
+      );
       const endDateTime = combineDateTime(editForm.endDate, editForm.endTime);
 
       if (!startDateTime || !endDateTime) {
@@ -1108,8 +1475,14 @@ export default function StaffActivitiesPage() {
       if (!editForm.registrationStart || !editForm.registrationEnd) {
         throw new Error("กรุณาระบุช่วงเวลาลงทะเบียน");
       }
-      if (new Date(editForm.registrationEnd) <= new Date(editForm.registrationStart) || new Date(editForm.registrationEnd) >= startDateObj) {
-        throw new Error("เวลาสิ้นสุดลงทะเบียนต้องอยู่หลังเวลาเริ่มลงทะเบียนและก่อนเวลาเริ่มกิจกรรม");
+      if (
+        new Date(editForm.registrationEnd) <=
+          new Date(editForm.registrationStart) ||
+        new Date(editForm.registrationEnd) >= startDateObj
+      ) {
+        throw new Error(
+          "เวลาสิ้นสุดลงทะเบียนต้องอยู่หลังเวลาเริ่มลงทะเบียนและก่อนเวลาเริ่มกิจกรรม",
+        );
       }
 
       const updatedSkills = editForm.selectedSkills.map((skill) => {
@@ -1160,7 +1533,9 @@ export default function StaffActivitiesPage() {
     }
     setGeneratingId(activityId);
     try {
-      const res = await fetch(`/api/activities/${activityId}/generate-code`, { method: "POST" });
+      const res = await fetch(`/api/activities/${activityId}/generate-code`, {
+        method: "POST",
+      });
       if (!res.ok) {
         const err = await res.json();
         throw new Error(err.message || "สร้างรหัสไม่สำเร็จ");
@@ -1168,8 +1543,14 @@ export default function StaffActivitiesPage() {
       const data = await res.json();
       setActivities((prev) =>
         prev.map((a) =>
-          a.id === activityId ? { ...a, verificationCode: data.code, codeExpiresAt: data.expiresAt } : a
-        )
+          a.id === activityId
+            ? {
+                ...a,
+                verificationCode: data.code,
+                codeExpiresAt: data.expiresAt,
+              }
+            : a,
+        ),
       );
       setModalActivityId(activityId);
       setShowCodeModal(true);
@@ -1184,7 +1565,10 @@ export default function StaffActivitiesPage() {
     if (!modalActivityId) return;
     setIsRegenerating(true);
     try {
-      const res = await fetch(`/api/activities/${modalActivityId}/generate-code`, { method: "POST" });
+      const res = await fetch(
+        `/api/activities/${modalActivityId}/generate-code`,
+        { method: "POST" },
+      );
       if (!res.ok) {
         const err = await res.json();
         throw new Error(err.message || "สร้างรหัสไม่สำเร็จ");
@@ -1192,8 +1576,14 @@ export default function StaffActivitiesPage() {
       const data = await res.json();
       setActivities((prev) =>
         prev.map((a) =>
-          a.id === modalActivityId ? { ...a, verificationCode: data.code, codeExpiresAt: data.expiresAt } : a
-        )
+          a.id === modalActivityId
+            ? {
+                ...a,
+                verificationCode: data.code,
+                codeExpiresAt: data.expiresAt,
+              }
+            : a,
+        ),
       );
     } catch (err) {
       alert(err instanceof Error ? err.message : "เกิดข้อผิดพลาด");
@@ -1222,28 +1612,56 @@ export default function StaffActivitiesPage() {
   // ---------- แก้ไขกิจกรรม ----------
   const handleEdit = (activity: StaffActivity) => {
     setEditingActivity(activity);
+
     setEditForm({
       title: activity.title,
       description: activity.description,
-      startDate: activity.date || "",
-      startTime: activity.time ? activity.time.slice(0, 5) : "",
-      endDate: activity.endDate || "",
-      endTime: activity.endTime ? activity.endTime.slice(0, 5) : "",
+
+      // แปลงให้เป็น YYYY-MM-DD สำหรับ input type="date"
+      startDate: toDateInputValue(activity.date),
+      startTime: activity.time ? String(activity.time).slice(0, 5) : "",
+
+      // แปลงให้เป็น YYYY-MM-DD สำหรับ input type="date"
+      endDate: toDateInputValue(activity.endDate),
+      endTime: activity.endTime ? String(activity.endTime).slice(0, 5) : "",
+
       term: activity.term,
       location: activity.location,
       organizer: activity.organizer || "คณะวิทยาศาสตร์และนวัตกรรมดิจิทัล",
-      selectedSkills: activity.skills.map((skill) => ({ skillId: skill.skillId || "", name: skill.name, level: skill.level })),
+
+      selectedSkills: activity.skills.map((skill) => ({
+        skillId: skill.skillId || "",
+        name: skill.name,
+        level: skill.level,
+      })),
+
       templateId: activity.templateId || "",
-      registrationStart: toDateTimeInputValue(activity.registrationStart?.slice(0, 10), activity.registrationStart?.slice(11, 16)),
-      registrationEnd: toDateTimeInputValue(activity.registrationEnd?.slice(0, 10), activity.registrationEnd?.slice(11, 16)),
+
+      registrationStart: toDateTimeInputValue(
+        activity.registrationStart?.slice(0, 10),
+        activity.registrationStart?.slice(11, 16),
+      ),
+
+      registrationEnd: toDateTimeInputValue(
+        activity.registrationEnd?.slice(0, 10),
+        activity.registrationEnd?.slice(11, 16),
+      ),
     });
+
     setIsEditModalOpen(true);
   };
 
   const handleDelete = async (activityId: string) => {
-    if (!confirm("คุณต้องการลบกิจกรรมนี้ใช่หรือไม่? การดำเนินการนี้ไม่สามารถยกเลิกได้")) return;
+    if (
+      !confirm(
+        "คุณต้องการลบกิจกรรมนี้ใช่หรือไม่? การดำเนินการนี้ไม่สามารถยกเลิกได้",
+      )
+    )
+      return;
     try {
-      const res = await fetch(`/api/activities/${activityId}`, { method: "DELETE" });
+      const res = await fetch(`/api/activities/${activityId}`, {
+        method: "DELETE",
+      });
       if (!res.ok) {
         const err = await res.json();
         throw new Error(err.message || "ลบกิจกรรมไม่สำเร็จ");
@@ -1262,14 +1680,30 @@ export default function StaffActivitiesPage() {
       // ตรวจสอบความถูกต้องของ endDate/endTime
       if (field === "startDate" || field === "startTime") {
         // ถ้า endDate/endTime มีอยู่แล้วและไม่ถูกต้อง ให้เคลียร์
-        if (next.endDate && next.endTime && !isValidEndDateTime(next.startDate, next.startTime, next.endDate, next.endTime)) {
+        if (
+          next.endDate &&
+          next.endTime &&
+          !isValidEndDateTime(
+            next.startDate,
+            next.startTime,
+            next.endDate,
+            next.endTime,
+          )
+        ) {
           next.endDate = "";
           next.endTime = "";
         }
       }
       if (field === "endDate" || field === "endTime") {
         if (next.startDate && next.startTime && next.endDate && next.endTime) {
-          if (!isValidEndDateTime(next.startDate, next.startTime, next.endDate, next.endTime)) {
+          if (
+            !isValidEndDateTime(
+              next.startDate,
+              next.startTime,
+              next.endDate,
+              next.endTime,
+            )
+          ) {
             // ถ้าไม่ถูกต้อง ให้คืนค่าเดิม (ไม่เปลี่ยนแปลง)
             return prev;
           }
@@ -1283,13 +1717,25 @@ export default function StaffActivitiesPage() {
     setForm((prev) => {
       const exists = prev.selectedSkills.some((s) => s.skillId === skillId);
       if (exists) {
-        return { ...prev, selectedSkills: prev.selectedSkills.filter((s) => s.skillId !== skillId) };
+        return {
+          ...prev,
+          selectedSkills: prev.selectedSkills.filter(
+            (s) => s.skillId !== skillId,
+          ),
+        };
       } else {
         const skill = skillOptions.find((s) => s.skillId === skillId);
         if (!skill) return prev;
         return {
           ...prev,
-          selectedSkills: [...prev.selectedSkills, { skillId: skill.skillId, name: skill.skillname, level: skill.level }],
+          selectedSkills: [
+            ...prev.selectedSkills,
+            {
+              skillId: skill.skillId,
+              name: skill.skillname,
+              level: skill.level,
+            },
+          ],
         };
       }
     });
@@ -1298,7 +1744,9 @@ export default function StaffActivitiesPage() {
   const skillLevelChange = (skillId: string, level: string) => {
     setForm((prev) => ({
       ...prev,
-      selectedSkills: prev.selectedSkills.map((s) => (s.skillId === skillId ? { ...s, level } : s)),
+      selectedSkills: prev.selectedSkills.map((s) =>
+        s.skillId === skillId ? { ...s, level } : s,
+      ),
     }));
   };
 
@@ -1311,14 +1759,30 @@ export default function StaffActivitiesPage() {
     setEditForm((prev) => {
       const next = { ...prev, [field]: value };
       if (field === "startDate" || field === "startTime") {
-        if (next.endDate && next.endTime && !isValidEndDateTime(next.startDate, next.startTime, next.endDate, next.endTime)) {
+        if (
+          next.endDate &&
+          next.endTime &&
+          !isValidEndDateTime(
+            next.startDate,
+            next.startTime,
+            next.endDate,
+            next.endTime,
+          )
+        ) {
           next.endDate = "";
           next.endTime = "";
         }
       }
       if (field === "endDate" || field === "endTime") {
         if (next.startDate && next.startTime && next.endDate && next.endTime) {
-          if (!isValidEndDateTime(next.startDate, next.startTime, next.endDate, next.endTime)) {
+          if (
+            !isValidEndDateTime(
+              next.startDate,
+              next.startTime,
+              next.endDate,
+              next.endTime,
+            )
+          ) {
             return prev;
           }
         }
@@ -1331,13 +1795,25 @@ export default function StaffActivitiesPage() {
     setEditForm((prev) => {
       const exists = prev.selectedSkills.some((s) => s.skillId === skillId);
       if (exists) {
-        return { ...prev, selectedSkills: prev.selectedSkills.filter((s) => s.skillId !== skillId) };
+        return {
+          ...prev,
+          selectedSkills: prev.selectedSkills.filter(
+            (s) => s.skillId !== skillId,
+          ),
+        };
       } else {
         const skill = skillOptions.find((s) => s.skillId === skillId);
         if (!skill) return prev;
         return {
           ...prev,
-          selectedSkills: [...prev.selectedSkills, { skillId: skill.skillId, name: skill.skillname, level: skill.level }],
+          selectedSkills: [
+            ...prev.selectedSkills,
+            {
+              skillId: skill.skillId,
+              name: skill.skillname,
+              level: skill.level,
+            },
+          ],
         };
       }
     });
@@ -1346,7 +1822,9 @@ export default function StaffActivitiesPage() {
   const editSkillLevelChange = (skillId: string, level: string) => {
     setEditForm((prev) => ({
       ...prev,
-      selectedSkills: prev.selectedSkills.map((s) => (s.skillId === skillId ? { ...s, level } : s)),
+      selectedSkills: prev.selectedSkills.map((s) =>
+        s.skillId === skillId ? { ...s, level } : s,
+      ),
     }));
   };
 
@@ -1354,7 +1832,9 @@ export default function StaffActivitiesPage() {
     setEditForm((prev) => ({ ...prev, templateId }));
   };
 
-  const modalActivity = modalActivityId ? activities.find((a) => a.id === modalActivityId) : null;
+  const modalActivity = modalActivityId
+    ? activities.find((a) => a.id === modalActivityId)
+    : null;
 
   // ===== ฟังก์ชันแปลง hours เป็นชั่วโมง:นาที =====
   const formatActivityHours = (hours: number | null | undefined): string => {
@@ -1369,9 +1849,13 @@ export default function StaffActivitiesPage() {
       <section className="p-4 sm:p-6 lg:p-7">
         <div className="min-h-[calc(100vh-8.5rem)] rounded-2xl border border-blue-100 bg-white/95 px-4 py-8 shadow-[0_18px_50px_rgba(15,23,42,0.08)] sm:px-10">
           <div>
-            <h1 className="text-2xl font-semibold text-slate-950 sm:text-3xl">จัดการกิจกรรมและการอบรม</h1>
+            <h1 className="text-2xl font-semibold text-slate-950 sm:text-3xl">
+              จัดการกิจกรรมและการอบรม
+            </h1>
             <div className="mt-2 h-0.5 w-24 rounded-full bg-[#FFC107]" />
-            <p className="mt-3 text-sm text-slate-500">สร้างและจัดการกิจกรรมทั้งหมด</p>
+            <p className="mt-3 text-sm text-slate-500">
+              สร้างและจัดการกิจกรรมทั้งหมด
+            </p>
           </div>
 
           {error && (
@@ -1389,10 +1873,16 @@ export default function StaffActivitiesPage() {
           </button>
 
           <div className="mt-5 flex gap-8 border-b border-transparent">
-            <TabButton active={activeTab === "active"} onClick={() => setActiveTab("active")}>
+            <TabButton
+              active={activeTab === "active"}
+              onClick={() => setActiveTab("active")}
+            >
               กิจกรรมที่กำลังดำเนิน
             </TabButton>
-            <TabButton active={activeTab === "past"} onClick={() => setActiveTab("past")}>
+            <TabButton
+              active={activeTab === "past"}
+              onClick={() => setActiveTab("past")}
+            >
               กิจกรรมที่ผ่านมาแล้ว
             </TabButton>
           </div>
@@ -1402,7 +1892,9 @@ export default function StaffActivitiesPage() {
           ) : (
             <div className="mt-7 space-y-5">
               {filteredActivities.length === 0 ? (
-                <div className="text-center text-slate-400 py-8">ไม่มีกิจกรรมในหมวดนี้</div>
+                <div className="text-center text-slate-400 py-8">
+                  ไม่มีกิจกรรมในหมวดนี้
+                </div>
               ) : (
                 filteredActivities.map((activity) => (
                   <article
@@ -1410,35 +1902,46 @@ export default function StaffActivitiesPage() {
                     className="grid gap-4 rounded-xl border border-blue-100 bg-white px-8 py-4 shadow-[0_8px_18px_rgba(21,101,192,0.16)] lg:grid-cols-[1.05fr_1.18fr_0.75fr_0.8fr_1.05fr]"
                   >
                     <div className="flex min-h-[96px] flex-col justify-center">
-                      <h2 className="text-sm font-bold text-slate-950">{activity.title}</h2>
+                      <h2 className="text-sm font-bold text-slate-950">
+                        {activity.title}
+                      </h2>
                       <div className="mt-6 flex gap-3 text-xs leading-5 text-slate-500">
                         <CalendarDays className="mt-0.5 h-4 w-4 shrink-0 text-slate-400" />
                         <div>
                           <p>
                             {activity.date
-                              ? new Date(activity.date).toLocaleDateString("th-TH", {
-                                  year: "numeric",
-                                  month: "long",
-                                  day: "numeric",
-                                })
+                              ? new Date(activity.date).toLocaleDateString(
+                                  "th-TH",
+                                  {
+                                    year: "numeric",
+                                    month: "long",
+                                    day: "numeric",
+                                  },
+                                )
                               : "ไม่ระบุวันที่"}
                           </p>
                           <p>
                             {activity.time
-                              ? new Date(`2000-01-01T${activity.time}`).toLocaleTimeString("th-TH", {
+                              ? new Date(
+                                  `2000-01-01T${activity.time}`,
+                                ).toLocaleTimeString("th-TH", {
                                   hour: "2-digit",
                                   minute: "2-digit",
                                 }) + " น."
                               : "ไม่ระบุเวลา"}
                             {activity.endTime
-                              ? ` - ${new Date(`2000-01-01T${activity.endTime}`).toLocaleTimeString("th-TH", {
+                              ? ` - ${new Date(
+                                  `2000-01-01T${activity.endTime}`,
+                                ).toLocaleTimeString("th-TH", {
                                   hour: "2-digit",
                                   minute: "2-digit",
                                 })} น.`
                               : ""}
                           </p>
                           {activity.hours ? (
-                            <p className="mt-1 text-[#1565C0]">{formatActivityHours(activity.hours)}</p>
+                            <p className="mt-1 text-[#1565C0]">
+                              {formatActivityHours(activity.hours)}
+                            </p>
                           ) : null}
                         </div>
                       </div>
@@ -1464,35 +1967,52 @@ export default function StaffActivitiesPage() {
                           แก้ไขแบบประเมิน
                         </button>
                       )}
-                      {activity.verificationCode && activity.confirmationEnabled && (
-                        <p className="mt-2 flex items-center gap-2 text-xs text-emerald-600">
-                          <KeyRound className="h-3 w-3" />
-                          รหัส: <span className="font-mono font-bold">{activity.verificationCode}</span>
-                          <span className="text-[10px] text-slate-400">(เปิดอยู่)</span>
-                        </p>
-                      )}
-                      {activity.verificationCode && !activity.confirmationEnabled && (
-                        <p className="mt-2 flex items-center gap-2 text-xs text-slate-400">
-                          <KeyRound className="h-3 w-3" /> รหัสถูกซ่อน (ปิดการมองเห็น)
-                        </p>
-                      )}
+                      {activity.verificationCode &&
+                        activity.confirmationEnabled && (
+                          <p className="mt-2 flex items-center gap-2 text-xs text-emerald-600">
+                            <KeyRound className="h-3 w-3" />
+                            รหัส:{" "}
+                            <span className="font-mono font-bold">
+                              {activity.verificationCode}
+                            </span>
+                            <span className="text-[10px] text-slate-400">
+                              (เปิดอยู่)
+                            </span>
+                          </p>
+                        )}
+                      {activity.verificationCode &&
+                        !activity.confirmationEnabled && (
+                          <p className="mt-2 flex items-center gap-2 text-xs text-slate-400">
+                            <KeyRound className="h-3 w-3" /> รหัสถูกซ่อน
+                            (ปิดการมองเห็น)
+                          </p>
+                        )}
                     </div>
 
                     <div className="border-blue-100 lg:border-l lg:px-7">
-                      <p className="mb-5 text-sm font-bold text-slate-950">ทักษะ:</p>
+                      <p className="mb-5 text-sm font-bold text-slate-950">
+                        ทักษะ:
+                      </p>
                       <div className="flex flex-col items-start gap-3">
                         {activity.skills.length > 0 ? (
                           activity.skills.map((skill, index) => (
-                            <ActivityPill key={`${activity.id}-${index}`} skill={skill} />
+                            <ActivityPill
+                              key={`${activity.id}-${index}`}
+                              skill={skill}
+                            />
                           ))
                         ) : (
-                          <span className="text-xs text-slate-400">ยังไม่ได้กำหนดทักษะ</span>
+                          <span className="text-xs text-slate-400">
+                            ยังไม่ได้กำหนดทักษะ
+                          </span>
                         )}
                       </div>
                     </div>
 
                     <div className="border-blue-100 lg:border-l lg:px-5">
-                      <p className="mb-5 text-sm font-bold text-slate-950">รายชื่อ (คน)</p>
+                      <p className="mb-5 text-sm font-bold text-slate-950">
+                        รายชื่อ (คน)
+                      </p>
                       <p className="text-sm text-slate-700">
                         {activity.attendeeCount > 0 && (
                           <button
@@ -1508,19 +2028,63 @@ export default function StaffActivitiesPage() {
                     </div>
 
                     <div className="border-blue-100 lg:border-l lg:pl-5">
-                      <p className="mb-2 text-sm font-bold text-slate-950">เปิดลงทะเบียน</p>
-                      <ToggleSwitch enabled={activity.registrationEnabled} onClick={() => updateRegistration(activity.id)} />
-                      <p className="mt-2 text-xs text-slate-500">
-                        {activity.registrationEnabled ? "เปิดให้ลงทะเบียนได้ทันที (ไม่อิงช่วงเวลา)" : "ปิดการลงทะเบียน"}
-                      </p>
+                      {(() => {
+                        const registration = getRegistrationWindowStatus(
+                          activity,
+                          registrationNow,
+                        );
+
+                        return (
+                          <>
+                            <p className="mb-2 text-sm font-bold text-slate-950">
+                              Emergency Override
+                            </p>
+
+                            <ToggleSwitch
+                              enabled={activity.registrationEnabled}
+                              onClick={() => updateRegistration(activity.id)}
+                            />
+
+                            <p className="mt-2 text-xs font-medium text-slate-700">
+                              {registration.label}
+                            </p>
+
+                            <div className="mt-2 space-y-1 text-[11px] leading-4 text-slate-500">
+                              <p>
+                                ช่วงเวลาปกติ: {formatRegistrationDateTime(
+                                  activity.registrationStart,
+                                )}
+                                {activity.registrationEnd
+                                  ? ` - ${formatRegistrationDateTime(
+                                      activity.registrationEnd,
+                                    )}`
+                                  : ""}
+                              </p>
+                              <p>
+                                {activity.registrationEnabled
+                                  ? "เปิดรับฉุกเฉินนอกช่วงเวลาได้ จนถึงก่อนเริ่มกิจกรรม"
+                                  : "ระบบเปิด/ปิดตามช่วงเวลาที่กำหนดอัตโนมัติ"}
+                              </p>
+                            </div>
+                          </>
+                        );
+                      })()}
                     </div>
 
                     <div className="border-blue-100 lg:border-l lg:pl-5">
-                      <p className="mb-2 text-sm font-bold text-slate-950">ยืนยันการเข้าร่วม</p>
-                      <ToggleSwitch enabled={activity.confirmationEnabled} onClick={() => updateConfirmation(activity.id)} />
+                      <p className="mb-2 text-sm font-bold text-slate-950">
+                        ยืนยันการเข้าร่วม
+                      </p>
+                      <ToggleSwitch
+                        enabled={activity.confirmationEnabled}
+                        onClick={() => updateConfirmation(activity.id)}
+                      />
                       <button
                         type="button"
-                        disabled={!activity.hasEvaluation || !activity.confirmationEnabled}
+                        disabled={
+                          !activity.hasEvaluation ||
+                          !activity.confirmationEnabled
+                        }
                         onClick={() => showVerificationCode(activity.id)}
                         className={`mt-3 inline-flex h-9 w-full items-center justify-center gap-2 rounded-lg border px-3 text-xs font-semibold transition ${
                           activity.hasEvaluation && activity.confirmationEnabled
@@ -1532,16 +2096,20 @@ export default function StaffActivitiesPage() {
                           "กำลังสร้าง..."
                         ) : !activity.hasEvaluation ? (
                           <>
-                            <ClipboardList className="h-4 w-4" /> ต้องมีแบบประเมินก่อน
+                            <ClipboardList className="h-4 w-4" />{" "}
+                            ต้องมีแบบประเมินก่อน
                           </>
                         ) : !activity.confirmationEnabled ? (
                           <>
-                            <ClipboardList className="h-4 w-4" /> ต้องเปิดการยืนยันก่อน
+                            <ClipboardList className="h-4 w-4" />{" "}
+                            ต้องเปิดการยืนยันก่อน
                           </>
                         ) : (
                           <>
                             <KeyRound className="h-4 w-4" />
-                            {activity.verificationCode ? "ดูรหัสยืนยัน" : "สร้างรหัสยืนยันการเข้าร่วม"}
+                            {activity.verificationCode
+                              ? "ดูรหัสยืนยัน"
+                              : "สร้างรหัสยืนยันการเข้าร่วม"}
                           </>
                         )}
                       </button>
@@ -1552,7 +2120,11 @@ export default function StaffActivitiesPage() {
                           type="button"
                           onClick={() => handleEdit(activity)}
                           disabled={activity.hasConfirmedParticipants}
-                          title={activity.hasConfirmedParticipants ? "มีนิสิตยืนยันการเข้าร่วมแล้ว" : undefined}
+                          title={
+                            activity.hasConfirmedParticipants
+                              ? "มีนิสิตยืนยันการเข้าร่วมแล้ว"
+                              : undefined
+                          }
                           className="inline-flex h-8 flex-1 items-center justify-center gap-1 rounded-lg border border-[#1565C0] bg-white px-2 text-xs font-medium text-[#1565C0] transition hover:bg-blue-50 disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-slate-100 disabled:text-slate-400"
                         >
                           <Edit className="h-3.5 w-3.5" /> แก้ไข
@@ -1584,7 +2156,10 @@ export default function StaffActivitiesPage() {
           onToggleSkill={toggleSkill}
           onSkillLevelChange={skillLevelChange}
           onTemplateChange={handleTemplateChange}
-          onClose={() => { setForm(emptyForm); setIsModalOpen(false); }}
+          onClose={() => {
+            setForm(emptyForm);
+            setIsModalOpen(false);
+          }}
           onSubmit={createActivity}
           isEditing={false}
         />
@@ -1600,7 +2175,11 @@ export default function StaffActivitiesPage() {
           onToggleSkill={toggleEditSkill}
           onSkillLevelChange={editSkillLevelChange}
           onTemplateChange={handleEditTemplateChange}
-          onClose={() => { setIsEditModalOpen(false); setEditingActivity(null); setEditForm(emptyForm); }}
+          onClose={() => {
+            setIsEditModalOpen(false);
+            setEditingActivity(null);
+            setEditForm(emptyForm);
+          }}
           onSubmit={handleUpdateActivity}
           isEditing={true}
         />
@@ -1637,7 +2216,10 @@ export default function StaffActivitiesPage() {
         <VerificationCodeModal
           code={modalActivity.verificationCode || ""}
           expiresAt={modalActivity.codeExpiresAt || new Date().toISOString()}
-          onClose={() => { setShowCodeModal(false); setModalActivityId(null); }}
+          onClose={() => {
+            setShowCodeModal(false);
+            setModalActivityId(null);
+          }}
           onRegenerate={regenerateCode}
           isRegenerating={isRegenerating}
         />
@@ -1649,19 +2231,27 @@ export default function StaffActivitiesPage() {
           <div className="relative w-full max-w-4xl max-h-[90vh] overflow-y-auto rounded-2xl bg-white p-6 shadow-2xl sm:p-8">
             <button
               type="button"
-              onClick={() => { setShowParticipantsModal(false); setParticipants([]); setSelectedParticipantActivityId(null); }}
+              onClick={() => {
+                setShowParticipantsModal(false);
+                setParticipants([]);
+                setSelectedParticipantActivityId(null);
+              }}
               className="absolute right-4 top-4 rounded-full p-2 text-slate-400 transition hover:bg-slate-100 hover:text-slate-600"
             >
               <X className="h-5 w-5" />
             </button>
 
             <div className="mb-6">
-              <h2 className="text-2xl font-semibold text-slate-950">รายชื่อผู้เข้าร่วมกิจกรรม</h2>
+              <h2 className="text-2xl font-semibold text-slate-950">
+                รายชื่อผู้เข้าร่วมกิจกรรม
+              </h2>
               <div className="mt-2 h-0.5 w-20 rounded-full bg-[#FFC107]" />
               <p className="mt-2 text-sm text-slate-500">
                 กิจกรรม:{" "}
                 <span className="font-medium">
-                  {activities.find((a) => a.id === selectedParticipantActivityId)?.title || ""}
+                  {activities.find(
+                    (a) => a.id === selectedParticipantActivityId,
+                  )?.title || ""}
                 </span>
               </p>
             </div>
@@ -1672,28 +2262,53 @@ export default function StaffActivitiesPage() {
                 <span className="ml-2 text-slate-500">กำลังโหลด...</span>
               </div>
             ) : participants.length === 0 ? (
-              <div className="py-12 text-center text-slate-400">ไม่มีผู้เข้าร่วม</div>
+              <div className="py-12 text-center text-slate-400">
+                ไม่มีผู้เข้าร่วม
+              </div>
             ) : (
               <div className="overflow-x-auto rounded-xl border border-blue-100">
                 <table className="w-full min-w-[600px] text-sm">
                   <thead className="bg-blue-50/50">
                     <tr>
-                      <th className="px-4 py-3 text-left font-medium text-slate-500">ลำดับ</th>
-                      <th className="px-4 py-3 text-left font-medium text-slate-500">รหัสนิสิต</th>
-                      <th className="px-4 py-3 text-left font-medium text-slate-500">ชื่อ-นามสกุล</th>
-                      <th className="px-4 py-3 text-left font-medium text-slate-500">หลักสูตร</th>
-                      <th className="px-4 py-3 text-center font-medium text-slate-500">คะแนน</th>
+                      <th className="px-4 py-3 text-left font-medium text-slate-500">
+                        ลำดับ
+                      </th>
+                      <th className="px-4 py-3 text-left font-medium text-slate-500">
+                        รหัสนิสิต
+                      </th>
+                      <th className="px-4 py-3 text-left font-medium text-slate-500">
+                        ชื่อ-นามสกุล
+                      </th>
+                      <th className="px-4 py-3 text-left font-medium text-slate-500">
+                        หลักสูตร
+                      </th>
+                      <th className="px-4 py-3 text-center font-medium text-slate-500">
+                        คะแนน
+                      </th>
                     </tr>
                   </thead>
                   <tbody>
                     {participants.map((p, index) => (
-                      <tr key={p.studentId} className="border-b border-blue-50/50 transition hover:bg-blue-50/30">
-                        <td className="px-4 py-3 text-slate-500">{index + 1}</td>
-                        <td className="px-4 py-3 font-medium text-slate-800">{p.studentId}</td>
-                        <td className="px-4 py-3 text-slate-700">{`${p.firstname || ""} ${p.lastname || ""}`.trim()}</td>
-                        <td className="px-4 py-3 text-slate-500">{p.program || "-"}</td>
+                      <tr
+                        key={p.studentId}
+                        className="border-b border-blue-50/50 transition hover:bg-blue-50/30"
+                      >
+                        <td className="px-4 py-3 text-slate-500">
+                          {index + 1}
+                        </td>
+                        <td className="px-4 py-3 font-medium text-slate-800">
+                          {p.studentId}
+                        </td>
+                        <td className="px-4 py-3 text-slate-700">
+                          {`${p.firstname || ""} ${p.lastname || ""}`.trim()}
+                        </td>
+                        <td className="px-4 py-3 text-slate-500">
+                          {p.program || "-"}
+                        </td>
                         <td className="px-4 py-3 text-center font-semibold text-[#1565C0]">
-                          {p.score !== null && p.score !== undefined ? Number(p.score).toFixed(1) : "-"}
+                          {p.score !== null && p.score !== undefined
+                            ? Number(p.score).toFixed(1)
+                            : "-"}
                         </td>
                       </tr>
                     ))}
@@ -1705,7 +2320,11 @@ export default function StaffActivitiesPage() {
             <div className="mt-4 flex justify-end">
               <button
                 type="button"
-                onClick={() => { setShowParticipantsModal(false); setParticipants([]); setSelectedParticipantActivityId(null); }}
+                onClick={() => {
+                  setShowParticipantsModal(false);
+                  setParticipants([]);
+                  setSelectedParticipantActivityId(null);
+                }}
                 className="rounded-lg border border-slate-300 px-6 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
               >
                 ปิด
@@ -1727,7 +2346,10 @@ export default function StaffActivitiesPage() {
           font-size: 0.875rem;
           color: #0f172a;
           outline: none;
-          transition: border-color 160ms ease, box-shadow 160ms ease, background 160ms ease;
+          transition:
+            border-color 160ms ease,
+            box-shadow 160ms ease,
+            background 160ms ease;
         }
         .staff-activity-input:focus {
           border-color: #1565c0;
