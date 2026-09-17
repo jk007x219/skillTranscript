@@ -7,7 +7,7 @@ export async function ensureActivityRegistrationColumns() {
      FROM information_schema.COLUMNS
      WHERE TABLE_SCHEMA = DATABASE()
        AND TABLE_NAME = 'activity'
-       AND COLUMN_NAME IN ('registrationStart', 'registrationEnd', 'registrationEnabled')`,
+       AND COLUMN_NAME IN ('registrationStart', 'registrationEnd', 'registrationEnabled', 'applicationEnabled')`,
   );
   const columns = new Set(rows.map((row) => row.COLUMN_NAME));
 
@@ -19,6 +19,10 @@ export async function ensureActivityRegistrationColumns() {
   }
   if (!columns.has("registrationEnabled")) {
     await pool.query("ALTER TABLE activity ADD COLUMN registrationEnabled TINYINT(1) NOT NULL DEFAULT 0");
+  }
+  if (!columns.has("applicationEnabled")) {
+    // เปิดเป็นค่าเริ่มต้นเพื่อไม่ให้กิจกรรมเดิมหายจากหน้าของนิสิต
+    await pool.query("ALTER TABLE activity ADD COLUMN applicationEnabled TINYINT(1) NOT NULL DEFAULT 1");
   }
 }
 
