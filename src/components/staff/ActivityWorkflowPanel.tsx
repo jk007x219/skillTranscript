@@ -1,18 +1,289 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { CheckCircle2, Eye, ClipboardCheck, Loader2 } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { createPortal } from "react-dom";
+import { CheckCircle2, ClipboardCheck, Eye, Loader2 } from "lucide-react";
 
-type Activity = { id: string; title: string; date?: string; applicationEnabled: boolean; registrationEnabled: boolean; confirmationEnabled: boolean; hasEvaluation: boolean };
+type Activity = {
+  id: string;
+  title: string;
+  applicationEnabled: boolean;
+  registrationEnabled: boolean;
+  confirmationEnabled: boolean;
+  hasEvaluation: boolean;
+};
 
-function Switch({ enabled, disabled, onClick }: { enabled: boolean; disabled?: boolean; onClick: () => void }) {
-  return <button type="button" disabled={disabled} onClick={onClick} className={`relative h-7 w-12 rounded-full transition ${enabled ? "bg-[#1565C0]" : "bg-slate-300"} disabled:cursor-not-allowed disabled:opacity-50`} aria-pressed={enabled}><span className={`absolute top-1 h-5 w-5 rounded-full bg-white shadow transition ${enabled ? "left-6" : "left-1"}`} /></button>;
+type PortalTarget = {
+  activity: Activity;
+  element: HTMLElement;
+};
+
+function Switch({
+  enabled,
+  disabled,
+  onClick,
+}: {
+  enabled: boolean;
+  disabled?: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      disabled={disabled}
+      onClick={onClick}
+      className={`relative h-6 w-11 shrink-0 rounded-full transition-colors ${
+        enabled ? "bg-[#1565C0]" : "bg-slate-200"
+      } disabled:cursor-not-allowed disabled:opacity-50`}
+      aria-pressed={enabled}
+    >
+      <span
+        className={`absolute top-1 h-4 w-4 rounded-full bg-white shadow-sm transition-all ${
+          enabled ? "left-6" : "left-1"
+        }`}
+      />
+    </button>
+  );
+}
+
+function WorkflowStep({
+  number,
+  icon,
+  title,
+  description,
+  enabled,
+  disabled,
+  busy,
+  onToggle,
+}: {
+  number: number;
+  icon: React.ReactNode;
+  title: string;
+  description: string;
+  enabled: boolean;
+  disabled?: boolean;
+  busy?: boolean;
+  onToggle: () => void;
+}) {
+  return (
+    <div
+      className={`flex min-w-0 items-center gap-3 rounded-xl border px-3 py-2.5 transition ${
+        enabled
+          ? "border-blue-100 bg-blue-50/55"
+          : "border-slate-100 bg-slate-50/60"
+      }`}
+    >
+      <div
+        className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${
+          enabled ? "bg-[#1565C0] text-white" : "bg-white text-slate-400"
+        }`}
+      >
+        {icon}
+      </div>
+      <div className="min-w-0 flex-1">
+        <div className="flex items-center gap-1.5">
+          <span className="text-[10px] font-bold uppercase tracking-wide text-slate-400">
+            ขั้นที่ {number}
+          </span>
+          {enabled && <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />}
+        </div>
+        <p className="truncate text-xs font-semibold text-slate-800">{title}</p>
+        <p className="truncate text-[10px] text-slate-500">{description}</p>
+      </div>
+      {busy ? (
+        <Loader2 className="h-4 w-4 shrink-0 animate-spin text-[#1565C0]" />
+      ) : (
+        <Switch
+          enabled={enabled}
+          disabled={disabled}
+          onClick={onToggle}
+        />
+      )}
+    </div>
+  );
+}
+
+function InlineWorkflow({ activity }: { activity: Activity }) {
+  const [current, setCurrent] = useState(activity);
+  const [busy, setBusy] = useState<string | null>(null);
+
+  useEffect(() => {
+    setCurrent(activity);
+  }, [activity]);
+
+  const toggle = async (
+    field: "applicationEnabled" | "registrationEnabled" | "confirmationEnabled",
+  ) => {
+    setBusy(field);
+    try {
+      const response = await fetch("/api/activities/workflow", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          activityId: current.id,
+          field,
+          value: !current[field],
+        }),
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data?.error || data?.message || "อัปเดตไม่สำเร็จ");
+      }
+      setCurrent((prev) => ({ ...prev, ...data }));
+    } catch (error) {
+      window.alert(error instanceof Error ? error.message : "เกิดข้อผิดพลาด");
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  return (
+    <div className="mt-4 border-t border-slate-100 pt-4 lg:col-span-5">
+      <div className="mb-2 flex items-center justify-between gap-3">
+        <div>
+          <p className="text-xs font-bold text-slate-800">ลำดับการเปิดใช้งาน</p>
+          <p className="mt-0.5 text-[10px] text-slate-400">
+            เปิดทีละขั้นตามลำดับ เพื่อให้นิสิตไม่สามารถข้ามขั้นตอนได้
+          </p>
+        </div>
+        <span className="hidden rounded-full bg-slate-50 px-2.5 py-1 text-[10px] font-medium text-slate-500 sm:inline-flex">
+          1 สมัคร → 2 ลงทะเบียน → 3 ยืนยัน
+        </span>
+      </div>
+
+      <div className="grid gap-2 md:grid-cols-3">
+        <WorkflowStep
+          number={1}
+          icon={<Eye className="h-4 w-4" />}
+          title="มองเห็นการสมัคร"
+          description="นิสิตมองเห็นและสมัครกิจกรรมได้"
+          enabled={current.applicationEnabled}
+          busy={busy === "applicationEnabled"}
+          onToggle={() => toggle("applicationEnabled")}
+        />
+        <WorkflowStep
+          number={2}
+          icon={<ClipboardCheck className="h-4 w-4" />}
+          title="เปิดการลงทะเบียน"
+          description={
+            current.applicationEnabled
+              ? "ผู้ที่สมัครแล้วจึงลงทะเบียนได้"
+              : "ต้องเปิดขั้นที่ 1 ก่อน"
+          }
+          enabled={current.registrationEnabled}
+          disabled={!current.applicationEnabled || busy !== null}
+          busy={busy === "registrationEnabled"}
+          onToggle={() => toggle("registrationEnabled")}
+        />
+        <WorkflowStep
+          number={3}
+          icon={<CheckCircle2 className="h-4 w-4" />}
+          title="เปิดยืนยันการเข้าร่วม"
+          description={
+            !current.registrationEnabled
+              ? "ต้องเปิดขั้นที่ 2 ก่อน"
+              : !current.hasEvaluation
+                ? "ต้องสร้างแบบประเมินก่อน"
+                : "นิสิตยืนยันด้วยรหัสกิจกรรม"
+          }
+          enabled={current.confirmationEnabled}
+          disabled={
+            !current.registrationEnabled ||
+            !current.hasEvaluation ||
+            busy !== null
+          }
+          busy={busy === "confirmationEnabled"}
+          onToggle={() => toggle("confirmationEnabled")}
+        />
+      </div>
+    </div>
+  );
 }
 
 export default function ActivityWorkflowPanel() {
-  const [activities,setActivities]=useState<Activity[]>([]); const [loading,setLoading]=useState(true); const [busy,setBusy]=useState<string|null>(null);
-  const load=async()=>{setLoading(true);try{const [a,w]=await Promise.all([fetch("/api/activities",{cache:"no-store"}),fetch("/api/activities/workflow",{cache:"no-store"})]);const ad=await a.json(),wd=await w.json();const map=new Map((Array.isArray(wd)?wd:[]).map((x:any)=>[x.activityId,x]));setActivities((Array.isArray(ad)?ad:[]).map((x:any)=>({...x,...map.get(x.id)})).filter((x:any)=>x.status==="active"));}finally{setLoading(false)}};
-  useEffect(()=>{void load()},[]);
-  const toggle=async(a:Activity,field:keyof Pick<Activity,"applicationEnabled"|"registrationEnabled"|"confirmationEnabled">)=>{setBusy(`${a.id}:${field}`);try{const r=await fetch("/api/activities/workflow",{method:"PUT",headers:{"Content-Type":"application/json"},body:JSON.stringify({activityId:a.id,field,value:!a[field]})});const d=await r.json();if(!r.ok)throw new Error(d?.error||d?.message||"อัปเดตไม่สำเร็จ");setActivities(prev=>prev.map(x=>x.id===a.id?{...x,...d}:x));}catch(e){alert(e instanceof Error?e.message:"เกิดข้อผิดพลาด")}finally{setBusy(null)}};
-  return <section className="mb-6 rounded-2xl border border-blue-100 bg-white/95 p-5 shadow-[0_14px_34px_rgba(15,23,42,0.07)]"><div className="flex items-start justify-between gap-4"><div><h2 className="text-lg font-semibold text-slate-950">ลำดับการเปิดใช้งานกิจกรรม</h2><p className="mt-1 text-sm text-slate-500">เปิดตามลำดับ: มองเห็นการสมัคร → ลงทะเบียน → ยืนยันการเข้าร่วม</p></div><div className="hidden items-center gap-2 text-xs text-slate-500 sm:flex"><Eye className="h-4 w-4"/>ควบคุมการมองเห็นและสิทธิ์ของนิสิต</div></div>{loading?<div className="flex justify-center py-8"><Loader2 className="h-6 w-6 animate-spin text-[#1565C0]"/></div>:activities.length===0?<p className="py-8 text-center text-sm text-slate-400">ไม่มีกิจกรรมที่กำลังดำเนินการ</p>:<div className="mt-5 space-y-3">{activities.map(a=><div key={a.id} className="rounded-xl border border-blue-50 bg-slate-50/60 p-4"><div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between"><div className="min-w-0"><p className="font-semibold text-slate-900">{a.title}</p><p className="mt-1 text-xs text-slate-500">ขั้นตอนจะเปิดทีละระดับ เพื่อไม่ให้นิสิตข้ามขั้น</p></div><div className="grid gap-3 sm:grid-cols-3"><div className="flex items-center gap-3 rounded-lg bg-white px-3 py-2"><Eye className="h-4 w-4 text-[#1565C0]"/><span className="w-28 text-xs font-medium">มองเห็นการสมัคร</span><Switch enabled={a.applicationEnabled} disabled={busy===`${a.id}:applicationEnabled`} onClick={()=>toggle(a,"applicationEnabled")}/></div><div className="flex items-center gap-3 rounded-lg bg-white px-3 py-2"><ClipboardCheck className="h-4 w-4 text-[#1565C0]"/><span className="w-28 text-xs font-medium">เปิดการลงทะเบียน</span><Switch enabled={a.registrationEnabled} disabled={!a.applicationEnabled||busy===`${a.id}:registrationEnabled`} onClick={()=>toggle(a,"registrationEnabled")}/></div><div className="flex items-center gap-3 rounded-lg bg-white px-3 py-2"><CheckCircle2 className="h-4 w-4 text-[#1565C0]"/><span className="w-28 text-xs font-medium">เปิดยืนยันเข้าร่วม</span><Switch enabled={a.confirmationEnabled} disabled={!a.registrationEnabled||!a.hasEvaluation||busy===`${a.id}:confirmationEnabled`} onClick={()=>toggle(a,"confirmationEnabled")}/></div></div></div></div>)}</div>}</section>;
+  const [activities, setActivities] = useState<Activity[]>([]);
+  const [targets, setTargets] = useState<PortalTarget[]>([]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const load = async () => {
+      try {
+        const response = await fetch("/api/activities/workflow", {
+          cache: "no-store",
+        });
+        const data = await response.json();
+        if (!cancelled) {
+          setActivities(
+            (Array.isArray(data) ? data : []).filter(
+              (item) => item.status === "active",
+            ),
+          );
+        }
+      } catch {
+        if (!cancelled) setActivities([]);
+      }
+    };
+
+    void load();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const activityMap = useMemo(
+    () => new Map(activities.map((activity) => [activity.title.trim(), activity])),
+    [activities],
+  );
+
+  useEffect(() => {
+    const syncTargets = () => {
+      const articles = Array.from(
+        document.querySelectorAll<HTMLElement>(
+          ".staff-legacy-activity-page article.grid",
+        ),
+      );
+      const next: PortalTarget[] = [];
+
+      for (const article of articles) {
+        const title = article.querySelector("h2")?.textContent?.trim();
+        if (!title) continue;
+        const activity = activityMap.get(title);
+        if (!activity) continue;
+
+        let mount = article.querySelector<HTMLElement>(
+          ":scope > .activity-workflow-mount",
+        );
+        if (!mount) {
+          mount = document.createElement("div");
+          mount.className = "activity-workflow-mount";
+          article.appendChild(mount);
+        }
+        next.push({ activity, element: mount });
+      }
+
+      setTargets(next);
+    };
+
+    syncTargets();
+    const observer = new MutationObserver(syncTargets);
+    observer.observe(document.querySelector(".staff-legacy-activity-page") || document.body, {
+      childList: true,
+      subtree: true,
+    });
+
+    return () => observer.disconnect();
+  }, [activityMap]);
+
+  return (
+    <>
+      {targets.map(({ activity, element }) =>
+        createPortal(
+          <InlineWorkflow key={activity.id} activity={activity} />,
+          element,
+          activity.id,
+        ),
+      )}
+    </>
+  );
 }
