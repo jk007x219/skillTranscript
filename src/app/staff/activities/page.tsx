@@ -1,5 +1,6 @@
 import StaffActivitiesPage from "@/components/staff/StaffActivitiesPage";
 import ActivityWorkflowPanel from "@/components/staff/ActivityWorkflowPanel";
+import styles from "./page.module.css";
 
 export default function StaffActivitiesRoutePage() {
   return (
@@ -7,20 +8,9 @@ export default function StaffActivitiesRoutePage() {
       <div className="px-4 pt-4 sm:px-6 lg:px-7">
         <ActivityWorkflowPanel />
       </div>
-      <div className="staff-legacy-activity-page">
+      <div className={styles.legacyActivityPage}>
         <StaffActivitiesPage />
       </div>
-      <style jsx global>{`
-        .staff-legacy-activity-page article.grid > div:nth-child(4),
-        .staff-legacy-activity-page article.grid > div:nth-child(5) {
-          display: none !important;
-        }
-        @media (min-width: 1024px) {
-          .staff-legacy-activity-page article.grid {
-            grid-template-columns: 1.05fr 1.18fr 0.75fr !important;
-          }
-        }
-      `}</style>
     </>
   );
 }
