@@ -8,3 +8,14 @@
     grid-template-columns: 1.05fr 1.18fr 0.75fr !important;
   }
 }
+
+.staff-activity-workflow-root {
+  position: absolute;
+  width: 0;
+  height: 0;
+  overflow: hidden;
+}
+
+.activity-workflow-mount {
+  width: 100%;
+}
