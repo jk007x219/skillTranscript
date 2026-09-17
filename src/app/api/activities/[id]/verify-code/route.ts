@@ -12,179 +12,96 @@ export async function POST(
   },
 ) {
   try {
-    const { id } =
-      await params;
+    const { id } = await params;
+    const session = await auth();
 
-    const session =
-      await auth();
-
-    if (
-      !session?.user?.studentId ||
-      session.user.role !==
-        "student"
-    ) {
-      throw httpError(
-        403,
-        "กรุณาเข้าสู่ระบบด้วยบัญชีนิสิต",
-      );
+    if (!session?.user?.studentId || session.user.role !== "student") {
+      throw httpError(403, "กรุณาเข้าสู่ระบบด้วยบัญชีนิสิต");
     }
 
-    const body =
-      await request.json();
+    const body = await request.json();
+    const code = typeof body.code === "string" ? body.code.trim() : "";
 
-    const code =
-      typeof body.code ===
-      "string"
-        ? body.code.trim()
-        : "";
-
-    if (
-      !/^\d{6}$/.test(code)
-    ) {
-      throw httpError(
-        400,
-        "กรุณากรอกรหัส 6 หลัก",
-      );
+    if (!/^\d{6}$/.test(code)) {
+      throw httpError(400, "กรุณากรอกรหัส 6 หลัก");
     }
 
-    const [activities] =
-      await pool.query(
-        `
-          SELECT
-            activityId,
-            verification_code,
-            code_expires_at,
-            date,
-            time,
-            status
-          FROM activity
-          WHERE activityId = ?
-          LIMIT 1
-        `,
-        [id],
-      );
+    // ต้องสมัครกิจกรรมก่อน จึงจะยืนยันการเข้าร่วมได้
+    const [registrations] = await pool.query<any[]>(
+      `
+        SELECT ParticipationId, status
+        FROM participation
+        WHERE studentId = ? AND activityId = ?
+        LIMIT 1
+      `,
+      [session.user.studentId, id],
+    );
 
-    if (
-      (activities as any[])
-        .length === 0
-    ) {
-      throw httpError(
-        404,
-        "ไม่พบกิจกรรม",
-      );
+    if (registrations.length === 0) {
+      throw httpError(403, "กรุณาสมัครกิจกรรมก่อนยืนยันการเข้าร่วม");
     }
 
-    const activity =
-      (activities as any[])[0];
+    const registration = registrations[0];
 
-    if (
-      activity.status !==
-      "active"
-    ) {
-      throw httpError(
-        400,
-        "กิจกรรมนี้ไม่อยู่ในสถานะที่สามารถยืนยันการเข้าร่วมได้",
-      );
+    if (registration.status === "completed") {
+      throw httpError(400, "กิจกรรมนี้เสร็จสิ้นแล้ว");
     }
 
-    const storedCode =
-      activity.verification_code;
-
-    if (!storedCode) {
-      throw httpError(
-        400,
-        "กิจกรรมนี้ยังไม่มีรหัสยืนยัน",
-      );
+    if (registration.status !== "registered") {
+      throw httpError(403, "สถานะการสมัครไม่สามารถยืนยันการเข้าร่วมได้");
     }
 
-    const expiresAt =
-      activity.code_expires_at
-        ? new Date(
-            activity.code_expires_at,
-          )
-        : null;
+    const [activities] = await pool.query<any[]>(
+      `
+        SELECT activityId, verification_code, code_expires_at, status
+        FROM activity
+        WHERE activityId = ?
+        LIMIT 1
+      `,
+      [id],
+    );
 
-    if (
-      expiresAt &&
-      !Number.isNaN(
-        expiresAt.getTime(),
-      ) &&
-      new Date() >
-        expiresAt
-    ) {
-      throw httpError(
-        400,
-        "รหัสยืนยันหมดอายุแล้ว",
-      );
+    if (activities.length === 0) {
+      throw httpError(404, "ไม่พบกิจกรรม");
     }
 
-    if (
-      String(storedCode) !==
-      code
-    ) {
-      throw httpError(
-        400,
-        "รหัสยืนยันไม่ถูกต้อง",
-      );
+    const activity = activities[0];
+
+    if (activity.status !== "active") {
+      throw httpError(400, "กิจกรรมนี้ไม่อยู่ในสถานะที่สามารถยืนยันการเข้าร่วมได้");
     }
 
-    /**
-     * ต้องลงทะเบียนกิจกรรมก่อน
-     */
-    const [registrations] =
-      await pool.query<any[]>(
-        `
-          SELECT
-            ParticipationId,
-            status
-          FROM participation
-          WHERE
-            studentId = ?
-            AND activityId = ?
-          LIMIT 1
-        `,
-        [
-          session.user.studentId,
-          id,
-        ],
-      );
-
-    if (
-      registrations.length === 0
-    ) {
-      throw httpError(
-        403,
-        "กรุณาลงทะเบียนกิจกรรมก่อนยืนยันการเข้าร่วม",
-      );
+    if (!activity.verification_code) {
+      throw httpError(400, "กิจกรรมนี้ยังไม่มีรหัสยืนยัน");
     }
 
-    const registration =
-      registrations[0];
+    const expiresAt = activity.code_expires_at ? new Date(activity.code_expires_at) : null;
 
-    if (
-      registration.status !==
-      "registered"
-    ) {
-      if (
-        registration.status ===
-        "completed"
-      ) {
-        throw httpError(
-          400,
-          "กิจกรรมนี้ยืนยันการเข้าร่วมไปแล้ว",
-        );
-      }
-
-      throw httpError(
-        403,
-        "ไม่สามารถยืนยันการเข้าร่วมจากสถานะปัจจุบันได้",
-      );
+    if (expiresAt && !Number.isNaN(expiresAt.getTime()) && new Date() > expiresAt) {
+      throw httpError(400, "รหัสยืนยันหมดอายุแล้ว");
     }
+
+    if (String(activity.verification_code) !== code) {
+      throw httpError(400, "รหัสยืนยันไม่ถูกต้อง");
+    }
+
+    // เปลี่ยนสถานะจากสมัครแล้ว -> ยืนยันการเข้าร่วมแล้ว
+    await pool.query(
+      `
+        UPDATE participation
+        SET status = 'confirmed', joinDate = CURDATE()
+        WHERE ParticipationId = ?
+          AND studentId = ?
+          AND activityId = ?
+          AND status = 'registered'
+      `,
+      [registration.ParticipationId, session.user.studentId, id],
+    );
 
     return NextResponse.json({
       valid: true,
-      message:
-        "รหัสยืนยันถูกต้อง",
+      confirmed: true,
+      message: "ยืนยันการเข้าร่วมสำเร็จ",
     });
   } catch (error) {
     return jsonError(error);
