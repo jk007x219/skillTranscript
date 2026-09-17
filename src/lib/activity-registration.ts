@@ -21,8 +21,25 @@ export async function ensureActivityRegistrationColumns() {
     await pool.query("ALTER TABLE activity ADD COLUMN registrationEnabled TINYINT(1) NOT NULL DEFAULT 0");
   }
   if (!columns.has("applicationEnabled")) {
-    // เปิดเป็นค่าเริ่มต้นเพื่อไม่ให้กิจกรรมเดิมหายจากหน้าของนิสิต
     await pool.query("ALTER TABLE activity ADD COLUMN applicationEnabled TINYINT(1) NOT NULL DEFAULT 1");
+  }
+}
+
+export async function ensureParticipationStatusWorkflow() {
+  const [rows] = await pool.query<RowDataPacket[]>(
+    `SELECT COLUMN_TYPE
+     FROM information_schema.COLUMNS
+     WHERE TABLE_SCHEMA = DATABASE()
+       AND TABLE_NAME = 'participation'
+       AND COLUMN_NAME = 'status'
+     LIMIT 1`,
+  );
+
+  const type = String(rows[0]?.COLUMN_TYPE || "");
+  if (type.startsWith("enum(") && !type.includes("'applied'")) {
+    await pool.query(
+      `ALTER TABLE participation MODIFY COLUMN status ENUM('applied','registered','confirmed','completed') NOT NULL DEFAULT 'applied'`,
+    );
   }
 }
 
