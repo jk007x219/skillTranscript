@@ -37,7 +37,6 @@ function canAccessPath(pathname: string, token: Record<string, unknown>) {
   if (pathname.startsWith("/staff")) return role === "officer";
   if (pathname.startsWith("/executive")) return role === "executive" || isExecutive;
 
-  // ✅ แก้ไข: อนุญาต teacher และ officer เข้าถึง /api/staff/templates
   if (pathname.startsWith("/api/staff/templates")) {
     return role === "teacher" || role === "officer" || isExecutive;
   }
@@ -65,7 +64,6 @@ function forbidden(request: NextRequest) {
   if (isApiRequest(request.nextUrl.pathname)) {
     return NextResponse.json({ message: "ไม่มีสิทธิ์เข้าถึงข้อมูลนี้" }, { status: 403 });
   }
-
   return NextResponse.redirect(new URL("/", request.url));
 }
 
@@ -73,7 +71,6 @@ function unauthorized(request: NextRequest) {
   if (isApiRequest(request.nextUrl.pathname)) {
     return NextResponse.json({ message: "กรุณาเข้าสู่ระบบ" }, { status: 401 });
   }
-
   const loginUrl = new URL("/login", request.url);
   loginUrl.searchParams.set("callbackUrl", request.nextUrl.pathname);
   return NextResponse.redirect(loginUrl);
@@ -87,27 +84,33 @@ export async function middleware(request: NextRequest) {
   }
 
   const needsAuth = isProtectedPage(pathname) || (isApiRequest(pathname) && !isPublicPath(pathname));
-
-  if (!needsAuth) {
-    return NextResponse.next();
-  }
+  if (!needsAuth) return NextResponse.next();
 
   const token = await getToken({
     req: request,
     secret: process.env.AUTH_SECRET || process.env.NEXTAUTH_SECRET,
   });
 
-  if (!token) {
-    return unauthorized(request);
-  }
+  if (!token) return unauthorized(request);
 
   if (token.mustChangePassword && token.role) {
-    const redirectUrl = new URL("/change-password", request.url);
-    return NextResponse.redirect(redirectUrl);
+    return NextResponse.redirect(new URL("/change-password", request.url));
   }
 
-  if (!canAccessPath(pathname, token)) {
-    return forbidden(request);
+  if (!canAccessPath(pathname, token)) return forbidden(request);
+
+  // The student activities page uses /api/activities with studentId.
+  // Send that request to the workflow endpoint so registered/confirmed
+  // states are kept visible while completed activities stay in history.
+  if (pathname === "/api/activities" && token.role === "student") {
+    const studentId = request.nextUrl.searchParams.get("studentId");
+    const visible = request.nextUrl.searchParams.get("visible");
+    if (studentId && visible === "true" && studentId === token.studentId) {
+      const rewriteUrl = request.nextUrl.clone();
+      rewriteUrl.pathname = `/api/students/${encodeURIComponent(studentId)}/activities`;
+      rewriteUrl.search = "";
+      return NextResponse.rewrite(rewriteUrl);
+    }
   }
 
   return NextResponse.next();
