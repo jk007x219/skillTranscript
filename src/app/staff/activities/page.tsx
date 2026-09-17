@@ -11,13 +11,13 @@ export default function StaffActivitiesRoutePage() {
         <StaffActivitiesPage />
       </div>
       <style jsx global>{`
+        .staff-legacy-activity-page article.grid > div:nth-child(4),
+        .staff-legacy-activity-page article.grid > div:nth-child(5) {
+          display: none !important;
+        }
         @media (min-width: 1024px) {
           .staff-legacy-activity-page article.grid {
             grid-template-columns: 1.05fr 1.18fr 0.75fr !important;
-          }
-          .staff-legacy-activity-page article.grid > div:nth-child(4),
-          .staff-legacy-activity-page article.grid > div:nth-child(5) {
-            display: none !important;
           }
         }
       `}</style>
