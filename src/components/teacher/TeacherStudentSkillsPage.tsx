@@ -267,44 +267,123 @@ function ProgressList({ items, accent, onSkillClick }: { items: SkillWithIcon[];
 }
 
 // ===== DashboardPanel (เพิ่ม onSkillClick) =====
+type SkillLevel = "all" | "basic" | "intermediate" | "advanced";
+
+function normalizeSkillLevel(level?: string | null): Exclude<SkillLevel, "all"> {
+  const value = (level || "").trim().toLowerCase();
+  if (value.includes("สูง") || value.includes("advanced") || value.includes("high") || value === "3") {
+    return "advanced";
+  }
+  if (value.includes("กลาง") || value.includes("intermediate") || value.includes("medium") || value.includes("mid") || value === "2") {
+    return "intermediate";
+  }
+  return "basic";
+}
+
 function DashboardPanel({
-  title,
-  subtitle,
-  accent,
   items,
   chartId,
   onSkillClick,
 }: {
-  title: string;
-  subtitle: string;
-  accent: string;
   items: SkillWithIcon[];
   chartId: string;
   onSkillClick?: (skill: SkillWithIcon) => void;
 }) {
+  const [activeLevel, setActiveLevel] = useState<SkillLevel>("all");
+
+  const grouped = useMemo(
+    () => ({
+      basic: items.filter((item) => normalizeSkillLevel(item.level) === "basic"),
+      intermediate: items.filter((item) => normalizeSkillLevel(item.level) === "intermediate"),
+      advanced: items.filter((item) => normalizeSkillLevel(item.level) === "advanced"),
+    }),
+    [items],
+  );
+
+  const visibleItems = activeLevel === "all" ? items : grouped[activeLevel];
+
+  const tabs: Array<{ key: SkillLevel; label: string; count: number }> = [
+    { key: "all", label: "ทั้งหมด", count: items.length },
+    { key: "basic", label: "พื้นฐาน", count: grouped.basic.length },
+    { key: "intermediate", label: "กลาง", count: grouped.intermediate.length },
+    { key: "advanced", label: "สูง", count: grouped.advanced.length },
+  ];
+
   const average =
-    items.length > 0 ? Math.round(items.reduce((total, item) => total + item.percent, 0) / items.length) : 0;
+    visibleItems.length > 0
+      ? Math.round(visibleItems.reduce((total, item) => total + item.percent, 0) / visibleItems.length)
+      : 0;
 
   return (
-    <section className="overflow-hidden rounded-2xl border border-blue-100 bg-white shadow-[0_18px_50px_rgba(15,23,42,0.08)]">
-      <div className="flex flex-col gap-4 border-b border-blue-50 bg-gradient-to-r from-white via-blue-50/60 to-white px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <div className="flex items-center gap-2">
-            <span className="flex h-8 w-8 items-center justify-center rounded-lg text-white shadow-sm" style={{ backgroundColor: accent }}>
-              <Star className="h-4 w-4" aria-hidden="true" />
-            </span>
-            <h2 className="text-base font-semibold text-slate-950">{title}</h2>
+    <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-[0_14px_36px_rgba(15,23,42,0.06)]">
+      <div className="border-b border-slate-100 px-5 py-4">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h2 className="text-base font-semibold text-slate-900">กราฟทักษะนิสิต</h2>
+            <p className="mt-1 text-xs text-slate-500">
+              เลือกดูกราฟทักษะได้ทั้ง 3 ระดับ เช่นเดียวกับหน้า Student Dashboard
+            </p>
           </div>
-          <p className="mt-1 text-xs text-[#1565C0]">{subtitle}</p>
+          <span className="w-fit rounded-full bg-slate-50 px-3 py-1 text-xs font-semibold text-slate-600">
+            {visibleItems.length} ทักษะ
+          </span>
         </div>
-        <div className="inline-flex w-fit items-center gap-2 rounded-full bg-white px-3 py-2 text-xs font-semibold text-slate-700 shadow-sm ring-1 ring-blue-100">
-          <CheckCircle2 className="h-4 w-4" style={{ color: accent }} aria-hidden="true" />
-          ภาพรวม {average}%
+
+        <div className="mt-4 flex flex-wrap gap-1.5">
+          {tabs.map((tab) => {
+            const active = activeLevel === tab.key;
+            const accent =
+              tab.key === "basic"
+                ? "#39b54a"
+                : tab.key === "intermediate"
+                  ? "#FFC107"
+                  : tab.key === "advanced"
+                    ? "#1565C0"
+                    : "#1565C0";
+
+            return (
+              <button
+                key={tab.key}
+                type="button"
+                onClick={() => setActiveLevel(tab.key)}
+                className={`rounded-full px-3.5 py-1.5 text-xs font-semibold transition-colors ${active ? "text-white shadow-sm" : "bg-slate-50 text-slate-500 hover:bg-slate-100 hover:text-slate-700"}`}
+                style={active ? { backgroundColor: accent } : undefined}
+              >
+                {tab.label}
+                <span className="ml-1.5 opacity-70">{tab.count}</span>
+              </button>
+            );
+          })}
         </div>
       </div>
-      <div className="grid gap-6 p-5 lg:grid-cols-[0.9fr_1fr] lg:items-center">
-        <RadarChart accent={accent} values={items.map((item) => item.percent)} labels={items.map((item) => item.skillName)} id={chartId} />
-        <ProgressList items={items} accent={accent} onSkillClick={onSkillClick} />
+
+      <div className="grid gap-6 p-5 lg:grid-cols-[280px_1fr] lg:items-center">
+        <div className="rounded-xl bg-slate-50/60 p-4">
+          <RadarChart
+            accent={
+              activeLevel === "basic"
+                ? "#39b54a"
+                : activeLevel === "intermediate"
+                  ? "#FFC107"
+                  : "#1565C0"
+            }
+            values={visibleItems.length >= 3 ? visibleItems.map((item) => item.percent) : []}
+            labels={visibleItems.map((item) => item.skillName)}
+            id={`teacher-skill-chart-${chartId}-${activeLevel}`}
+          />
+          <div className="mt-3 text-center">
+            <p className="text-2xl font-semibold tabular-nums text-slate-900">{average}%</p>
+            <p className="text-xs text-slate-500">คะแนนเฉลี่ยของระดับที่เลือก</p>
+          </div>
+        </div>
+
+        <ProgressList items={visibleItems} accent={
+          activeLevel === "basic"
+            ? "#39b54a"
+            : activeLevel === "intermediate"
+              ? "#FFC107"
+              : "#1565C0"
+        } onSkillClick={onSkillClick} />
       </div>
     </section>
   );
@@ -702,29 +781,8 @@ export default function TeacherStudentSkillsPage() {
 
           {/* กราฟทักษะทั้ง 3 ระดับ */}
           <DashboardPanel
-            title="ทักษะระดับพื้นฐาน"
-            subtitle="กราฟแสดงทักษะที่อยู่ในระดับพื้นฐาน"
-            accent="#39b54a"
-            items={skillsByLevel["พื้นฐาน"]}
-            chartId="basic-skill-chart"
-            onSkillClick={handleSkillClick}
-          />
-
-          <DashboardPanel
-            title="ทักษะระดับกลาง"
-            subtitle="กราฟแสดงทักษะที่อยู่ในระดับกลาง"
-            accent="#FFC107"
-            items={skillsByLevel["กลาง"]}
-            chartId="intermediate-skill-chart"
-            onSkillClick={handleSkillClick}
-          />
-
-          <DashboardPanel
-            title="ทักษะระดับสูง"
-            subtitle="กราฟแสดงทักษะที่อยู่ในระดับสูง"
-            accent="#1565C0"
-            items={skillsByLevel["สูง"]}
-            chartId="advanced-skill-chart"
+            items={skillsWithIcon}
+            chartId="all-levels"
             onSkillClick={handleSkillClick}
           />
 
