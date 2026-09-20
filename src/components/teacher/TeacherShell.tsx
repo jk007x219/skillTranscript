@@ -20,6 +20,7 @@ import {
   LayoutDashboard,
   AlertTriangle,
   Lock,
+  QrCode,
 } from "lucide-react";
 import { useAuth } from "@/context/auth-context";
 
@@ -35,6 +36,7 @@ function SidebarNav({ activePath, onNavigate, user }: { activePath: string; onNa
   const baseLinks: SidebarLink[] = [
     { href: "/teacher/students", label: "ตรวจสอบข้อมูลทักษะนิสิตที่ปรึกษา", icon: UsersRound },
     { href: "/teacher/activities", label: "จัดการกิจกรรมและการอบรม", icon: CalendarDays },
+    { href: "/teacher/scan-qr", label: "สแกน QR", icon: QrCode },
     { href: "/teacher/library", label: "คลังข้อมูลและแม่แบบ", icon: Database },
   ];
 
