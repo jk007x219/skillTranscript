@@ -2112,15 +2112,24 @@ const updateWorkflow = async (
   return (
     <StaffShell activePath="/staff/activities">
       <section className="p-4 sm:p-6 lg:p-7">
-        <div className="min-h-[calc(100vh-8.5rem)] rounded-2xl border border-blue-100 bg-white/95 px-4 py-8 shadow-[0_18px_50px_rgba(15,23,42,0.08)] sm:px-10">
-          <div>
-            <h1 className="text-2xl font-semibold text-slate-950 sm:text-3xl">
+        <div className="min-h-[calc(100vh-8.5rem)] rounded-2xl border border-slate-200 bg-white px-4 py-6 shadow-[0_12px_35px_rgba(15,23,42,0.06)] sm:px-7 sm:py-7 lg:px-8">
+          <div className="flex flex-col gap-5 border-b border-slate-100 pb-6 sm:flex-row sm:items-end sm:justify-between">
+            <div>
+            <h1 className="text-2xl font-semibold tracking-tight text-slate-950 sm:text-3xl">
               จัดการกิจกรรมและการอบรม
             </h1>
             <div className="mt-2 h-0.5 w-24 rounded-full bg-[#FFC107]" />
             <p className="mt-3 text-sm text-slate-500">
               สร้างและจัดการกิจกรรมทั้งหมด
             </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setIsModalOpen(true)}
+              className="inline-flex h-11 shrink-0 items-center justify-center gap-2 rounded-lg bg-[#1565C0] px-5 text-sm font-semibold text-white shadow-sm transition hover:bg-[#0D47A1] focus:outline-none focus:ring-2 focus:ring-blue-200"
+            >
+              <Plus className="h-5 w-5" /> เพิ่มกิจกรรมใหม่
+            </button>
           </div>
 
           {error && (
@@ -2129,15 +2138,7 @@ const updateWorkflow = async (
             </div>
           )}
 
-          <button
-            type="button"
-            onClick={() => setIsModalOpen(true)}
-            className="mt-12 inline-flex h-11 items-center justify-center gap-2 rounded bg-[#1565C0] px-5 text-sm font-semibold text-white shadow-sm transition hover:bg-[#0D47A1]"
-          >
-            <Plus className="h-5 w-5" /> เพิ่มกิจกรรมใหม่
-          </button>
-
-          <div className="mt-8 border-b border-slate-200">
+          <div className="mt-6 border-b border-slate-200">
             <nav
               className="flex gap-1 overflow-x-auto"
               aria-label="ตัวกรองกิจกรรม"
@@ -2187,16 +2188,16 @@ const updateWorkflow = async (
                 filteredActivities.map((activity) => (
                   <article
                     key={activity.id}
-                    className="grid gap-4 rounded-xl border border-blue-100 bg-white px-8 py-4 shadow-[0_8px_18px_rgba(21,101,192,0.16)] lg:grid-cols-[1.05fr_1.18fr_0.75fr_0.8fr_1.05fr]"
+                    className="grid gap-0 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-[0_6px_20px_rgba(15,23,42,0.05)] transition-shadow hover:shadow-[0_10px_28px_rgba(15,23,42,0.08)] lg:grid-cols-3 xl:grid-cols-[2fr_1.1fr_0.7fr_0.95fr_1.05fr_1.1fr]"
                   >
-                    <div className="flex min-h-[96px] flex-col justify-center">
-                      <h2 className="text-sm font-bold text-slate-950">
+                    <div className="flex min-h-[150px] flex-col justify-start border-b border-slate-100 p-5 lg:border-b-0 lg:border-r xl:p-5">
+                      <h2 className="text-base font-semibold leading-6 text-slate-950">
                         {activity.title}
                       </h2>
                       <p className="mt-2 inline-flex w-fit rounded-full bg-blue-50 px-2.5 py-1 font-mono text-[11px] font-semibold text-[#1565C0]">
                         รหัสกิจกรรม: {activity.id}
                       </p>
-                      <div className="mt-6 flex gap-3 text-xs leading-5 text-slate-500">
+                      <div className="mt-4 flex gap-3 text-xs leading-5 text-slate-500">
                         <CalendarDays className="mt-0.5 h-4 w-4 shrink-0 text-slate-400" />
                         <div>
                           <p>
@@ -2280,7 +2281,7 @@ const updateWorkflow = async (
                         )}
                     </div>
 
-                    <div className="border-blue-100 lg:border-l lg:px-7">
+                    <div className="border-b border-slate-100 p-5 lg:border-b-0 lg:border-r xl:p-5">
                       <p className="mb-5 text-sm font-bold text-slate-950">
                         ทักษะ:
                       </p>
@@ -2300,7 +2301,7 @@ const updateWorkflow = async (
                       </div>
                     </div>
 
-                    <div className="border-blue-100 lg:border-l lg:px-5">
+                    <div className="border-b border-slate-100 p-5 lg:border-b-0 lg:border-r xl:p-5">
                       <p className="mb-5 text-sm font-bold text-slate-950">
                         รายชื่อ (คน)
                       </p>
@@ -2318,7 +2319,7 @@ const updateWorkflow = async (
                       </p>
                     </div>
 
-                    <div className="border-blue-100 lg:border-l lg:pl-5">
+                    <div className="border-b border-slate-100 p-5 lg:border-b-0 lg:border-r xl:p-5">
                       <p className="mb-2 text-sm font-bold text-slate-950">
                         เปิดรับสมัคร
                       </p>
