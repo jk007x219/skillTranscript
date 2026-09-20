@@ -516,20 +516,21 @@ export default function TeacherStudentSkillsPage() {
     }));
   }, [allSkills]);
 
-  // แยกทักษะตามหมวดหมู่
-  const { facultySkills, essentialSkills } = useMemo(() => {
-    const faculty: SkillWithIcon[] = [];
-    const essential: SkillWithIcon[] = [];
+  // แยกทักษะตาม "ระดับ" ทั้ง 3 ระดับ
+  // พื้นฐาน / กลาง / สูง
+  const skillsByLevel = useMemo(() => {
+    const groups: Record<string, SkillWithIcon[]> = {
+      "พื้นฐาน": [],
+      "กลาง": [],
+      "สูง": [],
+    };
 
     skillsWithIcon.forEach((skill) => {
-      if (isFacultySkill(skill.skillName)) {
-        faculty.push(skill);
-      } else {
-        essential.push(skill);
-      }
+      const level = skill.level === "พื้นฐาน" || skill.level === "สูง" ? skill.level : "กลาง";
+      groups[level].push(skill);
     });
 
-    return { facultySkills: faculty, essentialSkills: essential };
+    return groups;
   }, [skillsWithIcon]);
 
   const totalSkills = skillsWithIcon.length;
@@ -699,22 +700,31 @@ export default function TeacherStudentSkillsPage() {
             </div>
           </div>
 
-          {/* DashboardPanels */}
+          {/* กราฟทักษะทั้ง 3 ระดับ */}
           <DashboardPanel
-            title="ทักษะของนิสิตคณะวิทยาศาสตร์ต้องมี"
-            subtitle="คำนวณจากกิจกรรมและชั่วโมงที่นิสิตเข้าร่วมในฐานข้อมูล"
-            accent="#FFC107"
-            items={facultySkills}
-            chartId="faculty-skill-chart"
+            title="ทักษะระดับพื้นฐาน"
+            subtitle="กราฟแสดงทักษะที่อยู่ในระดับพื้นฐาน"
+            accent="#39b54a"
+            items={skillsByLevel["พื้นฐาน"]}
+            chartId="basic-skill-chart"
             onSkillClick={handleSkillClick}
           />
 
           <DashboardPanel
-            title="ทักษะที่จำเป็นสำหรับนิสิต"
-            subtitle="คำนวณจากกิจกรรมและชั่วโมงที่นิสิตเข้าร่วมในฐานข้อมูล"
+            title="ทักษะระดับกลาง"
+            subtitle="กราฟแสดงทักษะที่อยู่ในระดับกลาง"
+            accent="#FFC107"
+            items={skillsByLevel["กลาง"]}
+            chartId="intermediate-skill-chart"
+            onSkillClick={handleSkillClick}
+          />
+
+          <DashboardPanel
+            title="ทักษะระดับสูง"
+            subtitle="กราฟแสดงทักษะที่อยู่ในระดับสูง"
             accent="#1565C0"
-            items={essentialSkills}
-            chartId="essential-skill-chart"
+            items={skillsByLevel["สูง"]}
+            chartId="advanced-skill-chart"
             onSkillClick={handleSkillClick}
           />
 
