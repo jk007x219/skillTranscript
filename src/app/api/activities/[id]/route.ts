@@ -10,6 +10,21 @@ import {
 
 const BANGKOK_OFFSET = "+07:00";
 
+async function ensureActivityCapacityColumn() {
+  const [rows] = await pool.query<any[]>(
+    `SELECT COUNT(*) AS count
+     FROM INFORMATION_SCHEMA.COLUMNS
+     WHERE TABLE_SCHEMA = DATABASE()
+       AND TABLE_NAME = 'activity'
+       AND COLUMN_NAME = 'capacity'`,
+  );
+  if (!Number(rows[0]?.count)) {
+    await pool.query(`ALTER TABLE activity ADD COLUMN capacity INT NOT NULL DEFAULT 30`);
+  }
+}
+
+
+
 // ============================================================
 // Helper: แปลง Date / String เป็นส่วนวันที่ YYYY-MM-DD
 // ============================================================
@@ -672,6 +687,8 @@ export async function PUT(
     const { id } =
       await params;
 
+    await ensureActivityCapacityColumn();
+
     await ensureActivityRegistrationColumns();
 
     const session =
@@ -750,6 +767,7 @@ export async function PUT(
             a.registrationStart,
             a.registrationEnd,
             a.registrationEnabled,
+            a.capacity,
 
             EXISTS(
               SELECT 1
@@ -829,6 +847,7 @@ export async function PUT(
       registrationStart,
       registrationEnd,
       registrationEnabled,
+      capacity,
     } = body;
 
     // ========================================================
@@ -997,6 +1016,14 @@ export async function PUT(
     // ========================================================
     // Basic fields
     // ========================================================
+    if (capacity !== undefined) {
+      const activityCapacity = Number(capacity);
+      if (!Number.isInteger(activityCapacity) || activityCapacity < 1) {
+        throw httpError(400, "จำนวนที่รับนิสิตต้องเป็นจำนวนเต็มอย่างน้อย 1 คน");
+      }
+      addUpdate("capacity", activityCapacity);
+    }
+
 
     addUpdate(
       "activityName",
