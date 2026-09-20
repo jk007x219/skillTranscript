@@ -2428,7 +2428,6 @@ const updateWorkflow = async (
                           <Trash2 className="h-3.5 w-3.5" /> ลบ
                         </button>
                       </div>
-                    </div>
                   </article>
                 ))
               )}
