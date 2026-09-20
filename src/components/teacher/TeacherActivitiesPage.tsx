@@ -11,7 +11,6 @@ import {
   CameraOff,
   ClipboardList,
   FileWarning,
-  KeyRound,
   MapPin,
   Plus,
   ToggleLeft,
@@ -1932,75 +1931,6 @@ export default function StaffActivitiesPage() {
     }
   };
 
-  const showVerificationCode = async (activityId: string) => {
-    const activity = activities.find((a) => a.id === activityId);
-    if (!activity) return;
-    if (activity.verificationCode) {
-      setModalActivityId(activityId);
-      setShowCodeModal(true);
-      return;
-    }
-    setGeneratingId(activityId);
-    try {
-      const res = await fetch(`/api/activities/${activityId}/generate-code`, {
-        method: "POST",
-      });
-      if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.message || "สร้างรหัสไม่สำเร็จ");
-      }
-      const data = await res.json();
-      setActivities((prev) =>
-        prev.map((a) =>
-          a.id === activityId
-            ? {
-                ...a,
-                verificationCode: data.code,
-                codeExpiresAt: data.expiresAt,
-              }
-            : a,
-        ),
-      );
-      setModalActivityId(activityId);
-      setShowCodeModal(true);
-    } catch (err) {
-      alert(err instanceof Error ? err.message : "เกิดข้อผิดพลาด");
-    } finally {
-      setGeneratingId(null);
-    }
-  };
-
-  const regenerateCode = async () => {
-    if (!modalActivityId) return;
-    setIsRegenerating(true);
-    try {
-      const res = await fetch(
-        `/api/activities/${modalActivityId}/generate-code`,
-        { method: "POST" },
-      );
-      if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.message || "สร้างรหัสไม่สำเร็จ");
-      }
-      const data = await res.json();
-      setActivities((prev) =>
-        prev.map((a) =>
-          a.id === modalActivityId
-            ? {
-                ...a,
-                verificationCode: data.code,
-                codeExpiresAt: data.expiresAt,
-              }
-            : a,
-        ),
-      );
-    } catch (err) {
-      alert(err instanceof Error ? err.message : "เกิดข้อผิดพลาด");
-    } finally {
-      setIsRegenerating(false);
-    }
-  };
-
   const handleViewParticipants = async (activityId: string) => {
     setSelectedParticipantActivityId(activityId);
     setShowParticipantsModal(true);
@@ -2797,7 +2727,7 @@ export default function StaffActivitiesPage() {
                       </td>
                       <td className="px-4 py-3 text-slate-500">{p.program || "-"}</td>
                       <td className="px-4 py-3 text-center font-semibold text-[#2455A4]">
-                        {p.score !== null && p.score !== undefined ? Number(p.score).toFixed(1) : "-"}
+                        {p.earnedScore !== null && p.earnedScore !== undefined ? `${Number(p.earnedScore).toFixed(Number(p.earnedScore) % 1 === 0 ? 0 : 2)}/${Number(p.maxScore ?? 10).toFixed(Number(p.maxScore ?? 10) % 1 === 0 ? 0 : 2)}` : "-"}
                       </td>
                     </tr>
                   ))}
