@@ -2309,6 +2309,9 @@ const updateWorkflow = async (
                               {formatActivityHours(activity.hours)}
                             </p>
                           ) : null}
+                          <p className="mt-2 font-medium text-slate-700">
+                            รับ {activity.capacity || 0} คน • สมัครแล้ว {activity.attendeeCount || 0}/{activity.capacity || 0} คน
+                          </p>
                         </div>
                       </div>
                       {!isExternalActivity(activity) && (
