@@ -1,5 +1,7 @@
 // components/teacher/TeacherActivitiesPage.tsx
-// แก้ไขแล้ว: แยก date/time, แสดงชั่วโมง:นาที, รองรับแก้ไขแบบประเมิน
+// รีดีไซน์เลเอาท์ใหม่ทั้งหมด: การ์ดกิจกรรมแบบชั้นเดียว อ่านง่าย ลดความรก
+// ตรรกะ/สถานะ/การเรียก API ทั้งหมดยังเหมือนเดิม มีการปรับเฉพาะโครงสร้าง UI
+
 "use client";
 
 import { type ChangeEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -10,9 +12,11 @@ import {
   ClipboardList,
   FileWarning,
   KeyRound,
+  MapPin,
   Plus,
   ToggleLeft,
   ToggleRight,
+  Users,
   X,
   Trash2,
   Copy,
@@ -22,7 +26,7 @@ import {
   Edit,
   QrCode,
 } from "lucide-react";
-import TeacherShell from "@/components/teacher/TeacherShell";
+import TeacherShell from "@/components/staff/TeacherShell";
 
 type BarcodeDetectorLike = {
   detect(source: CanvasImageSource): Promise<Array<{ rawValue?: string }>>;
@@ -165,7 +169,7 @@ const emptyForm: ActivityForm = {
   capacity: "30",
 };
 
-// ===== Helper functions =====
+// ===== Helper functions (ตรรกะเดิมทั้งหมด ไม่เปลี่ยนแปลง) =====
 function getTodayDate() {
   return new Date().toISOString().split("T")[0];
 }
@@ -241,12 +245,10 @@ function toDateInputValue(value?: string | Date | null): string {
 
   const text = String(value);
 
-  // รองรับ YYYY-MM-DD
   if (/^\d{4}-\d{2}-\d{2}$/.test(text)) {
     return text;
   }
 
-  // รองรับ YYYY-MM-DDTHH:mm:ss...
   const match = text.match(/^(\d{4}-\d{2}-\d{2})/);
 
   if (match) {
@@ -279,11 +281,62 @@ function isActivityPast(activity: TeacherActivity, now: Date = new Date()) {
   return !Number.isNaN(activityEnd.getTime()) && activityEnd < now;
 }
 
-// ---------- helper components ----------
+// ---------- shared presentational building blocks ----------
+
+// เชลล์กลางของโมดัลทั้งหมด ให้หน้าตาสม่ำเสมอ ลดโค้ดซ้ำ
+function ModalShell({
+  title,
+  subtitle,
+  onClose,
+  children,
+  maxWidthClass = "max-w-lg",
+  zIndexClass = "z-[70]",
+}: {
+  title: string;
+  subtitle?: React.ReactNode;
+  onClose: () => void;
+  children: React.ReactNode;
+  maxWidthClass?: string;
+  zIndexClass?: string;
+}) {
+  return (
+    <div
+      className={`fixed inset-0 ${zIndexClass} flex items-center justify-center bg-slate-900/30 px-4 backdrop-blur-sm`}
+    >
+      <div
+        className={`relative w-full ${maxWidthClass} max-h-[90vh] overflow-y-auto rounded-2xl bg-white p-6 shadow-xl sm:p-8`}
+      >
+        <button
+          type="button"
+          onClick={onClose}
+          className="absolute right-4 top-4 flex h-9 w-9 items-center justify-center rounded-full text-slate-400 transition hover:bg-slate-100 hover:text-slate-600"
+          aria-label="ปิดหน้าต่าง"
+        >
+          <X className="h-5 w-5" />
+        </button>
+
+        <div className="pr-8">
+          <h2 className="text-xl font-semibold text-slate-900 sm:text-2xl">
+            {title}
+          </h2>
+          <div className="mt-2 h-1 w-12 rounded-full bg-[#C8932A]" />
+          {subtitle && (
+            <p className="mt-3 text-sm text-slate-500">{subtitle}</p>
+          )}
+        </div>
+
+        <div className="mt-6">{children}</div>
+      </div>
+    </div>
+  );
+}
+
 function ActivityPill({ skill }: { skill: ActivitySkill }) {
   return (
-    <span className="inline-flex min-h-8 items-center justify-center rounded-full border border-[#76B7F2] bg-white px-4 py-1.5 text-center text-[11px] font-medium text-slate-700 shadow-sm">
-      {skill.name} : {skill.level}
+    <span className="inline-flex items-center rounded-full bg-[#EEF2F8] px-3 py-1 text-xs font-medium text-[#2455A4]">
+      {skill.name}
+      <span className="mx-1.5 h-1 w-1 rounded-full bg-[#9FB4D6]" />
+      {skill.level}
     </span>
   );
 }
@@ -300,12 +353,93 @@ function ToggleSwitch({
     <button
       type="button"
       onClick={onClick}
-      className={`inline-flex items-center rounded-full transition ${enabled ? "text-[#4598D0]" : "text-slate-400"}`}
+      className={`inline-flex shrink-0 items-center rounded-full transition ${enabled ? "text-[#2455A4]" : "text-slate-300"}`}
       aria-label={
         enabled ? "ปิดการยืนยันการเข้าร่วม" : "เปิดการยืนยันการเข้าร่วม"
       }
     >
-      <Icon className="h-8 w-14" />
+      <Icon className="h-7 w-12" />
+    </button>
+  );
+}
+
+// แถวควบคุมแบบ toggle พร้อมป้ายกำกับ ใช้แทนบล็อกใหญ่เดิมที่กินพื้นที่มาก
+function ToggleRow({
+  label,
+  hint,
+  enabled,
+  onClick,
+}: {
+  label: string;
+  hint?: string;
+  enabled: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <div className="flex items-center justify-between gap-3 rounded-lg border border-slate-100 bg-white px-3 py-2">
+      <div className="min-w-0">
+        <p className="truncate text-sm font-medium text-slate-700">{label}</p>
+        {hint && <p className="truncate text-xs text-slate-400">{hint}</p>}
+      </div>
+      <ToggleSwitch enabled={enabled} onClick={onClick} />
+    </div>
+  );
+}
+
+// บล็อกตัวเลขสรุป แทนคอลัมน์กว้าง ๆ ที่มีเส้นแบ่งเยอะแบบเดิม
+function StatBlock({
+  label,
+  value,
+  caption,
+  children,
+}: {
+  label: string;
+  value: React.ReactNode;
+  caption?: string;
+  children?: React.ReactNode;
+}) {
+  return (
+    <div className="rounded-xl bg-slate-50 p-3.5">
+      <p className="text-xs font-medium text-slate-500">{label}</p>
+      <p className="mt-1 text-xl font-semibold leading-none text-slate-900">
+        {value}
+      </p>
+      {caption && <p className="mt-1 text-xs text-slate-400">{caption}</p>}
+      {children && <div className="mt-2.5">{children}</div>}
+    </div>
+  );
+}
+
+// ปุ่มไอคอน+ข้อความขนาดเล็ก ใช้ในแถบคำสั่งของการ์ด
+function ActionButton({
+  icon: Icon,
+  label,
+  onClick,
+  disabled,
+  title,
+  tone = "default",
+}: {
+  icon: React.ComponentType<{ className?: string }>;
+  label: string;
+  onClick: () => void;
+  disabled?: boolean;
+  title?: string;
+  tone?: "default" | "danger";
+}) {
+  const toneClass =
+    tone === "danger"
+      ? "border-red-200 text-red-600 hover:bg-red-50"
+      : "border-slate-200 text-slate-600 hover:border-[#2455A4] hover:text-[#2455A4] hover:bg-blue-50/40";
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      title={title}
+      className={`inline-flex h-8 items-center gap-1.5 rounded-lg border bg-white px-3 text-xs font-medium transition disabled:cursor-not-allowed disabled:border-slate-100 disabled:text-slate-300 ${toneClass}`}
+    >
+      <Icon className="h-3.5 w-3.5" />
+      {label}
     </button>
   );
 }
@@ -313,16 +447,19 @@ function ToggleSwitch({
 function Field({
   label,
   children,
+  hint,
 }: {
   label: string;
   children: React.ReactNode;
+  hint?: string;
 }) {
   return (
     <label className="block">
-      <span className="mb-1 block text-sm font-semibold text-slate-800 sm:mb-2">
+      <span className="mb-1.5 block text-sm font-medium text-slate-700">
         {label}
       </span>
       {children}
+      {hint && <span className="mt-1 block text-xs text-slate-400">{hint}</span>}
     </label>
   );
 }
@@ -374,7 +511,7 @@ function requestCameraStream(constraints: MediaStreamConstraints) {
   });
 }
 
-// ---------- AddActivityModal (แก้ไข: แยก date/time, แสดงชั่วโมง:นาที) ----------
+// ---------- AddActivityModal ----------
 function AddActivityModal({
   form,
   skillOptions,
@@ -399,7 +536,6 @@ function AddActivityModal({
   isEditing?: boolean;
 }) {
   const today = getTodayDate();
-  const currentTime = getCurrentTime();
 
   const { hours, minutes } = calculateHoursMinutes(
     form.startDate,
@@ -410,31 +546,20 @@ function AddActivityModal({
   const durationDisplay = formatHoursMinutes(hours, minutes);
 
   return (
-    <div className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-900/15 px-4 backdrop-blur-sm">
-      <div className="relative w-full max-w-[690px] max-h-[90vh] overflow-y-auto rounded-xl bg-[#EAF3FA] px-8 py-8 shadow-[0_26px_90px_rgba(15,23,42,0.18)] sm:px-12 sm:py-10">
-        <button
-          type="button"
-          onClick={onClose}
-          className="absolute right-4 top-4 flex h-9 w-9 items-center justify-center rounded-full text-slate-700 transition hover:bg-white/70 sm:right-6 sm:top-5"
-          aria-label="ปิดหน้าต่าง"
-        >
-          <X className="h-5 w-5" />
-        </button>
-
-        <div className="text-center">
-          <h2 className="text-xl font-semibold text-[#0D47A1] sm:text-2xl">
-            {isEditing ? "แก้ไขกิจกรรม" : "เพิ่มกิจกรรมใหม่"}
-          </h2>
-          <div className="mx-auto mt-2 h-0.5 w-20 rounded-full bg-[#FFC107]" />
-        </div>
-
-        <form
-          className="mx-auto mt-5 max-w-[520px] space-y-3 sm:mt-6 sm:space-y-4"
-          onSubmit={(e) => {
-            e.preventDefault();
-            onSubmit();
-          }}
-        >
+    <ModalShell
+      title={isEditing ? "แก้ไขกิจกรรม" : "เพิ่มกิจกรรมใหม่"}
+      onClose={onClose}
+      maxWidthClass="max-w-2xl"
+      zIndexClass="z-[70]"
+    >
+      <form
+        className="space-y-6"
+        onSubmit={(e) => {
+          e.preventDefault();
+          onSubmit();
+        }}
+      >
+        <div className="space-y-4">
           <Field label="ชื่อกิจกรรม/อบรม">
             <input
               value={form.title}
@@ -448,13 +573,15 @@ function AddActivityModal({
             <textarea
               value={form.description}
               onChange={(e) => onChange("description", e.target.value)}
-              rows={4}
-              className="teacher-activity-input min-h-[100px] resize-none py-2.5 sm:min-h-[142px] sm:py-3"
+              rows={3}
+              className="teacher-activity-input min-h-[90px] resize-none py-2.5"
             />
           </Field>
+        </div>
 
-          {/* ===== วันที่และเวลา (แยกกัน) ===== */}
-          <div className="grid gap-4 sm:grid-cols-2 sm:gap-8">
+        <div className="rounded-xl border border-slate-100 p-4">
+          <p className="text-sm font-semibold text-slate-800">วันเวลาจัดกิจกรรม</p>
+          <div className="mt-3 grid gap-3 sm:grid-cols-2">
             <Field label="วันที่เริ่มต้น">
               <input
                 type="date"
@@ -475,9 +602,6 @@ function AddActivityModal({
                 required
               />
             </Field>
-          </div>
-
-          <div className="grid gap-4 sm:grid-cols-2 sm:gap-8">
             <Field label="วันที่สิ้นสุด">
               <input
                 type="date"
@@ -509,7 +633,6 @@ function AddActivityModal({
                       val,
                     )
                   ) {
-                    // ไม่ต้องตั้งค่า
                     return;
                   }
                   onChange("endTime", val);
@@ -520,37 +643,33 @@ function AddActivityModal({
               />
             </Field>
           </div>
+          <p className="mt-3 text-sm text-slate-500">
+            รวมเวลา:{" "}
+            <span className="font-medium text-[#2455A4]">
+              {durationDisplay || "—"}
+            </span>
+          </p>
+        </div>
 
-          <Field label="จำนวนชั่วโมงกิจกรรม">
+        <div className="grid gap-3 sm:grid-cols-2">
+          <Field label="ภาคเรียน">
+            <select
+              value={form.term}
+              onChange={(e) => onChange("term", e.target.value)}
+              className="teacher-activity-input appearance-none bg-white pr-8"
+            >
+              <option value="1">ภาคเรียนที่ 1</option>
+              <option value="2">ภาคเรียนที่ 2</option>
+              <option value="3">ภาคเรียนที่ 3</option>
+            </select>
+          </Field>
+          <Field label="สถานที่จัดกิจกรรม">
             <input
-              value={durationDisplay}
-              className="teacher-activity-input bg-white/70 text-slate-700"
-              placeholder="คำนวณอัตโนมัติ"
-              readOnly
+              value={form.location}
+              onChange={(e) => onChange("location", e.target.value)}
+              className="teacher-activity-input"
             />
           </Field>
-
-          <div className="grid gap-4 sm:grid-cols-2 sm:gap-8">
-            <Field label="ภาคเรียน">
-              <select
-                value={form.term}
-                onChange={(e) => onChange("term", e.target.value)}
-                className="teacher-activity-input appearance-none bg-white pr-8"
-              >
-                <option value="1">ภาคเรียนที่ 1</option>
-                <option value="2">ภาคเรียนที่ 2</option>
-                <option value="3">ภาคเรียนที่ 3</option>
-              </select>
-            </Field>
-            <Field label="สถานที่จัดกิจกรรม">
-              <input
-                value={form.location}
-                onChange={(e) => onChange("location", e.target.value)}
-                className="teacher-activity-input"
-              />
-            </Field>
-          </div>
-
           <Field label="จำนวนที่รับนิสิต">
             <input
               type="number"
@@ -562,7 +681,6 @@ function AddActivityModal({
               required
             />
           </Field>
-
           <Field label="ผู้จัดกิจกรรม">
             <input
               value={form.organizer}
@@ -571,181 +689,166 @@ function AddActivityModal({
               placeholder="คณะวิทยาศาสตร์และนวัตกรรมดิจิทัล"
             />
           </Field>
+        </div>
 
-          <div className="rounded-lg border border-blue-100 bg-white/60 p-4">
-            <p className="text-sm font-semibold text-slate-800">
-              ช่วงเวลาลงทะเบียน
-            </p>
-            <p className="mt-1 text-xs text-slate-500">
-              นิสิตต้องลงทะเบียนในช่วงเวลานี้ก่อนจึงจะยืนยันการเข้าร่วมได้
-            </p>
-<div className="mt-3 grid gap-4 sm:grid-cols-2">
-  <Field label="เริ่มลงทะเบียน">
-    <input
-      type="datetime-local"
-      value={form.registrationStart}
-      onChange={(e) => {
-        const value = e.target.value;
-
-        // เริ่มลงทะเบียนต้องไม่เกินเวลาสิ้นสุดลงทะเบียน
-        if (
-          form.registrationEnd &&
-          value &&
-          value >= form.registrationEnd
-        ) {
-          return;
-        }
-
-        // เริ่มลงทะเบียนต้องไม่เกินเวลาสิ้นสุดกิจกรรม
-        if (
-          form.endDate &&
-          form.endTime &&
-          value &&
-          value > `${form.endDate}T${form.endTime}`
-        ) {
-          return;
-        }
-
-        onChange("registrationStart", value);
-      }}
-      min={`${today}T00:00`}
-      max={
-          form.endDate && form.endTime
-            ? `${form.endDate}T${form.endTime}`
-            : undefined
-        }
-      className="teacher-activity-input"
-    />
-  </Field>
-
-  <Field label="สิ้นสุดลงทะเบียน">
-    <input
-      type="datetime-local"
-      value={form.registrationEnd}
-      onChange={(e) => {
-        const value = e.target.value;
-
-        // สิ้นสุดลงทะเบียนต้องหลังเริ่มลงทะเบียน
-        if (
-          form.registrationStart &&
-          value &&
-          value <= form.registrationStart
-        ) {
-          return;
-        }
-
-        // สิ้นสุดลงทะเบียนต้องไม่เกินเวลาสิ้นสุดกิจกรรม
-        if (
-          form.endDate &&
-          form.endTime &&
-          value &&
-          value > `${form.endDate}T${form.endTime}`
-        ) {
-          return;
-        }
-
-        onChange("registrationEnd", value);
-      }}
-      min={
-        form.registrationStart || `${today}T00:00`
-      }
-      max={
-        form.endDate && form.endTime
-          ? `${form.endDate}T${form.endTime}`
-          : undefined
-      }
-      className="teacher-activity-input"
-    />
-  </Field>
-</div>
+        <div className="rounded-xl border border-slate-100 p-4">
+          <p className="text-sm font-semibold text-slate-800">
+            ช่วงเวลาลงทะเบียน
+          </p>
+          <p className="mt-1 text-xs text-slate-500">
+            นิสิตต้องลงทะเบียนในช่วงเวลานี้ก่อนจึงจะยืนยันการเข้าร่วมได้
+          </p>
+          <div className="mt-3 grid gap-3 sm:grid-cols-2">
+            <Field label="เริ่มลงทะเบียน">
+              <input
+                type="datetime-local"
+                value={form.registrationStart}
+                onChange={(e) => {
+                  const value = e.target.value;
+                  if (
+                    form.registrationEnd &&
+                    value &&
+                    value >= form.registrationEnd
+                  ) {
+                    return;
+                  }
+                  if (
+                    form.endDate &&
+                    form.endTime &&
+                    value &&
+                    value > `${form.endDate}T${form.endTime}`
+                  ) {
+                    return;
+                  }
+                  onChange("registrationStart", value);
+                }}
+                min={`${today}T00:00`}
+                max={
+                  form.endDate && form.endTime
+                    ? `${form.endDate}T${form.endTime}`
+                    : undefined
+                }
+                className="teacher-activity-input"
+              />
+            </Field>
+            <Field label="สิ้นสุดลงทะเบียน">
+              <input
+                type="datetime-local"
+                value={form.registrationEnd}
+                onChange={(e) => {
+                  const value = e.target.value;
+                  if (
+                    form.registrationStart &&
+                    value &&
+                    value <= form.registrationStart
+                  ) {
+                    return;
+                  }
+                  if (
+                    form.endDate &&
+                    form.endTime &&
+                    value &&
+                    value > `${form.endDate}T${form.endTime}`
+                  ) {
+                    return;
+                  }
+                  onChange("registrationEnd", value);
+                }}
+                min={form.registrationStart || `${today}T00:00`}
+                max={
+                  form.endDate && form.endTime
+                    ? `${form.endDate}T${form.endTime}`
+                    : undefined
+                }
+                className="teacher-activity-input"
+              />
+            </Field>
           </div>
+        </div>
 
-          <Field label="แม่แบบเกียรติบัตร (ใบเซอร์)">
-            <select
-              value={form.templateId || ""}
-              onChange={(e) => onTemplateChange(e.target.value)}
-              className="teacher-activity-input appearance-none bg-white pr-8"
-            >
-              <option value="">-- ไม่ระบุ --</option>
-              {templates.map((t) => (
-                <option key={t.id} value={t.id}>
-                  {t.name}
-                </option>
-              ))}
-            </select>
-            <p className="mt-1 text-xs text-slate-500">
-              เลือกแม่แบบเพื่อใช้สร้างเกียรติบัตรให้ผู้เข้าร่วม
-            </p>
-          </Field>
+        <Field
+          label="แม่แบบเกียรติบัตร (ใบเซอร์)"
+          hint="เลือกแม่แบบเพื่อใช้สร้างเกียรติบัตรให้ผู้เข้าร่วม"
+        >
+          <select
+            value={form.templateId || ""}
+            onChange={(e) => onTemplateChange(e.target.value)}
+            className="teacher-activity-input appearance-none bg-white pr-8"
+          >
+            <option value="">-- ไม่ระบุ --</option>
+            {templates.map((t) => (
+              <option key={t.id} value={t.id}>
+                {t.name}
+              </option>
+            ))}
+          </select>
+        </Field>
 
-          <div>
-            <p className="text-sm font-semibold text-slate-800">
-              ทักษะที่ได้รับจากกิจกรรม
-            </p>
-            <p className="mt-1 text-xs text-slate-500">
-              เลือกทักษะที่เกี่ยวข้องกับกิจกรรมนี้
-            </p>
-            <div className="mt-3 grid gap-2">
-              {skillOptions.map((skill) => {
-                const selected = form.selectedSkills.find(
-                  (s) => s.skillId === skill.skillId,
-                );
-                const isSelected = !!selected;
-                const level = selected ? selected.level : skill.level;
-                return (
-                  <div
-                    key={skill.skillId}
-                    className={`flex items-center gap-3 rounded-lg border p-3 transition ${
-                      isSelected
-                        ? "border-[#1565C0] bg-blue-50"
-                        : "border-blue-100 bg-white hover:border-blue-200"
-                    }`}
+        <div>
+          <p className="text-sm font-semibold text-slate-800">
+            ทักษะที่ได้รับจากกิจกรรม
+          </p>
+          <p className="mt-1 text-xs text-slate-500">
+            เลือกทักษะที่เกี่ยวข้องกับกิจกรรมนี้
+          </p>
+          <div className="mt-3 grid gap-2">
+            {skillOptions.map((skill) => {
+              const selected = form.selectedSkills.find(
+                (s) => s.skillId === skill.skillId,
+              );
+              const isSelected = !!selected;
+              const level = selected ? selected.level : skill.level;
+              return (
+                <div
+                  key={skill.skillId}
+                  className={`flex items-center gap-3 rounded-lg border p-3 transition ${
+                    isSelected
+                      ? "border-[#2455A4] bg-blue-50/60"
+                      : "border-slate-100 bg-white hover:border-slate-200"
+                  }`}
+                >
+                  <input
+                    type="checkbox"
+                    id={`skill-${skill.skillId}`}
+                    checked={isSelected}
+                    onChange={() => onToggleSkill(skill.skillId)}
+                    className="h-4 w-4 rounded border-slate-300 text-[#2455A4] focus:ring-[#2455A4]"
+                  />
+                  <label
+                    htmlFor={`skill-${skill.skillId}`}
+                    className="flex-1 cursor-pointer text-sm font-medium text-slate-700"
                   >
-                    <input
-                      type="checkbox"
-                      id={`skill-${skill.skillId}`}
-                      checked={isSelected}
-                      onChange={() => onToggleSkill(skill.skillId)}
-                      className="h-4 w-4 rounded border-blue-300 text-[#1565C0] focus:ring-[#1565C0]"
-                    />
-                    <label
-                      htmlFor={`skill-${skill.skillId}`}
-                      className="flex-1 cursor-pointer text-sm font-medium text-slate-700"
+                    {skill.skillname}
+                  </label>
+                  {isSelected && (
+                    <select
+                      value={level}
+                      onChange={(e) =>
+                        onSkillLevelChange(skill.skillId, e.target.value)
+                      }
+                      className="h-8 rounded-lg border border-slate-200 bg-white px-2 text-sm outline-none focus:border-[#2455A4]"
                     >
-                      {skill.skillname}
-                    </label>
-                    {isSelected && (
-                      <select
-                        value={level}
-                        onChange={(e) =>
-                          onSkillLevelChange(skill.skillId, e.target.value)
-                        }
-                        className="h-8 rounded-lg border border-blue-200 bg-white px-2 text-sm outline-none focus:border-[#1565C0]"
-                      >
-                        {LEVELS.map((l) => (
-                          <option key={l} value={l}>
-                            {l}
-                          </option>
-                        ))}
-                      </select>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
+                      {LEVELS.map((l) => (
+                        <option key={l} value={l}>
+                          {l}
+                        </option>
+                      ))}
+                    </select>
+                  )}
+                </div>
+              );
+            })}
           </div>
+        </div>
 
-          <div className="pt-4 text-center sm:pt-6">
-            <button
-              type="submit"
-              className="h-10 w-full max-w-[390px] rounded-lg bg-[#4598D0] px-6 text-sm font-semibold text-white shadow-sm transition hover:bg-[#1565C0] sm:h-11 sm:text-base"
-            >
-              {isEditing ? "อัปเดตกิจกรรม" : "เพิ่มกิจกรรม"}
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
+        <button
+          type="submit"
+          className="h-11 w-full rounded-xl bg-[#2455A4] text-sm font-semibold text-white shadow-sm transition hover:bg-[#1B3F80]"
+        >
+          {isEditing ? "อัปเดตกิจกรรม" : "เพิ่มกิจกรรม"}
+        </button>
+      </form>
+    </ModalShell>
   );
 }
 
@@ -916,169 +1019,156 @@ function EvaluationModal({
   };
 
   return (
-    <div className="fixed inset-0 z-[80] flex items-center justify-center bg-slate-900/40 px-4 backdrop-blur-sm">
-      <div className="relative w-full max-w-4xl max-h-[90vh] overflow-y-auto rounded-2xl bg-white p-6 shadow-2xl sm:p-8">
+    <ModalShell
+      title={isEditing ? "แก้ไขแบบประเมินความรู้" : "สร้างแบบประเมินความรู้"}
+      subtitle={
+        <>
+          กิจกรรม: <span className="font-medium text-slate-700">{activity.title}</span>
+        </>
+      }
+      onClose={onClose}
+      maxWidthClass="max-w-3xl"
+      zIndexClass="z-[80]"
+    >
+      <div className="space-y-4">
+        {questions.map((q, qIndex) => (
+          <div
+            key={q.id}
+            className="rounded-xl border border-slate-100 bg-slate-50/60 p-4"
+          >
+            <div className="flex items-start justify-between gap-2">
+              <div className="flex-1">
+                <label className="block text-sm font-medium text-slate-700">
+                  คำถามข้อ {qIndex + 1}
+                </label>
+                <textarea
+                  value={q.question}
+                  onChange={(e) =>
+                    updateQuestion(q.id, "question", e.target.value)
+                  }
+                  className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-[#2455A4] focus:ring-2 focus:ring-blue-100 resize-y min-h-[60px]"
+                  placeholder="พิมพ์คำถาม..."
+                  rows={2}
+                />
+              </div>
+              {questions.length > 1 && (
+                <button
+                  type="button"
+                  onClick={() => removeQuestion(q.id)}
+                  className="mt-5 rounded-lg p-1.5 text-slate-400 transition hover:bg-red-50 hover:text-red-500"
+                  aria-label="ลบคำถาม"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </button>
+              )}
+            </div>
+
+            <div className="mt-3">
+              <label className="block text-sm font-medium text-slate-700">
+                ตัวเลือก (คลิกที่ตัวเลือกเพื่อเลือกเป็นคำตอบที่ถูกต้อง)
+              </label>
+              {q.options.map((opt, optIndex) => (
+                <div
+                  key={optIndex}
+                  className={`mt-1 flex items-center gap-2 rounded-lg border px-3 py-2 transition cursor-pointer ${
+                    q.correctAnswer === optIndex
+                      ? "border-emerald-500 bg-emerald-50 ring-2 ring-emerald-200"
+                      : "border-slate-200 bg-white hover:border-slate-300"
+                  }`}
+                  onClick={() => selectCorrectAnswer(q.id, optIndex)}
+                >
+                  <span className="text-sm font-medium text-slate-400 min-w-[55px] shrink-0">
+                    ข้อ {optIndex + 1}:
+                  </span>
+                  <input
+                    type="text"
+                    value={opt}
+                    onChange={(e) =>
+                      updateOption(q.id, optIndex, e.target.value)
+                    }
+                    onClick={(e) => e.stopPropagation()}
+                    className="flex-1 bg-transparent text-sm text-slate-700 outline-none placeholder:text-slate-400"
+                    placeholder={`พิมพ์ตัวเลือกข้อ ${optIndex + 1}...`}
+                  />
+                  {q.options.length > 2 && (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        removeOption(q.id, optIndex);
+                      }}
+                      className="rounded-lg p-1 text-slate-400 transition hover:bg-red-50 hover:text-red-500 shrink-0"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                  )}
+                </div>
+              ))}
+              <button
+                type="button"
+                onClick={() => addOption(q.id)}
+                className="mt-2 text-sm text-[#2455A4] hover:underline"
+              >
+                + เพิ่มตัวเลือก
+              </button>
+            </div>
+
+            <div className="mt-3">
+              <label className="block text-sm font-medium text-slate-700">
+                ทักษะที่เกี่ยวข้อง (เลือกได้หลายทักษะ)
+              </label>
+              <div className="mt-1 flex flex-wrap gap-3">
+                {skillOptions.length > 0 ? (
+                  skillOptions.map((skill) => (
+                    <label
+                      key={skill}
+                      className="flex items-center gap-1.5 text-sm"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={(q.skillNames || []).includes(skill)}
+                        onChange={() => toggleSkill(q.id, skill)}
+                        className="h-4 w-4 rounded border-slate-300 text-[#2455A4] focus:ring-[#2455A4]"
+                      />
+                      <span>{skill}</span>
+                    </label>
+                  ))
+                ) : (
+                  <span className="text-sm text-slate-400">
+                    ไม่มีทักษะในกิจกรรมนี้ กรุณาเพิ่มทักษะก่อน
+                  </span>
+                )}
+              </div>
+            </div>
+          </div>
+        ))}
+
+        <button
+          type="button"
+          onClick={addQuestion}
+          className="inline-flex items-center gap-1 rounded-lg border border-dashed border-[#2455A4] px-4 py-2 text-sm font-medium text-[#2455A4] transition hover:bg-blue-50"
+        >
+          <Plus className="h-4 w-4" /> เพิ่มคำถาม
+        </button>
+      </div>
+
+      <div className="mt-6 flex justify-end gap-3 border-t border-slate-100 pt-4">
         <button
           type="button"
           onClick={onClose}
-          className="absolute right-4 top-4 rounded-full p-2 text-slate-400 transition hover:bg-slate-100 hover:text-slate-600"
+          className="rounded-lg border border-slate-200 px-6 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
         >
-          <X className="h-5 w-5" />
+          ยกเลิก
         </button>
-
-        <div className="mb-6">
-          <h2 className="text-2xl font-semibold text-slate-950">
-            {isEditing ? "แก้ไขแบบประเมินความรู้" : "สร้างแบบประเมินความรู้"}
-          </h2>
-          <div className="mt-2 h-0.5 w-20 rounded-full bg-[#FFC107]" />
-          <p className="mt-2 text-sm text-slate-500">
-            กิจกรรม: <span className="font-medium">{activity.title}</span>
-          </p>
-        </div>
-
-        <div className="space-y-4">
-          {questions.map((q, qIndex) => (
-            <div
-              key={q.id}
-              className="rounded-xl border border-blue-100 bg-blue-50/30 p-4"
-            >
-              {/* คำถาม */}
-              <div className="flex items-start justify-between gap-2">
-                <div className="flex-1">
-                  <label className="block text-sm font-medium text-slate-700">
-                    คำถามข้อ {qIndex + 1}
-                  </label>
-                  <textarea
-                    value={q.question}
-                    onChange={(e) =>
-                      updateQuestion(q.id, "question", e.target.value)
-                    }
-                    className="mt-1 w-full rounded-lg border border-blue-200 bg-white px-3 py-2 text-sm outline-none focus:border-[#1565C0] focus:ring-2 focus:ring-blue-100 resize-y min-h-[60px]"
-                    placeholder="พิมพ์คำถาม..."
-                    rows={2}
-                  />
-                </div>
-                {questions.length > 1 && (
-                  <button
-                    type="button"
-                    onClick={() => removeQuestion(q.id)}
-                    className="mt-5 rounded-lg p-1.5 text-slate-400 transition hover:bg-red-50 hover:text-red-500"
-                    aria-label="ลบคำถาม"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </button>
-                )}
-              </div>
-
-              {/* ตัวเลือก */}
-              <div className="mt-3">
-                <label className="block text-sm font-medium text-slate-700">
-                  ตัวเลือก (คลิกที่ตัวเลือกเพื่อเลือกเป็นคำตอบที่ถูกต้อง)
-                </label>
-                {q.options.map((opt, optIndex) => (
-                  <div
-                    key={optIndex}
-                    className={`mt-1 flex items-center gap-2 rounded-lg border px-3 py-2 transition cursor-pointer ${
-                      q.correctAnswer === optIndex
-                        ? "border-emerald-500 bg-emerald-50 ring-2 ring-emerald-300"
-                        : "border-blue-200 bg-white hover:border-blue-400"
-                    }`}
-                    onClick={() => selectCorrectAnswer(q.id, optIndex)}
-                  >
-                    <span className="text-sm font-medium text-slate-400 min-w-[55px] shrink-0">
-                      ข้อ {optIndex + 1}:
-                    </span>
-                    <input
-                      type="text"
-                      value={opt}
-                      onChange={(e) =>
-                        updateOption(q.id, optIndex, e.target.value)
-                      }
-                      onClick={(e) => e.stopPropagation()}
-                      className="flex-1 bg-transparent text-sm text-slate-700 outline-none placeholder:text-slate-400"
-                      placeholder={`พิมพ์ตัวเลือกข้อ ${optIndex + 1}...`}
-                    />
-                    {q.options.length > 2 && (
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          removeOption(q.id, optIndex);
-                        }}
-                        className="rounded-lg p-1 text-slate-400 transition hover:bg-red-50 hover:text-red-500 shrink-0"
-                      >
-                        <X className="h-4 w-4" />
-                      </button>
-                    )}
-                  </div>
-                ))}
-                <button
-                  type="button"
-                  onClick={() => addOption(q.id)}
-                  className="mt-2 text-sm text-[#1565C0] hover:underline"
-                >
-                  + เพิ่มตัวเลือก
-                </button>
-              </div>
-
-              {/* ทักษะที่เกี่ยวข้อง */}
-              <div className="mt-3">
-                <label className="block text-sm font-medium text-slate-700">
-                  ทักษะที่เกี่ยวข้อง (เลือกได้หลายทักษะ)
-                </label>
-                <div className="mt-1 flex flex-wrap gap-3">
-                  {skillOptions.length > 0 ? (
-                    skillOptions.map((skill) => (
-                      <label
-                        key={skill}
-                        className="flex items-center gap-1.5 text-sm"
-                      >
-                        <input
-                          type="checkbox"
-                          checked={(q.skillNames || []).includes(skill)}
-                          onChange={() => toggleSkill(q.id, skill)}
-                          className="h-4 w-4 rounded border-blue-300 text-[#1565C0] focus:ring-[#1565C0]"
-                        />
-                        <span>{skill}</span>
-                      </label>
-                    ))
-                  ) : (
-                    <span className="text-sm text-slate-400">
-                      ไม่มีทักษะในกิจกรรมนี้ กรุณาเพิ่มทักษะก่อน
-                    </span>
-                  )}
-                </div>
-              </div>
-            </div>
-          ))}
-
-          <button
-            type="button"
-            onClick={addQuestion}
-            className="inline-flex items-center gap-1 rounded-lg border border-dashed border-[#1565C0] px-4 py-2 text-sm font-medium text-[#1565C0] transition hover:bg-blue-50"
-          >
-            <Plus className="h-4 w-4" /> เพิ่มคำถาม
-          </button>
-        </div>
-
-        <div className="mt-6 flex justify-end gap-3 border-t border-slate-200 pt-4">
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded-lg border border-slate-300 px-6 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
-          >
-            ยกเลิก
-          </button>
-          <button
-            type="button"
-            onClick={handleSave}
-            className="rounded-lg bg-[#1565C0] px-6 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-[#0D47A1]"
-          >
-            {isEditing ? "อัปเดตแบบประเมิน" : "บันทึกแบบประเมิน"}
-          </button>
-        </div>
+        <button
+          type="button"
+          onClick={handleSave}
+          className="rounded-lg bg-[#2455A4] px-6 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-[#1B3F80]"
+        >
+          {isEditing ? "อัปเดตแบบประเมิน" : "บันทึกแบบประเมิน"}
+        </button>
       </div>
-    </div>
+    </ModalShell>
   );
 }
 
@@ -1114,91 +1204,80 @@ function VerificationCodeModal({
   };
 
   return (
-    <div className="fixed inset-0 z-[90] flex items-center justify-center bg-slate-950/40 px-4 backdrop-blur-sm">
-      <div className="relative w-full max-w-[480px] rounded-2xl bg-white p-6 shadow-2xl sm:p-8">
-        <button
-          type="button"
-          onClick={onClose}
-          className="absolute right-4 top-4 rounded-full p-2 text-slate-400 transition hover:bg-slate-100 hover:text-slate-600"
-        >
-          <X className="h-5 w-5" />
-        </button>
+    <ModalShell
+      title={code ? "รหัสยืนยันการเข้าร่วม" : "ยังไม่มีรหัสยืนยัน"}
+      onClose={onClose}
+      maxWidthClass="max-w-md"
+      zIndexClass="z-[90]"
+    >
+      <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-blue-50 text-[#2455A4]">
+        <KeyRound className="h-7 w-7" />
+      </div>
 
-        <div className="text-center">
-          <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-blue-50 text-[#1565C0]">
-            <KeyRound className="h-8 w-8" />
-          </div>
-          <h2 className="mt-4 text-2xl font-semibold text-slate-950">
-            {code ? "รหัสยืนยันการเข้าร่วม" : "ยังไม่มีรหัสยืนยัน"}
-          </h2>
-          <div className="mx-auto mt-2 h-1 w-20 rounded-full bg-[#FFC107]" />
+      <div className="mt-6 space-y-5">
+        <div className="rounded-xl border border-slate-100 bg-slate-50 p-6 text-center">
+          <p className="text-sm text-slate-500">รหัสยืนยัน</p>
+          {code ? (
+            <p className="mt-2 font-mono text-4xl font-bold tracking-[0.3em] text-[#2455A4]">
+              {code}
+            </p>
+          ) : (
+            <p className="mt-2 text-sm text-slate-400">
+              ยังไม่มีรหัส กรุณาสร้างรหัสใหม่
+            </p>
+          )}
         </div>
 
-        <div className="mt-6 space-y-6">
-          <div className="rounded-xl border border-blue-100 bg-blue-50/50 p-6 text-center">
-            <p className="text-sm text-slate-500">รหัสยืนยัน</p>
-            {code ? (
-              <p className="mt-2 font-mono text-4xl font-bold tracking-[0.3em] text-[#1565C0]">
-                {code}
-              </p>
-            ) : (
-              <p className="mt-2 text-sm text-slate-400">
-                ยังไม่มีรหัส กรุณาสร้างรหัสใหม่
-              </p>
-            )}
-          </div>
-
-          {code && (
-            <div className="flex items-center justify-between rounded-lg border border-slate-100 bg-slate-50 px-4 py-3">
-              <div className="flex items-center gap-3">
-                <Clock className="h-5 w-5 text-slate-400" />
-                <div>
-                  <p className="text-xs text-slate-500">หมดอายุ</p>
-                  <p className="text-sm font-medium text-slate-700">
-                    {formatDate(expiresAt)}
-                  </p>
-                </div>
+        {code && (
+          <div className="flex items-center justify-between rounded-lg border border-slate-100 bg-slate-50 px-4 py-3">
+            <div className="flex items-center gap-3">
+              <Clock className="h-5 w-5 text-slate-400" />
+              <div>
+                <p className="text-xs text-slate-500">หมดอายุ</p>
+                <p className="text-sm font-medium text-slate-700">
+                  {formatDate(expiresAt)}
+                </p>
               </div>
-              <button
-                type="button"
-                onClick={handleCopy}
-                className="inline-flex items-center gap-2 rounded-lg border border-[#1565C0] bg-white px-4 py-2 text-sm font-medium text-[#1565C0] transition hover:bg-blue-50"
-              >
-                {copied ? (
-                  <>
-                    <Check className="h-4 w-4" /> คัดลอกแล้ว
-                  </>
-                ) : (
-                  <>
-                    <Copy className="h-4 w-4" /> คัดลอก
-                  </>
-                )}
-              </button>
             </div>
-          )}
-
-          <div className="flex gap-3">
-            {code && (
-              <button
-                type="button"
-                onClick={onRegenerate}
-                disabled={isRegenerating}
-                className="flex-1 h-11 rounded-xl border border-[#1565C0] text-sm font-semibold text-[#1565C0] transition hover:bg-blue-50 disabled:opacity-50"
-              >
-                {isRegenerating ? "กำลังสร้าง..." : "สร้างรหัสใหม่"}
-              </button>
-            )}
             <button
               type="button"
-              onClick={onClose}
-              className={`${code ? "flex-1" : "w-full"} h-11 rounded-xl bg-[#1565C0] text-sm font-semibold text-white shadow-md transition hover:bg-[#0D47A1]`}
+              onClick={handleCopy}
+              className="inline-flex items-center gap-2 rounded-lg border border-[#2455A4] bg-white px-4 py-2 text-sm font-medium text-[#2455A4] transition hover:bg-blue-50"
             >
-              ปิด
+              {copied ? (
+                <>
+                  <Check className="h-4 w-4" /> คัดลอกแล้ว
+                </>
+              ) : (
+                <>
+                  <Copy className="h-4 w-4" /> คัดลอก
+                </>
+              )}
             </button>
           </div>
+        )}
+
+        <div className="flex gap-3">
+          {code && (
+            <button
+              type="button"
+              onClick={onRegenerate}
+              disabled={isRegenerating}
+              className="flex-1 h-11 rounded-xl border border-[#2455A4] text-sm font-semibold text-[#2455A4] transition hover:bg-blue-50 disabled:opacity-50"
+            >
+              {isRegenerating ? "กำลังสร้าง..." : "สร้างรหัสใหม่"}
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={onClose}
+            className={`${code ? "flex-1" : "w-full"} h-11 rounded-xl bg-[#2455A4] text-sm font-semibold text-white shadow-md transition hover:bg-[#1B3F80]`}
+          >
+            ปิด
+          </button>
         </div>
       </div>
-    </div>
+    </ModalShell>
   );
 }
 
@@ -1242,7 +1321,6 @@ export default function StaffActivitiesPage() {
   const scanFrameRef = useRef<number | null>(null);
   const barcodeDetectorRef = useRef<BarcodeDetectorLike | null>(null);
 
-  // State สำหรับแก้ไขกิจกรรม
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [editingActivity, setEditingActivity] = useState<TeacherActivity | null>(
     null,
@@ -1309,7 +1387,6 @@ export default function StaffActivitiesPage() {
     fetchActivities();
   }, [fetchCurrentUser, fetchSkills, fetchTemplates, fetchActivities]);
 
-  // แบ่งกิจกรรมเป็น 3 มุมมองหลัก โดยเน้นกิจกรรมที่เจ้าหน้าที่บัญชีปัจจุบันเป็นผู้สร้าง
   const activityCategories: Array<{ key: ActivityCategory; label: string }> = [
     { key: "mine", label: "กิจกรรมที่สร้างโดยฉัน" },
     { key: "past", label: "กิจกรรมที่สิ้นสุดแล้ว" },
@@ -1317,7 +1394,7 @@ export default function StaffActivitiesPage() {
 
   const matchesActivityCategory = useCallback(
     (activity: TeacherActivity, category: ActivityCategory) => {
-      // อาจารย์ต้องเห็นเฉพาะกิจกรรมที่ตนเองสร้างเท่านั้น
+      // อาจารย์เห็นได้เฉพาะกิจกรรมที่ตนเองสร้างเท่านั้น
       if (!currentUserId || activity.createdBy !== currentUserId) {
         return false;
       }
@@ -1326,7 +1403,6 @@ export default function StaffActivitiesPage() {
         return isActivityPast(activity);
       }
 
-      // เหลือเฉพาะกิจกรรมของอาจารย์เองเท่านั้น
       return category === "mine";
     },
     [currentUserId],
@@ -1394,36 +1470,37 @@ export default function StaffActivitiesPage() {
       alert(err instanceof Error ? err.message : "เกิดข้อผิดพลาด");
     }
   };
-const updateWorkflow = async (
-  activityId: string,
-  field: "applicationEnabled" | "registrationEnabled",
-) => {
-  try {
-    const activity = activities.find((item) => item.id === activityId);
-    if (!activity) return;
-    const value = field === "applicationEnabled"
-      ? !activity.applicationEnabled
-      : !activity.registrationEnabled;
-    const res = await fetch("/api/activities/workflow", {
-      method: "PUT",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        activityId,
-        field,
-        value,
-      }),
-    });
-    if (!res.ok) {
-      const data = await res.json().catch(() => ({}));
-      throw new Error(data.message || "อัปเดตสถานะกิจกรรมไม่สำเร็จ");
+
+  const updateWorkflow = async (
+    activityId: string,
+    field: "applicationEnabled" | "registrationEnabled",
+  ) => {
+    try {
+      const activity = activities.find((item) => item.id === activityId);
+      if (!activity) return;
+      const value = field === "applicationEnabled"
+        ? !activity.applicationEnabled
+        : !activity.registrationEnabled;
+      const res = await fetch("/api/activities/workflow", {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          activityId,
+          field,
+          value,
+        }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.message || "อัปเดตสถานะกิจกรรมไม่สำเร็จ");
+      }
+      await fetchActivities();
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "เกิดข้อผิดพลาด");
     }
-    await fetchActivities();
-  } catch (err) {
-    alert(err instanceof Error ? err.message : "เกิดข้อผิดพลาด");
-  }
-};
+  };
 
   const stopCamera = useCallback(() => {
     if (scanFrameRef.current !== null) {
@@ -1646,7 +1723,7 @@ const updateWorkflow = async (
     }
   };
 
-  // ===== สร้างกิจกรรม (ปรับ payload) =====
+  // ===== สร้างกิจกรรม =====
   const createActivity = async () => {
     try {
       const startDateTime = combineDateTime(form.startDate, form.startTime);
@@ -1680,7 +1757,6 @@ const updateWorkflow = async (
         throw new Error("เวลาสิ้นสุดลงทะเบียนต้องอยู่หลังเวลาเริ่มลงทะเบียน");
       }
 
-      // ช่วงเวลาลงทะเบียนต้องไม่เกินเวลาสิ้นสุดกิจกรรม
       if (registrationStartObj > endDateObj || registrationEndObj > endDateObj) {
         throw new Error(
           "ช่วงเวลาลงทะเบียนต้องไม่เกินเวลาสิ้นสุดกิจกรรม",
@@ -1773,7 +1849,7 @@ const updateWorkflow = async (
     }
   };
 
-  // ===== แก้ไขกิจกรรม (ปรับ payload) =====
+  // ===== แก้ไขกิจกรรม =====
   const handleUpdateActivity = async () => {
     if (!editingActivity) return;
     try {
@@ -1811,7 +1887,6 @@ const updateWorkflow = async (
         throw new Error("เวลาสิ้นสุดลงทะเบียนต้องอยู่หลังเวลาเริ่มลงทะเบียน");
       }
 
-      // ช่วงเวลาลงทะเบียนต้องไม่เกินเวลาสิ้นสุดกิจกรรม
       if (registrationStartObj > endDateObj || registrationEndObj > endDateObj) {
         throw new Error(
           "ช่วงเวลาลงทะเบียนต้องไม่เกินเวลาสิ้นสุดกิจกรรม",
@@ -1950,33 +2025,24 @@ const updateWorkflow = async (
     setEditForm({
       title: activity.title,
       description: activity.description,
-
-      // แปลงให้เป็น YYYY-MM-DD สำหรับ input type="date"
       startDate: toDateInputValue(activity.date),
       startTime: activity.time ? String(activity.time).slice(0, 5) : "",
-
-      // แปลงให้เป็น YYYY-MM-DD สำหรับ input type="date"
       endDate: toDateInputValue(activity.endDate),
       endTime: activity.endTime ? String(activity.endTime).slice(0, 5) : "",
-
       term: activity.term,
       location: activity.location,
       organizer: activity.organizer || "คณะวิทยาศาสตร์และนวัตกรรมดิจิทัล",
       capacity: String(activity.capacity ?? 30),
-
       selectedSkills: activity.skills.map((skill) => ({
         skillId: skill.skillId || "",
         name: skill.name,
         level: skill.level,
       })),
-
       templateId: activity.templateId || "",
-
       registrationStart: toDateTimeInputValue(
         activity.registrationStart?.slice(0, 10),
         activity.registrationStart?.slice(11, 16),
       ),
-
       registrationEnd: toDateTimeInputValue(
         activity.registrationEnd?.slice(0, 10),
         activity.registrationEnd?.slice(11, 16),
@@ -2012,9 +2078,7 @@ const updateWorkflow = async (
   const handleFormChange = (field: keyof ActivityForm, value: string) => {
     setForm((prev) => {
       const next = { ...prev, [field]: value };
-      // ตรวจสอบความถูกต้องของ endDate/endTime
       if (field === "startDate" || field === "startTime") {
-        // ถ้า endDate/endTime มีอยู่แล้วและไม่ถูกต้อง ให้เคลียร์
         if (
           next.endDate &&
           next.endTime &&
@@ -2039,7 +2103,6 @@ const updateWorkflow = async (
               next.endTime,
             )
           ) {
-            // ถ้าไม่ถูกต้อง ให้คืนค่าเดิม (ไม่เปลี่ยนแปลง)
             return prev;
           }
         }
@@ -2171,7 +2234,6 @@ const updateWorkflow = async (
     ? activities.find((a) => a.id === modalActivityId)
     : null;
 
-  // ===== ฟังก์ชันแปลง hours เป็นชั่วโมง:นาที =====
   const formatActivityHours = (hours: number | null | undefined): string => {
     if (hours === null || hours === undefined || hours === 0) return "";
     const h = Math.floor(hours);
@@ -2181,289 +2243,291 @@ const updateWorkflow = async (
 
   return (
     <TeacherShell activePath="/staff/activities">
-      <section className="p-4 sm:p-6 lg:p-7">
-        <div className="min-h-[calc(100vh-8.5rem)] rounded-2xl border border-slate-200 bg-white px-4 py-6 shadow-[0_12px_35px_rgba(15,23,42,0.06)] sm:px-7 sm:py-7 lg:px-8">
-          <div className="flex flex-col gap-5 border-b border-slate-100 pb-6 sm:flex-row sm:items-end sm:justify-between">
+      <section className="bg-[#F5F6F8] p-4 sm:p-6 lg:p-7">
+        <div className="mx-auto max-w-6xl">
+          {/* หัวเรื่อง */}
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
             <div>
-            <h1 className="text-2xl font-semibold tracking-tight text-slate-950 sm:text-3xl">
-              จัดการกิจกรรมและการอบรม
-            </h1>
-            <div className="mt-2 h-0.5 w-24 rounded-full bg-[#FFC107]" />
-            <p className="mt-3 text-sm text-slate-500">
-              สร้างและจัดการกิจกรรมทั้งหมด
-            </p>
+              <h1 className="text-2xl font-semibold tracking-tight text-slate-950 sm:text-[28px]">
+                จัดการกิจกรรมและการอบรม
+              </h1>
+              <p className="mt-1.5 text-sm text-slate-500">
+                สร้าง ติดตาม และจัดการกิจกรรมทั้งหมดของหน่วยงาน
+              </p>
             </div>
             <button
               type="button"
               onClick={() => setIsModalOpen(true)}
-              className="inline-flex h-11 shrink-0 items-center justify-center gap-2 rounded-lg bg-[#1565C0] px-5 text-sm font-semibold text-white shadow-sm transition hover:bg-[#0D47A1] focus:outline-none focus:ring-2 focus:ring-blue-200"
+              className="inline-flex h-11 shrink-0 items-center justify-center gap-2 rounded-xl bg-[#2455A4] px-5 text-sm font-semibold text-white shadow-sm transition hover:bg-[#1B3F80] focus:outline-none focus:ring-2 focus:ring-blue-200"
             >
               <Plus className="h-5 w-5" /> เพิ่มกิจกรรมใหม่
             </button>
           </div>
 
           {error && (
-            <div className="mt-4 rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-600">
+            <div className="mt-5 rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-600">
               {error}
             </div>
           )}
 
-          <div className="mt-6 border-b border-slate-200">
-            <nav
-              className="flex gap-1 overflow-x-auto"
-              aria-label="ตัวกรองกิจกรรม"
-            >
-              {activityCategories.map((category) => {
-                const isActive = activeTab === category.key;
-                return (
-                  <button
-                    key={category.key}
-                    type="button"
-                    onClick={() => setActiveTab(category.key)}
-                    aria-current={isActive ? "page" : undefined}
-                    className={`relative whitespace-nowrap rounded-t-lg px-5 py-3 text-sm font-semibold transition-colors ${
+          {/* แท็บกรอง แบบ segmented control */}
+          <nav
+            className="mt-6 inline-flex flex-wrap gap-1 rounded-xl bg-slate-200/60 p-1"
+            aria-label="ตัวกรองกิจกรรม"
+          >
+            {activityCategories.map((category) => {
+              const isActive = activeTab === category.key;
+              return (
+                <button
+                  key={category.key}
+                  type="button"
+                  onClick={() => setActiveTab(category.key)}
+                  aria-current={isActive ? "page" : undefined}
+                  className={`inline-flex items-center gap-2 whitespace-nowrap rounded-lg px-4 py-2 text-sm font-medium transition ${
+                    isActive
+                      ? "bg-white text-[#1B3F80] shadow-sm"
+                      : "text-slate-500 hover:text-slate-800"
+                  }`}
+                >
+                  {category.label}
+                  <span
+                    className={`inline-flex min-w-5 items-center justify-center rounded-full px-1.5 py-0.5 text-[11px] font-medium ${
                       isActive
-                        ? "bg-blue-50 text-[#1565C0]"
-                        : "text-slate-500 hover:bg-slate-50 hover:text-slate-800"
+                        ? "bg-[#2455A4] text-white"
+                        : "bg-white text-slate-500"
                     }`}
                   >
-                    {category.label}
-                    <span
-                      className={`ml-2 inline-flex min-w-5 items-center justify-center rounded-full px-1.5 py-0.5 text-[11px] font-medium ${
-                        isActive
-                          ? "bg-[#1565C0] text-white"
-                          : "bg-slate-100 text-slate-500"
-                      }`}
-                    >
-                      {categoryCounts[category.key]}
-                    </span>
-                    {isActive && (
-                      <span className="absolute inset-x-3 -bottom-px h-0.5 rounded-full bg-[#1565C0]" />
-                    )}
-                  </button>
-                );
-              })}
-            </nav>
-          </div>
+                    {categoryCounts[category.key]}
+                  </span>
+                </button>
+              );
+            })}
+          </nav>
 
+          {/* รายการกิจกรรม */}
           {loading ? (
-            <div className="mt-8 text-center text-slate-500">กำลังโหลด...</div>
+            <div className="mt-10 flex items-center justify-center gap-2 text-slate-500">
+              <Loader2 className="h-5 w-5 animate-spin" /> กำลังโหลด...
+            </div>
           ) : (
-            <div className="mt-7 space-y-5">
+            <div className="mt-6 space-y-4">
               {filteredActivities.length === 0 ? (
-                <div className="text-center text-slate-400 py-8">
+                <div className="rounded-2xl border border-dashed border-slate-200 bg-white py-14 text-center text-sm text-slate-400">
                   ไม่มีกิจกรรมในหมวดนี้
                 </div>
               ) : (
-                filteredActivities.map((activity) => (
-                  <article
-                    key={activity.id}
-                    className="grid gap-0 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-[0_6px_20px_rgba(15,23,42,0.05)] transition-shadow hover:shadow-[0_10px_28px_rgba(15,23,42,0.08)] lg:grid-cols-3 xl:grid-cols-[2fr_1.05fr_1fr_1fr_1fr]"
-                  >
-                    <div className="flex min-h-[150px] flex-col justify-start border-b border-slate-100 p-5 lg:border-b-0 lg:border-r xl:p-5">
-                      <h2 className="text-base font-semibold leading-6 text-slate-950">
-                        {activity.title}
-                      </h2>
-                      <p className="mt-2 inline-flex w-fit rounded-full bg-blue-50 px-2.5 py-1 font-mono text-[11px] font-semibold text-[#1565C0]">
-                        รหัสกิจกรรม: {activity.id}
-                      </p>
-                      <div className="mt-4 flex gap-3 text-xs leading-5 text-slate-500">
-                        <CalendarDays className="mt-0.5 h-4 w-4 shrink-0 text-slate-400" />
-                        <div>
-                          <p>
-                            {activity.date
-                              ? new Date(activity.date).toLocaleDateString(
-                                  "th-TH",
-                                  {
-                                    year: "numeric",
-                                    month: "long",
-                                    day: "numeric",
-                                  },
-                                )
-                              : "ไม่ระบุวันที่"}
-                          </p>
-                          <p>
-                            {activity.time
-                              ? new Date(
-                                  `2000-01-01T${activity.time}`,
-                                ).toLocaleTimeString("th-TH", {
-                                  hour: "2-digit",
-                                  minute: "2-digit",
-                                }) + " น."
-                              : "ไม่ระบุเวลา"}
-                            {activity.endTime
-                              ? ` - ${new Date(
-                                  `2000-01-01T${activity.endTime}`,
-                                ).toLocaleTimeString("th-TH", {
-                                  hour: "2-digit",
-                                  minute: "2-digit",
-                                })} น.`
-                              : ""}
-                          </p>
-                          {activity.hours ? (
-                            <p className="mt-1 text-[#1565C0]">
-                              {formatActivityHours(activity.hours)}
-                            </p>
-                          ) : null}
-                          <p className="mt-2 font-medium text-slate-700">
-                            รับ {activity.capacity || 0} คน • สมัครแล้ว {activity.attendeeCount || 0}/{activity.capacity || 0} คน
-                          </p>
+                filteredActivities.map((activity) => {
+                  const past = isActivityPast(activity);
+                  const external = isExternalActivity(activity);
+                  return (
+                    <article
+                      key={activity.id}
+                      className="rounded-2xl border border-slate-200 bg-white p-5 shadow-[0_1px_3px_rgba(15,23,42,0.04)] transition hover:shadow-[0_6px_18px_rgba(15,23,42,0.07)] sm:p-6"
+                    >
+                      {/* แถวบน: สถานะ + รหัส + ปุ่มคำสั่งหลัก */}
+                      <div className="flex flex-wrap items-start justify-between gap-3">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span
+                            className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium ${
+                              past
+                                ? "bg-slate-100 text-slate-500"
+                                : "bg-emerald-50 text-emerald-600"
+                            }`}
+                          >
+                            <span
+                              className={`h-1.5 w-1.5 rounded-full ${past ? "bg-slate-400" : "bg-emerald-500"}`}
+                            />
+                            {past ? "สิ้นสุดแล้ว" : "กำลังดำเนินอยู่"}
+                          </span>
+                          {external && (
+                            <span className="inline-flex items-center rounded-full bg-amber-50 px-2.5 py-1 text-xs font-medium text-amber-700">
+                              กิจกรรมภายนอก
+                            </span>
+                          )}
+                          <span className="rounded-full bg-slate-50 px-2.5 py-1 font-mono text-[11px] font-medium text-slate-500">
+                            {activity.id}
+                          </span>
+                        </div>
+
+                        <div className="flex items-center gap-2">
+                          <ActionButton
+                            icon={KeyRound}
+                            label={generatingId === activity.id ? "กำลังสร้าง..." : "รหัสยืนยัน"}
+                            onClick={() => showVerificationCode(activity.id)}
+                            disabled={generatingId === activity.id}
+                          />
+                          <ActionButton
+                            icon={Edit}
+                            label="แก้ไข"
+                            onClick={() => handleEdit(activity)}
+                            disabled={activity.hasConfirmedParticipants}
+                            title={
+                              activity.hasConfirmedParticipants
+                                ? "มีนิสิตยืนยันการเข้าร่วมแล้ว"
+                                : undefined
+                            }
+                          />
+                          <ActionButton
+                            icon={Trash2}
+                            label="ลบ"
+                            onClick={() => handleDelete(activity.id)}
+                            tone="danger"
+                          />
                         </div>
                       </div>
-                      {!isExternalActivity(activity) && (
-                        <>
-                          {/* แสดงปุ่มสร้าง/แก้ไขแบบประเมิน */}
+
+                      {/* หัวข้อ + รายละเอียดเวลา/สถานที่ */}
+                      <h2 className="mt-3 text-base font-semibold leading-6 text-slate-950 sm:text-lg">
+                        {activity.title}
+                      </h2>
+
+                      <div className="mt-2.5 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-sm text-slate-500">
+                        <span className="inline-flex items-center gap-1.5">
+                          <CalendarDays className="h-4 w-4 text-slate-400" />
+                          {activity.date
+                            ? new Date(activity.date).toLocaleDateString("th-TH", {
+                                year: "numeric",
+                                month: "long",
+                                day: "numeric",
+                              })
+                            : "ไม่ระบุวันที่"}
+                        </span>
+                        <span className="inline-flex items-center gap-1.5">
+                          <Clock className="h-4 w-4 text-slate-400" />
+                          {activity.time
+                            ? new Date(`2000-01-01T${activity.time}`).toLocaleTimeString(
+                                "th-TH",
+                                { hour: "2-digit", minute: "2-digit" },
+                              ) + " น."
+                            : "ไม่ระบุเวลา"}
+                          {activity.endTime
+                            ? ` - ${new Date(`2000-01-01T${activity.endTime}`).toLocaleTimeString(
+                                "th-TH",
+                                { hour: "2-digit", minute: "2-digit" },
+                              )} น.`
+                            : ""}
+                          {activity.hours ? ` · ${formatActivityHours(activity.hours)}` : ""}
+                        </span>
+                        {activity.location && (
+                          <span className="inline-flex items-center gap-1.5">
+                            <MapPin className="h-4 w-4 text-slate-400" />
+                            {activity.location}
+                          </span>
+                        )}
+                      </div>
+
+                      {/* ทักษะ */}
+                      <div className="mt-3.5 flex flex-wrap gap-2">
+                        {activity.skills.length > 0 ? (
+                          activity.skills.map((skill, index) => (
+                            <ActivityPill key={`${activity.id}-${index}`} skill={skill} />
+                          ))
+                        ) : (
+                          <span className="text-xs text-slate-400">ยังไม่ได้กำหนดทักษะ</span>
+                        )}
+                      </div>
+
+                      {/* สถานะแบบประเมิน / รหัสยืนยัน แบบข้อความบรรทัดเดียว */}
+                      {!external && (
+                        <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs">
                           {!activity.hasEvaluation ? (
-                            <p className="mt-3 flex items-center gap-1 text-[10px] text-red-500">
-                              <FileWarning className="h-3 w-3" />
+                            <span className="inline-flex items-center gap-1 text-red-500">
+                              <FileWarning className="h-3.5 w-3.5" />
                               ยังไม่มีแบบประเมินความรู้
                               <button
                                 type="button"
                                 onClick={() => setEvaluationActivity(activity)}
-                                className="ml-1 text-[#1565C0] underline underline-offset-2 hover:text-[#0D47A1]"
+                                className="ml-1 font-medium text-[#2455A4] underline underline-offset-2 hover:text-[#1B3F80]"
                               >
                                 สร้างแบบประเมิน
                               </button>
-                            </p>
+                            </span>
                           ) : (
                             <button
                               type="button"
                               onClick={() => setEditingEvaluationActivity(activity)}
-                              className="mt-3 text-xs text-[#1565C0] underline underline-offset-2 hover:text-[#0D47A1]"
+                              className="font-medium text-[#2455A4] underline underline-offset-2 hover:text-[#1B3F80]"
                             >
                               แก้ไขแบบประเมิน
                             </button>
                           )}
-                          {activity.verificationCode &&
-                            activity.confirmationEnabled && (
-                              <p className="mt-2 flex items-center gap-2 text-xs text-emerald-600">
-                                <KeyRound className="h-3 w-3" />
-                                รหัสเดิม:{" "}
-                                <span className="font-mono font-bold">
-                                  {activity.verificationCode}
-                                </span>
-                                <span className="text-[10px] text-slate-400">
-                                  (เปิดอยู่)
-                                </span>
-                              </p>
-                            )}
 
-                        </>
+                          {activity.verificationCode && activity.confirmationEnabled && (
+                            <span className="inline-flex items-center gap-1.5 text-emerald-600">
+                              <KeyRound className="h-3.5 w-3.5" />
+                              รหัสเดิม:
+                              <span className="font-mono font-semibold">
+                                {activity.verificationCode}
+                              </span>
+                              (เปิดอยู่)
+                            </span>
+                          )}
+                          {activity.verificationCode && !activity.confirmationEnabled && (
+                            <span className="inline-flex items-center gap-1.5 text-slate-400">
+                              <KeyRound className="h-3.5 w-3.5" /> รหัสถูกซ่อน (ปิดการมองเห็น)
+                            </span>
+                          )}
+                        </div>
                       )}
-                      {!isExternalActivity(activity) &&
-                        activity.verificationCode &&
-                        !activity.confirmationEnabled && (
-                          <p className="mt-2 flex items-center gap-2 text-xs text-slate-400">
-                            <KeyRound className="h-3 w-3" /> รหัสถูกซ่อน
-                            (ปิดการมองเห็น)
-                          </p>
-                        )}
-                    </div>
 
-                    <div className="border-b border-slate-100 p-5 lg:border-b-0 lg:border-r xl:p-5">
-                      <p className="mb-5 text-sm font-bold text-slate-950">
-                        ทักษะ:
-                      </p>
-                      <div className="flex flex-col items-start gap-3">
-                        {activity.skills.length > 0 ? (
-                          activity.skills.map((skill, index) => (
-                            <ActivityPill
-                              key={`${activity.id}-${index}`}
-                              skill={skill}
+                      <div className="my-4 h-px bg-slate-100" />
+
+                      {/* สรุปตัวเลข + คำสั่งย่อย */}
+                      <div className="grid gap-3 sm:grid-cols-3">
+                        <StatBlock
+                          label="เปิดรับสมัคร"
+                          value={`${activity.attendeeCount || 0}/${activity.capacity || 0}`}
+                          caption="สมัครแล้ว / จำนวนที่รับ"
+                        >
+                          <ToggleRow
+                            label={activity.applicationEnabled ? "เปิดรับสมัครอยู่" : "ปิดรับสมัคร"}
+                            enabled={Boolean(activity.applicationEnabled)}
+                            onClick={() => updateWorkflow(activity.id, "applicationEnabled")}
+                          />
+                        </StatBlock>
+
+                        <StatBlock
+                          label="ลงทะเบียนนิสิต"
+                          value={activity.attendeeCount}
+                          caption="จำนวนผู้ลงทะเบียนเข้าร่วม"
+                        >
+                          <div className="flex gap-2">
+                            <ActionButton
+                              icon={QrCode}
+                              label="สแกน QR"
+                              onClick={() => openScanModal(activity)}
                             />
-                          ))
+                            <ActionButton
+                              icon={Users}
+                              label="รายชื่อ"
+                              onClick={() => handleViewParticipants(activity.id)}
+                            />
+                          </div>
+                        </StatBlock>
+
+                        {!external ? (
+                          <StatBlock
+                            label="เปิด/ปิดแบบประเมิน"
+                            value={activity.evaluationCompletedCount}
+                            caption="ทำแบบประเมินแล้ว"
+                          >
+                            <ToggleRow
+                              label={activity.confirmationEnabled ? "เปิดแบบประเมิน" : "ปิดแบบประเมิน"}
+                              enabled={activity.confirmationEnabled}
+                              onClick={() => updateConfirmation(activity.id)}
+                            />
+                          </StatBlock>
                         ) : (
-                          <span className="text-xs text-slate-400">
-                            ยังไม่ได้กำหนดทักษะ
-                          </span>
+                          <StatBlock
+                            label="ผู้ลงทะเบียนทั้งหมด"
+                            value={activity.registeredCount}
+                            caption="รวมทุกช่องทาง"
+                          />
                         )}
                       </div>
-                    </div>
-
-                    <div className="border-b border-slate-100 p-5 lg:border-b-0 lg:border-r xl:p-5">
-                      <p className="mb-2 text-sm font-bold text-slate-950">
-                        เปิดรับสมัคร
-                      </p>
-                      <p className="text-lg font-semibold text-slate-900">
-                        {activity.attendeeCount}/{activity.capacity} คน
-                      </p>
-                      <p className="mt-1 text-xs text-slate-500">
-                        สมัครแล้ว / จำนวนที่รับ
-                      </p>
-                      <ToggleSwitch
-                        enabled={Boolean(activity.applicationEnabled)}
-                        onClick={() => updateWorkflow(activity.id, "applicationEnabled")}
-                      />
-                      <p className="mt-1 text-xs text-slate-500">
-                        {activity.applicationEnabled ? "เปิดรับสมัครอยู่" : "ปิดรับสมัคร"}
-                      </p>
-                    </div>
-
-                    <div className="border-b border-slate-100 p-5 lg:border-b-0 lg:border-r xl:p-5">
-                      <p className="mb-2 text-sm font-bold text-slate-950">
-                        ลงทะเบียนนิสิต
-                      </p>
-                      <p className="text-lg font-semibold text-slate-900">
-                        {activity.attendeeCount} คน
-                      </p>
-                      <p className="mt-1 text-xs text-slate-500">
-                        จำนวนผู้ลงทะเบียนเข้าร่วม
-                      </p>
-                      <button
-                        type="button"
-                        onClick={() => openScanModal(activity)}
-                        className="mt-3 inline-flex h-9 w-full items-center justify-center gap-2 rounded-lg border border-[#1565C0] bg-white px-3 text-xs font-semibold text-[#1565C0] transition hover:bg-blue-50"
-                      >
-                        <QrCode className="h-4 w-4" />
-                        สแกน QR นิสิต
-                      </button>
-                    </div>
-
-                    {!isExternalActivity(activity) && (
-                      <div className="border-blue-100 lg:border-l p-5">
-                        <p className="mb-2 text-sm font-bold text-slate-950">
-                          เปิด/ปิดแบบประเมิน
-                        </p>
-                        <p className="text-lg font-semibold text-slate-900">
-                          {activity.evaluationCompletedCount} คน
-                        </p>
-                        <p className="mt-1 text-xs text-slate-500">
-                          ทำแบบประเมินแล้ว
-                        </p>
-                        <ToggleSwitch
-                          enabled={activity.confirmationEnabled}
-                          onClick={() => updateConfirmation(activity.id)}
-                        />
-                        <p className="mt-1 text-xs text-slate-500">
-                          {activity.confirmationEnabled ? "เปิดแบบประเมิน" : "ปิดแบบประเมิน"}
-                        </p>
-                      </div>
-                    )}
-                      {/* ปุ่มแก้ไขและลบ */}
-                      <div className="mt-3 flex gap-2">
-                        <button
-                          type="button"
-                          onClick={() => handleEdit(activity)}
-                          disabled={activity.hasConfirmedParticipants}
-                          title={
-                            activity.hasConfirmedParticipants
-                              ? "มีนิสิตยืนยันการเข้าร่วมแล้ว"
-                              : undefined
-                          }
-                          className="inline-flex h-8 flex-1 items-center justify-center gap-1 rounded-lg border border-[#1565C0] bg-white px-2 text-xs font-medium text-[#1565C0] transition hover:bg-blue-50 disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-slate-100 disabled:text-slate-400"
-                        >
-                          <Edit className="h-3.5 w-3.5" /> แก้ไข
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => handleDelete(activity.id)}
-                          className="inline-flex h-8 flex-1 items-center justify-center gap-1 rounded-lg border border-red-300 bg-white px-2 text-xs font-medium text-red-600 transition hover:bg-red-50"
-                        >
-                          <Trash2 className="h-3.5 w-3.5" /> ลบ
-                        </button>
-                      </div>
-                  </article>
-                ))
+                    </article>
+                  );
+                })
               )}
             </div>
           )}
@@ -2551,158 +2615,198 @@ const updateWorkflow = async (
 
       {/* Modal สแกน QR นิสิต */}
       {scanActivity && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/40 px-4 backdrop-blur-sm">
-          <div className="relative w-full max-w-lg rounded-2xl bg-white p-6 shadow-2xl sm:p-8">
-            <button
-              type="button"
-              onClick={closeScanModal}
-              className="absolute right-4 top-4 rounded-full p-2 text-slate-400 transition hover:bg-slate-100 hover:text-slate-600"
-            >
-              <X className="h-5 w-5" />
-            </button>
+        <ModalShell
+          title="สแกน QR ลงทะเบียน"
+          subtitle={scanActivity.title}
+          onClose={closeScanModal}
+          maxWidthClass="max-w-lg"
+          zIndexClass="z-[100]"
+        >
+          <div className="space-y-4">
+            <Field label="รหัสกิจกรรม">
+              <input
+                value={scanActivityCode}
+                onChange={(e) => setScanActivityCode(e.target.value)}
+                className="teacher-activity-input bg-white"
+              />
+            </Field>
 
-            <div className="pr-10">
-              <h2 className="text-2xl font-semibold text-slate-950">
-                สแกน QR ลงทะเบียน
-              </h2>
-              <div className="mt-2 h-0.5 w-20 rounded-full bg-[#FFC107]" />
-              <p className="mt-3 text-sm text-slate-500">
-                {scanActivity.title}
-              </p>
-            </div>
-
-            <div className="mt-6 space-y-4">
-              <Field label="รหัสกิจกรรม">
-                <input
-                  value={scanActivityCode}
-                  onChange={(e) => setScanActivityCode(e.target.value)}
-                  className="teacher-activity-input bg-white"
-                />
-              </Field>
-
-              <div className="rounded-2xl border border-blue-100 bg-slate-50 p-3">
-                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                  <div>
-                    <p className="text-sm font-semibold text-slate-800">
-                      กล้องสแกน QR นิสิต
-                    </p>
-                    <p className="mt-1 text-xs text-slate-500">
-                      ใช้ได้ทั้งคอมพิวเตอร์และมือถือ โดยมือถือจะพยายามใช้กล้องหลัง
-                    </p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={cameraActive ? stopCamera : startCamera}
-                    disabled={cameraStarting}
-                    className="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-[#1565C0] bg-white px-4 text-sm font-semibold text-[#1565C0] transition hover:bg-blue-50 disabled:cursor-wait disabled:border-slate-300 disabled:text-slate-400"
-                  >
-                    {cameraActive ? (
-                      <>
-                        <CameraOff className="h-4 w-4" />
-                        ปิดกล้อง
-                      </>
-                    ) : (
-                      <>
-                        <Camera className="h-4 w-4" />
-                        {cameraStarting ? "กำลังเปิด..." : "เปิดกล้อง"}
-                      </>
-                    )}
-                  </button>
-                </div>
-
-                <div className="mt-3 grid gap-2 sm:grid-cols-2">
-                  <button
-                    type="button"
-                    onClick={() => qrImageInputRef.current?.click()}
-                    className="inline-flex h-10 items-center justify-center gap-2 rounded-xl bg-[#1565C0] px-4 text-sm font-semibold text-white transition hover:bg-[#0D47A1]"
-                  >
-                    <QrCode className="h-4 w-4" />
-                    ถ่าย/เลือกภาพ QR
-                  </button>
-                  <p className="flex items-center text-xs leading-5 text-slate-500">
-                    ใช้ปุ่มนี้เมื่อเปิดผ่าน HTTP เช่น miscis.scidi.tsu.ac.th:3086
+            <div className="rounded-xl border border-slate-100 bg-slate-50 p-3">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <p className="text-sm font-semibold text-slate-800">
+                    กล้องสแกน QR นิสิต
                   </p>
-                  <input
-                    ref={qrImageInputRef}
-                    type="file"
-                    accept="image/*"
-                    capture="environment"
-                    onChange={handleQrImageChange}
-                    className="hidden"
-                  />
+                  <p className="mt-1 text-xs text-slate-500">
+                    ใช้ได้ทั้งคอมพิวเตอร์และมือถือ โดยมือถือจะพยายามใช้กล้องหลัง
+                  </p>
                 </div>
-
-                <div className="mt-3 overflow-hidden rounded-xl border border-blue-100 bg-slate-900">
-                  <video
-                    ref={videoRef}
-                    muted
-                    playsInline
-                    className={`aspect-video w-full object-cover ${cameraActive ? "block" : "hidden"}`}
-                  />
-                  {!cameraActive && (
-                    <div className="flex aspect-video w-full items-center justify-center px-6 text-center text-sm text-slate-300">
-                      เปิดกล้องแล้วนำ QR ของนิสิตให้อยู่ในกรอบ
-                    </div>
+                <button
+                  type="button"
+                  onClick={cameraActive ? stopCamera : startCamera}
+                  disabled={cameraStarting}
+                  className="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-[#2455A4] bg-white px-4 text-sm font-semibold text-[#2455A4] transition hover:bg-blue-50 disabled:cursor-wait disabled:border-slate-300 disabled:text-slate-400"
+                >
+                  {cameraActive ? (
+                    <>
+                      <CameraOff className="h-4 w-4" />
+                      ปิดกล้อง
+                    </>
+                  ) : (
+                    <>
+                      <Camera className="h-4 w-4" />
+                      {cameraStarting ? "กำลังเปิด..." : "เปิดกล้อง"}
+                    </>
                   )}
-                </div>
+                </button>
+              </div>
 
-                {cameraError && (
-                  <p className="mt-2 text-xs font-medium text-red-600">
-                    {cameraError}
-                  </p>
+              <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                <button
+                  type="button"
+                  onClick={() => qrImageInputRef.current?.click()}
+                  className="inline-flex h-10 items-center justify-center gap-2 rounded-xl bg-[#2455A4] px-4 text-sm font-semibold text-white transition hover:bg-[#1B3F80]"
+                >
+                  <QrCode className="h-4 w-4" />
+                  ถ่าย/เลือกภาพ QR
+                </button>
+                <p className="flex items-center text-xs leading-5 text-slate-500">
+                  ใช้ปุ่มนี้เมื่อเปิดผ่าน HTTP เช่น miscis.scidi.tsu.ac.th:3086
+                </p>
+                <input
+                  ref={qrImageInputRef}
+                  type="file"
+                  accept="image/*"
+                  capture="environment"
+                  onChange={handleQrImageChange}
+                  className="hidden"
+                />
+              </div>
+
+              <div className="mt-3 overflow-hidden rounded-xl border border-slate-200 bg-slate-900">
+                <video
+                  ref={videoRef}
+                  muted
+                  playsInline
+                  className={`aspect-video w-full object-cover ${cameraActive ? "block" : "hidden"}`}
+                />
+                {!cameraActive && (
+                  <div className="flex aspect-video w-full items-center justify-center px-6 text-center text-sm text-slate-300">
+                    เปิดกล้องแล้วนำ QR ของนิสิตให้อยู่ในกรอบ
+                  </div>
                 )}
               </div>
 
-              <label className="block">
-                <span className="mb-2 block text-sm font-semibold text-slate-800">
-                  ข้อมูลจาก QR นิสิต
-                </span>
-                <textarea
-                  value={scanPayload}
-                  onChange={(e) => setScanPayload(e.target.value)}
-                  autoFocus
-                  placeholder="สแกน QR ด้วยเครื่องสแกน หรือวางข้อมูล QR ที่นิสิตแสดง"
-                  className="min-h-[140px] w-full resize-none rounded-lg border border-[#7bbaf2] bg-white p-3 text-sm text-slate-800 outline-none transition focus:border-[#1565c0] focus:ring-4 focus:ring-blue-100"
-                />
-              </label>
-
-              {scanMessage && (
-                <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm font-medium text-emerald-700">
-                  {scanMessage}
-                </div>
-              )}
-              {scanError && (
-                <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm font-medium text-red-600">
-                  {scanError}
-                </div>
+              {cameraError && (
+                <p className="mt-2 text-xs font-medium text-red-600">
+                  {cameraError}
+                </p>
               )}
             </div>
 
-            <div className="mt-6 flex gap-3">
-              <button
-                type="button"
-                onClick={closeScanModal}
-                className="h-11 flex-1 rounded-xl border border-slate-300 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
-              >
-                ปิด
-              </button>
-              <button
-                type="button"
-                onClick={submitScan}
-                disabled={!scanActivityCode.trim() || !scanPayload.trim() || scanSubmitting}
-                className="h-11 flex-1 rounded-xl bg-[#1565C0] text-sm font-semibold text-white transition hover:bg-[#0D47A1] disabled:bg-slate-300"
-              >
-                {scanSubmitting ? "กำลังบันทึก..." : "บันทึกการลงทะเบียน"}
-              </button>
-            </div>
+            <Field label="ข้อมูลจาก QR นิสิต">
+              <textarea
+                value={scanPayload}
+                onChange={(e) => setScanPayload(e.target.value)}
+                autoFocus
+                placeholder="สแกน QR ด้วยเครื่องสแกน หรือวางข้อมูล QR ที่นิสิตแสดง"
+                className="min-h-[120px] w-full resize-none rounded-lg border border-slate-200 bg-white p-3 text-sm text-slate-800 outline-none transition focus:border-[#2455A4] focus:ring-4 focus:ring-blue-100"
+              />
+            </Field>
+
+            {scanMessage && (
+              <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm font-medium text-emerald-700">
+                {scanMessage}
+              </div>
+            )}
+            {scanError && (
+              <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm font-medium text-red-600">
+                {scanError}
+              </div>
+            )}
           </div>
-        </div>
+
+          <div className="mt-6 flex gap-3">
+            <button
+              type="button"
+              onClick={closeScanModal}
+              className="h-11 flex-1 rounded-xl border border-slate-200 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+            >
+              ปิด
+            </button>
+            <button
+              type="button"
+              onClick={submitScan}
+              disabled={!scanActivityCode.trim() || !scanPayload.trim() || scanSubmitting}
+              className="h-11 flex-1 rounded-xl bg-[#2455A4] text-sm font-semibold text-white transition hover:bg-[#1B3F80] disabled:bg-slate-300"
+            >
+              {scanSubmitting ? "กำลังบันทึก..." : "บันทึกการลงทะเบียน"}
+            </button>
+          </div>
+        </ModalShell>
       )}
 
       {/* Modal แสดงรายชื่อผู้เข้าร่วม */}
       {showParticipantsModal && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/40 px-4 backdrop-blur-sm">
-          <div className="relative w-full max-w-4xl max-h-[90vh] overflow-y-auto rounded-2xl bg-white p-6 shadow-2xl sm:p-8">
+        <ModalShell
+          title="รายชื่อผู้เข้าร่วมกิจกรรม"
+          subtitle={
+            <>
+              กิจกรรม:{" "}
+              <span className="font-medium text-slate-700">
+                {activities.find((a) => a.id === selectedParticipantActivityId)?.title || ""}
+              </span>
+            </>
+          }
+          onClose={() => {
+            setShowParticipantsModal(false);
+            setParticipants([]);
+            setSelectedParticipantActivityId(null);
+          }}
+          maxWidthClass="max-w-3xl"
+          zIndexClass="z-[100]"
+        >
+          {loadingParticipants ? (
+            <div className="flex items-center justify-center py-12">
+              <Loader2 className="h-6 w-6 animate-spin text-[#2455A4]" />
+              <span className="ml-2 text-slate-500">กำลังโหลด...</span>
+            </div>
+          ) : participants.length === 0 ? (
+            <div className="py-12 text-center text-slate-400">
+              ไม่มีผู้เข้าร่วม
+            </div>
+          ) : (
+            <div className="overflow-x-auto rounded-xl border border-slate-100">
+              <table className="w-full min-w-[600px] text-sm">
+                <thead className="bg-slate-50">
+                  <tr>
+                    <th className="px-4 py-3 text-left font-medium text-slate-500">ลำดับ</th>
+                    <th className="px-4 py-3 text-left font-medium text-slate-500">รหัสนิสิต</th>
+                    <th className="px-4 py-3 text-left font-medium text-slate-500">ชื่อ-นามสกุล</th>
+                    <th className="px-4 py-3 text-left font-medium text-slate-500">หลักสูตร</th>
+                    <th className="px-4 py-3 text-center font-medium text-slate-500">คะแนน</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {participants.map((p, index) => (
+                    <tr key={p.studentId} className="border-b border-slate-50 transition hover:bg-slate-50/60">
+                      <td className="px-4 py-3 text-slate-500">{index + 1}</td>
+                      <td className="px-4 py-3 font-medium text-slate-800">{p.studentId}</td>
+                      <td className="px-4 py-3 text-slate-700">
+                        {`${p.firstname || ""} ${p.lastname || ""}`.trim()}
+                      </td>
+                      <td className="px-4 py-3 text-slate-500">{p.program || "-"}</td>
+                      <td className="px-4 py-3 text-center font-semibold text-[#2455A4]">
+                        {p.score !== null && p.score !== undefined ? Number(p.score).toFixed(1) : "-"}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          <div className="mt-4 flex justify-end">
             <button
               type="button"
               onClick={() => {
@@ -2710,102 +2814,12 @@ const updateWorkflow = async (
                 setParticipants([]);
                 setSelectedParticipantActivityId(null);
               }}
-              className="absolute right-4 top-4 rounded-full p-2 text-slate-400 transition hover:bg-slate-100 hover:text-slate-600"
+              className="rounded-lg border border-slate-200 px-6 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
             >
-              <X className="h-5 w-5" />
+              ปิด
             </button>
-
-            <div className="mb-6">
-              <h2 className="text-2xl font-semibold text-slate-950">
-                รายชื่อผู้เข้าร่วมกิจกรรม
-              </h2>
-              <div className="mt-2 h-0.5 w-20 rounded-full bg-[#FFC107]" />
-              <p className="mt-2 text-sm text-slate-500">
-                กิจกรรม:{" "}
-                <span className="font-medium">
-                  {activities.find(
-                    (a) => a.id === selectedParticipantActivityId,
-                  )?.title || ""}
-                </span>
-              </p>
-            </div>
-
-            {loadingParticipants ? (
-              <div className="flex items-center justify-center py-12">
-                <Loader2 className="h-6 w-6 animate-spin text-[#1565C0]" />
-                <span className="ml-2 text-slate-500">กำลังโหลด...</span>
-              </div>
-            ) : participants.length === 0 ? (
-              <div className="py-12 text-center text-slate-400">
-                ไม่มีผู้เข้าร่วม
-              </div>
-            ) : (
-              <div className="overflow-x-auto rounded-xl border border-blue-100">
-                <table className="w-full min-w-[600px] text-sm">
-                  <thead className="bg-blue-50/50">
-                    <tr>
-                      <th className="px-4 py-3 text-left font-medium text-slate-500">
-                        ลำดับ
-                      </th>
-                      <th className="px-4 py-3 text-left font-medium text-slate-500">
-                        รหัสนิสิต
-                      </th>
-                      <th className="px-4 py-3 text-left font-medium text-slate-500">
-                        ชื่อ-นามสกุล
-                      </th>
-                      <th className="px-4 py-3 text-left font-medium text-slate-500">
-                        หลักสูตร
-                      </th>
-                      <th className="px-4 py-3 text-center font-medium text-slate-500">
-                        คะแนน
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {participants.map((p, index) => (
-                      <tr
-                        key={p.studentId}
-                        className="border-b border-blue-50/50 transition hover:bg-blue-50/30"
-                      >
-                        <td className="px-4 py-3 text-slate-500">
-                          {index + 1}
-                        </td>
-                        <td className="px-4 py-3 font-medium text-slate-800">
-                          {p.studentId}
-                        </td>
-                        <td className="px-4 py-3 text-slate-700">
-                          {`${p.firstname || ""} ${p.lastname || ""}`.trim()}
-                        </td>
-                        <td className="px-4 py-3 text-slate-500">
-                          {p.program || "-"}
-                        </td>
-                        <td className="px-4 py-3 text-center font-semibold text-[#1565C0]">
-                          {p.score !== null && p.score !== undefined
-                            ? Number(p.score).toFixed(1)
-                            : "-"}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-
-            <div className="mt-4 flex justify-end">
-              <button
-                type="button"
-                onClick={() => {
-                  setShowParticipantsModal(false);
-                  setParticipants([]);
-                  setSelectedParticipantActivityId(null);
-                }}
-                className="rounded-lg border border-slate-300 px-6 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
-              >
-                ปิด
-              </button>
-            </div>
           </div>
-        </div>
+        </ModalShell>
       )}
 
       <style jsx global>{`
@@ -2813,8 +2827,8 @@ const updateWorkflow = async (
           height: 38px;
           width: 100%;
           border-radius: 0.5rem;
-          border: 1px solid #7bbaf2;
-          background: transparent;
+          border: 1px solid #d7deea;
+          background: #ffffff;
           padding-left: 0.75rem;
           padding-right: 0.75rem;
           font-size: 0.875rem;
@@ -2826,9 +2840,8 @@ const updateWorkflow = async (
             background 160ms ease;
         }
         .teacher-activity-input:focus {
-          border-color: #1565c0;
-          background: rgba(255, 255, 255, 0.38);
-          box-shadow: 0 0 0 3px rgba(21, 101, 192, 0.1);
+          border-color: #2455a4;
+          box-shadow: 0 0 0 3px rgba(36, 85, 164, 0.1);
         }
         .teacher-activity-input[type="date"]::-webkit-calendar-picker-indicator,
         .teacher-activity-input[type="time"]::-webkit-calendar-picker-indicator {
