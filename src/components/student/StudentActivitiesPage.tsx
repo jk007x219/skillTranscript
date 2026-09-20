@@ -77,8 +77,8 @@ const date = (v?: string | null) =>
 const time = (v?: string | null) => {
   if (!v) return "-";
   const value = String(v);
-  const match = value.match(/(?:T|\\s)(\\d{2}:\\d{2})/);
-  return match?.[1] || (\\d{2}:\\d{2}/.test(value) ? value.match(/\\d{2}:\\d{2}/)?.[0] || "-" : "-");
+  const match = value.match(/(?:T|\s)(\d{2}:\d{2})/);
+  return match?.[1] ?? value.match(/\d{2}:\d{2}/)?.[0] ?? "-";
 };
 function Card({
   a,
