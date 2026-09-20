@@ -228,8 +228,7 @@ export default function StudentActivitiesPage() {
         .filter((x) =>
           tab === "open"
             ? !x.participationStatus &&
-              x.applicationEnabled &&
-              Boolean(x.registrationOpen)
+              x.applicationEnabled
             : ["applied", "registered", "confirmed"].includes(
                 x.participationStatus || "",
               ),
