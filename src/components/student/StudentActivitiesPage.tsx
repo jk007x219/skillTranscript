@@ -62,6 +62,8 @@ type P = {
   hours?: number | null;
   term?: string | null;
   joinDate?: string | null;
+  registrationStart?: string | null;
+  registrationEnd?: string | null;
   skillScores?: Array<{ name: string; earnedScore: number; maxScore: number }>;
 };
 const date = (v?: string | null) =>
@@ -120,8 +122,7 @@ function Card({
         </p>
         <p className="flex gap-2">
           <CalendarClock className="h-4 w-4 shrink-0" />
-          <span>ช่วงลงทะเบียน {a.registrationStart ? time(a.registrationStart) : "-"}
-          {a.registrationEnd ? ` - ${time(a.registrationEnd)}` : ""}
+          <span>ช่วงลงทะเบียน {a.registrationStart ? time(a.registrationStart) : "-"}{a.registrationEnd ? ` - ${time(a.registrationEnd)}` : ""}</span>
         </p>
         <p className="flex gap-2">
           <MapPin className="h-4 w-4" />
