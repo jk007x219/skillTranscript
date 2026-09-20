@@ -26,7 +26,7 @@ import {
   Edit,
   QrCode,
 } from "lucide-react";
-import TeacherShell from "@/components/staff/TeacherShell";
+import TeacherShell from "@/components/teacher/TeacherShell";
 
 type BarcodeDetectorLike = {
   detect(source: CanvasImageSource): Promise<Array<{ rawValue?: string }>>;

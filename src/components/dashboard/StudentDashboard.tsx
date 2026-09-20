@@ -7,8 +7,8 @@ import {
   Award,
   BriefcaseBusiness,
   CalendarDays,
+  Cpu,
   FileBadge,
-  LayoutDashboard,
   Lightbulb,
   MessageCircle,
   MonitorCheck,
@@ -64,59 +64,32 @@ const facultySkillNames = [
   "การใช้ห้องปฏิบัติการ",
 ];
 
+function isFacultySkill(title: string) {
+  return facultySkillNames.some((name) => title.includes(name));
+}
+
 // =====================================================
 // RADAR CHART LABEL
-// ใช้เฉพาะชื่อที่แสดงบนกราฟ
-// ไม่เปลี่ยนชื่อจริงจากฐานข้อมูล
+// ใช้เฉพาะชื่อที่แสดงบนกราฟ ไม่เปลี่ยนชื่อจริงจากฐานข้อมูล
 // =====================================================
 
 function getRadarLabel(title: string) {
   const labels: Record<string, string> = {
-    "ทักษะการสร้างนวัตกรรมสังคม":
-      "สร้างนวัตกรรมสังคม",
-
+    "ทักษะการสร้างนวัตกรรมสังคม": "สร้างนวัตกรรมสังคม",
     "ทักษะการใช้ห้องปฏิบัติการและความปลอดภัยในห้องปฏิบัติการ":
       "ห้องปฏิบัติการ\nและความปลอดภัย",
-
-    "ทักษะการคิดเชิงออกแบบนวัตกรรม":
-      "คิดเชิงออกแบบ\nนวัตกรรม",
-
-    "ทักษะการใช้เครื่องมือวิทยาศาสตร์":
-      "ใช้เครื่องมือ\nวิทยาศาสตร์",
-
-    "ทักษะการใช้ปัญญาประดิษฐ์":
-      "ใช้ปัญญาประดิษฐ์",
-
-    "ทักษะความปลอดภัยไซเบอร์":
-      "ความปลอดภัย\nไซเบอร์",
-
-    "ทักษะการสื่อสาร":
-      "การสื่อสาร",
-
-    "ทักษะการเป็นผู้ประกอบการ":
-      "การเป็น\nผู้ประกอบการ",
-
-    "ทักษะการทำงานเป็นทีม":
-      "การทำงานเป็นทีม",
-
-    "ทักษะการคิดและการแก้ปัญหา":
-      "คิดและแก้ปัญหา",
-
-    "ทักษะดิจิทัล":
-      "ทักษะดิจิทัล",
+    "ทักษะการคิดเชิงออกแบบนวัตกรรม": "คิดเชิงออกแบบ\nนวัตกรรม",
+    "ทักษะการใช้เครื่องมือวิทยาศาสตร์": "ใช้เครื่องมือ\nวิทยาศาสตร์",
+    "ทักษะการใช้ปัญญาประดิษฐ์": "ใช้ปัญญาประดิษฐ์",
+    "ทักษะความปลอดภัยไซเบอร์": "ความปลอดภัย\nไซเบอร์",
+    "ทักษะการสื่อสาร": "การสื่อสาร",
+    "ทักษะการเป็นผู้ประกอบการ": "การเป็น\nผู้ประกอบการ",
+    "ทักษะการทำงานเป็นทีม": "การทำงานเป็นทีม",
+    "ทักษะการคิดและการแก้ปัญหา": "คิดและแก้ปัญหา",
+    "ทักษะดิจิทัล": "ทักษะดิจิทัล",
   };
 
   return labels[title] ?? title.replace(/^ทักษะ/, "").trim();
-}
-
-// =====================================================
-// FACULTY SKILL CHECK
-// =====================================================
-
-function isFacultySkill(title: string) {
-  return facultySkillNames.some((name) =>
-    title.includes(name),
-  );
 }
 
 // =====================================================
@@ -125,339 +98,157 @@ function isFacultySkill(title: string) {
 
 function getSkillIcon(title: string): LucideIcon {
   if (title.includes("สื่อสาร")) return MessageCircle;
-
-  if (title.includes("ผู้ประกอบการ")) {
-    return BriefcaseBusiness;
-  }
-
-  if (title.includes("ทีม")) {
-    return UsersRound;
-  }
-
-  if (
-    title.includes("ดิจิทัล") ||
-    title.includes("เครื่องมือ")
-  ) {
-    return MonitorCheck;
-  }
-
-  if (
-    title.includes("คิด") ||
-    title.includes("แก้ปัญหา")
-  ) {
-    return GraduationCap;
-  }
-
-  if (
-    title.includes("ปัญญาประดิษฐ์") ||
-    title.includes("AI")
-  ) {
-    return UsersRound;
-  }
-
-  if (
-    title.includes("ปลอดภัย") ||
-    title.includes("ไซเบอร์")
-  ) {
-    return ShieldCheck;
-  }
-
-  if (title.includes("ห้องปฏิบัติการ")) {
-    return Network;
-  }
-
-  if (title.includes("นวัตกรรม")) {
-    return Lightbulb;
-  }
-
+  if (title.includes("ผู้ประกอบการ")) return BriefcaseBusiness;
+  if (title.includes("ทีม")) return UsersRound;
+  if (title.includes("ดิจิทัล") || title.includes("เครื่องมือ")) return MonitorCheck;
+  if (title.includes("คิด") || title.includes("แก้ปัญหา")) return GraduationCap;
+  if (title.includes("ปัญญาประดิษฐ์") || title.includes("AI")) return Cpu;
+  if (title.includes("ปลอดภัย") || title.includes("ไซเบอร์")) return ShieldCheck;
+  if (title.includes("ห้องปฏิบัติการ")) return Network;
+  if (title.includes("นวัตกรรม")) return Lightbulb;
   return Star;
 }
 
-// =====================================================
-// CONVERT SKILL
-// =====================================================
-
-function toProgressItem(
-  skill: DashboardSkill,
-): SkillProgressItem {
-  return {
-    ...skill,
-    icon: getSkillIcon(skill.title),
-  };
+function toProgressItem(skill: DashboardSkill): SkillProgressItem {
+  return { ...skill, icon: getSkillIcon(skill.title) };
 }
 
-// =====================================================
-// RADAR CALCULATION
-// =====================================================
-
-function chartAngles(count: number) {
-  return Array.from(
-    { length: count },
-    (_, index) =>
-      -90 + (360 / count) * index,
+function averagePercent(items: SkillProgressItem[]) {
+  if (items.length === 0) return 0;
+  return Math.round(
+    items.reduce((total, item) => total + item.percent, 0) / items.length,
   );
 }
 
-function polarPoint(
-  percent: number,
-  angle: number,
-) {
-  const radius = 96 * (percent / 100);
-  const radian = (Math.PI / 180) * angle;
+// =====================================================
+// RADAR MATH
+// =====================================================
 
-  return {
-    x: 130 + radius * Math.cos(radian),
-    y: 130 + radius * Math.sin(radian),
-  };
+function chartAngles(count: number) {
+  return Array.from({ length: count }, (_, index) => -90 + (360 / count) * index);
 }
 
-function polygonPoints(
-  values: number[],
-  angles: number[],
-) {
+function polarPoint(percent: number, angle: number, radius: number, center: number) {
+  const r = radius * (percent / 100);
+  const radian = (Math.PI / 180) * angle;
+  return { x: center + r * Math.cos(radian), y: center + r * Math.sin(radian) };
+}
+
+function polygonPoints(values: number[], angles: number[], radius: number, center: number) {
   return values
     .map((value, index) => {
-      const point = polarPoint(
-        value,
-        angles[index],
-      );
-
-      return `${point.x.toFixed(1)},${point.y.toFixed(1)}`;
-    })
-    .join(" ");
-}
-
-function gridPolygonPoints(
-  size: number,
-  angles: number[],
-) {
-  return angles
-    .map((angle) => {
-      const point = polarPoint(size, angle);
-
-      return `${point.x.toFixed(1)},${point.y.toFixed(1)}`;
+      const p = polarPoint(value, angles[index], radius, center);
+      return `${p.x.toFixed(1)},${p.y.toFixed(1)}`;
     })
     .join(" ");
 }
 
 // =====================================================
 // RADAR CHART
+// accent is fixed per panel (yellow for faculty, blue for essential)
 // =====================================================
 
 function RadarChart({
-  accent = "#FFC107",
+  accent,
   values,
   labels,
   id,
 }: {
-  accent?: string;
+  accent: string;
   values: number[];
   labels: string[];
   id: string;
 }) {
+  const size = 280;
+  const center = size / 2;
+  const radius = 100;
+
   if (values.length < 3) {
     return (
-      <div className="mx-auto flex aspect-square w-full max-w-[250px] items-center justify-center rounded-full bg-gradient-to-br from-white via-slate-50 to-blue-50/70 p-6 text-center text-sm text-slate-500 shadow-[inset_0_0_0_1px_rgba(21,101,192,0.08)]">
+      <div className="flex aspect-square w-full max-w-[280px] items-center justify-center rounded-2xl bg-slate-50 p-6 text-center text-sm text-slate-400">
         ยังไม่มีข้อมูลทักษะเพียงพอสำหรับกราฟเรดาร์
       </div>
     );
   }
 
-  const softPoints = values.map((value) =>
-    Math.max(0, value - 18),
-  );
-
   const angles = chartAngles(values.length);
 
   return (
-    <div className="relative mx-auto flex aspect-square w-full max-w-[330px] items-center justify-center rounded-full bg-gradient-to-br from-white via-slate-50 to-blue-50/70 p-5 shadow-[inset_0_0_0_1px_rgba(21,101,192,0.08)]">
-      {/* Glow */}
-      <div className="absolute inset-7 rounded-full bg-white/70 blur-2xl" />
-
-      {/* Radar SVG */}
-      <svg
-        viewBox="0 0 260 260"
-        className="relative h-full w-full overflow-visible drop-shadow-sm"
-      >
+    <div className="relative mx-auto aspect-square w-full max-w-[280px]">
+      <svg viewBox={`0 0 ${size} ${size}`} className="h-full w-full overflow-visible">
         <defs>
-          {/* Glow */}
-          <radialGradient
-            id={`${id}-glow`}
-            cx="50%"
-            cy="50%"
-            r="62%"
-          >
-            <stop
-              offset="0%"
-              stopColor={accent}
-              stopOpacity="0.34"
-            />
-
-            <stop
-              offset="100%"
-              stopColor={accent}
-              stopOpacity="0"
-            />
-          </radialGradient>
-
-          {/* Fill */}
-          <linearGradient
-            id={`${id}-fill`}
-            x1="50"
-            x2="210"
-            y1="30"
-            y2="230"
-            gradientUnits="userSpaceOnUse"
-          >
-            <stop
-              stopColor={accent}
-              stopOpacity="0.34"
-            />
-
-            <stop
-              offset="1"
-              stopColor={accent}
-              stopOpacity="0.08"
-            />
+          <linearGradient id={`${id}-fill`} x1="0" x2="1" y1="0" y2="1">
+            <stop stopColor={accent} stopOpacity="0.32" />
+            <stop offset="1" stopColor={accent} stopOpacity="0.06" />
           </linearGradient>
-
-          {/* Shadow */}
-          <filter
-            id={`${id}-shadow`}
-            x="-30%"
-            y="-30%"
-            width="160%"
-            height="160%"
-          >
-            <feDropShadow
-              dx="0"
-              dy="10"
-              stdDeviation="8"
-              floodColor={accent}
-              floodOpacity="0.24"
-            />
-          </filter>
         </defs>
 
-        {/* Background glow */}
-        <circle
-          cx="130"
-          cy="130"
-          r="98"
-          fill={`url(#${id}-glow)`}
-        />
-
-        {/* Grid */}
-        {[100, 80, 60, 40, 20].map(
-          (size) => (
-            <polygon
-              key={size}
-              points={gridPolygonPoints(
-                size,
-                angles,
-              )}
-              fill="none"
-              stroke={
-                size === 100
-                  ? "#BFD8F3"
-                  : "#D8E7F7"
-              }
-              strokeWidth="1"
-            />
-          ),
-        )}
-
-        {/* Axis */}
-        {angles.map((angle) => (
-          <line
-            key={angle}
-            x1="130"
-            y1="130"
-            x2="130"
-            y2="26"
-            stroke="#D8E7F7"
+        {/* grid rings */}
+        {[100, 75, 50, 25].map((ring) => (
+          <polygon
+            key={ring}
+            points={polygonPoints(
+              angles.map(() => ring),
+              angles,
+              radius,
+              center,
+            )}
+            fill="none"
+            stroke="#E2E8F0"
             strokeWidth="1"
-            transform={`rotate(${angle} 130 130)`}
           />
         ))}
 
-        {/* Main polygon */}
+        {/* axes */}
+        {angles.map((angle) => {
+          const end = polarPoint(100, angle, radius, center);
+          return (
+            <line
+              key={angle}
+              x1={center}
+              y1={center}
+              x2={end.x}
+              y2={end.y}
+              stroke="#E2E8F0"
+              strokeWidth="1"
+            />
+          );
+        })}
+
+        {/* data polygon */}
         <polygon
-          points={polygonPoints(
-            values,
-            angles,
-          )}
+          points={polygonPoints(values, angles, radius, center)}
           fill={`url(#${id}-fill)`}
           stroke={accent}
+          strokeWidth="2.5"
           strokeLinejoin="round"
-          strokeWidth="4"
-          filter={`url(#${id}-shadow)`}
         />
 
-        {/* Soft polygon */}
-        <polygon
-          points={polygonPoints(
-            softPoints,
-            angles,
-          )}
-          fill="white"
-          fillOpacity="0.2"
-          stroke={accent}
-          strokeDasharray="4 7"
-          strokeLinecap="round"
-          strokeOpacity="0.55"
-          strokeWidth="2"
-        />
-
-        {/* Points */}
+        {/* points */}
         {values.map((value, index) => {
-          const point = polarPoint(
-            value,
-            angles[index],
-          );
-
+          const p = polarPoint(value, angles[index], radius, center);
           return (
-            <g
-              key={`${id}-${labels[index]}`}
-            >
-              <circle
-                cx={point.x}
-                cy={point.y}
-                r="6.5"
-                fill="white"
-                stroke={accent}
-                strokeWidth="3"
-              />
-
-              <circle
-                cx={point.x}
-                cy={point.y}
-                r="2.5"
-                fill={accent}
-              />
-            </g>
+            <circle
+              key={`${id}-pt-${index}`}
+              cx={p.x}
+              cy={p.y}
+              r="4"
+              fill="white"
+              stroke={accent}
+              strokeWidth="2.5"
+            />
           );
         })}
       </svg>
 
-      {/* ================================================= */}
-      {/* RADAR LABELS */}
-      {/* ================================================= */}
-
+      {/* labels */}
       {labels.map((label, index) => {
-        const point = polarPoint(
-          122,
-          angles[index],
-        );
-
+        const p = polarPoint(122, angles[index], radius, center);
         return (
           <span
             key={`${id}-label-${index}`}
-            className="absolute w-[7.5rem] -translate-x-1/2 -translate-y-1/2 whitespace-pre-line rounded-full bg-white/90 px-2 py-1.5 text-center text-[10px] font-medium leading-[1.35] text-slate-600 shadow-sm ring-1 ring-blue-100"
-            style={{
-              left: `${(point.x / 260) * 100}%`,
-              top: `${(point.y / 260) * 100}%`,
-            }}
+            className="absolute w-24 -translate-x-1/2 -translate-y-1/2 whitespace-pre-line text-center text-[10px] font-medium leading-tight text-slate-500"
+            style={{ left: `${(p.x / size) * 100}%`, top: `${(p.y / size) * 100}%` }}
           >
             {label}
           </span>
@@ -471,57 +262,37 @@ function RadarChart({
 // PROGRESS LIST
 // =====================================================
 
-function ProgressList({
-  items,
-  accent,
-}: {
-  items: SkillProgressItem[];
-  accent: string;
-}) {
+function ProgressList({ items, accent }: { items: SkillProgressItem[]; accent: string }) {
   if (items.length === 0) {
     return (
-      <div className="rounded-xl border border-blue-100 bg-blue-50/50 px-4 py-6 text-center text-sm text-slate-500">
-        ยังไม่มีข้อมูลคะแนนทักษะจากฐานข้อมูลสำหรับหมวดนี้
+      <div className="flex h-full min-h-[160px] items-center justify-center rounded-xl border border-dashed border-slate-200 px-4 py-6 text-center text-sm text-slate-400">
+        ยังไม่มีข้อมูลทักษะในหมวดนี้
       </div>
     );
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-2.5">
       {items.map((item) => (
         <div
           key={item.skillId}
-          className="grid grid-cols-[36px_1fr_48px] items-center gap-3 rounded-lg border border-slate-100 bg-white/80 p-3 shadow-sm transition duration-300 hover:-translate-y-0.5 hover:border-blue-100 hover:shadow-md"
+          className="flex items-center gap-3 rounded-xl border border-slate-100 bg-white px-3 py-2.5 transition-colors hover:border-slate-200"
         >
-          {/* Icon */}
-          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-slate-50 ring-1 ring-slate-100">
-            <item.icon
-              className="h-5 w-5 text-slate-800"
-              aria-hidden="true"
-            />
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-slate-50 text-slate-700">
+            <item.icon className="h-4.5 w-4.5" aria-hidden="true" />
           </div>
 
-          {/* Skill + progress */}
-          <div>
-            <div className="mb-1 flex items-center justify-between text-xs font-medium text-slate-700">
-              <span className="line-clamp-1">
-                {item.title}
-              </span>
-            </div>
-
-            <div className="h-2.5 overflow-hidden rounded-full bg-slate-100">
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-sm font-medium text-slate-700">{item.title}</p>
+            <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-slate-100">
               <div
-                className="h-full rounded-full shadow-sm transition-all duration-700"
-                style={{
-                  width: `${item.percent}%`,
-                  background: `linear-gradient(90deg, ${accent} 0%, ${accent}CC 55%, #ffffff 155%)`,
-                }}
+                className="h-full rounded-full transition-all duration-500"
+                style={{ width: `${item.percent}%`, backgroundColor: accent }}
               />
             </div>
           </div>
 
-          {/* Percent */}
-          <span className="rounded-full bg-slate-50 px-2 py-1 text-right text-xs font-semibold text-[#1565C0] ring-1 ring-slate-100">
+          <span className="shrink-0 text-sm font-semibold tabular-nums text-slate-700">
             {item.percent}%
           </span>
         </div>
@@ -531,10 +302,11 @@ function ProgressList({
 }
 
 // =====================================================
-// LEVEL GROUPS
+// LEVEL FILTER (tabs only — colors always follow the panel's own accent)
 // =====================================================
 
 type SkillLevel = "basic" | "intermediate" | "advanced";
+type ProgressTab = SkillLevel | "all";
 
 function normalizeSkillLevel(level?: string | null): SkillLevel {
   const value = (level || "").trim().toLowerCase();
@@ -561,181 +333,17 @@ function normalizeSkillLevel(level?: string | null): SkillLevel {
   return "basic";
 }
 
-const levelMeta: Record<
-  SkillLevel,
-  { label: string; shortLabel: string; description: string; accent: string }
-> = {
-  basic: {
-    label: "พื้นฐาน",
-    shortLabel: "พื้นฐาน",
-    description: "ทักษะระดับพื้นฐาน",
-    accent: "#4AA3D8",
-  },
-  intermediate: {
-    label: "กลาง",
-    shortLabel: "กลาง",
-    description: "ทักษะระดับกลาง",
-    accent: "#1565C0",
-  },
-  advanced: {
-    label: "สูง",
-    shortLabel: "สูง",
-    description: "ทักษะระดับสูง",
-    accent: "#0D47A1",
-  },
+const levelLabels: Record<ProgressTab, string> = {
+  all: "รวม",
+  basic: "พื้นฐาน",
+  intermediate: "กลาง",
+  advanced: "สูง",
 };
 
-type ProgressTab = SkillLevel | "all";
-
 // =====================================================
-// LEVEL RADAR
-// =====================================================
-
-function LevelRadarCard({
-  level,
-  items,
-  chartId,
-}: {
-  level: SkillLevel;
-  items: SkillProgressItem[];
-  chartId: string;
-}) {
-  const meta = levelMeta[level];
-  const average =
-    items.length > 0
-      ? Math.round(
-          items.reduce((total, item) => total + item.percent, 0) /
-            items.length,
-        )
-      : 0;
-
-  return (
-    <article className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
-      <div className="flex items-center justify-between gap-3 px-1">
-        <div>
-          <h3 className="text-sm font-semibold text-slate-950">
-            {meta.label}
-          </h3>
-          <p className="mt-0.5 text-[11px] text-slate-500">
-            {meta.description}
-          </p>
-        </div>
-        <span
-          className="rounded-full px-2.5 py-1 text-[11px] font-semibold text-white"
-          style={{ backgroundColor: meta.accent }}
-        >
-          {average}%
-        </span>
-      </div>
-
-      <div className="mt-3">
-        <RadarChart
-          accent={meta.accent}
-          values={
-            items.length >= 3
-              ? items.map((item) => item.percent)
-              : []
-          }
-          labels={items.map((item) => getRadarLabel(item.title))}
-          id={chartId}
-        />
-      </div>
-
-      <div className="mt-2 rounded-lg bg-slate-50 px-2 py-1.5 text-center text-[11px] text-slate-500">
-        {items.length > 0
-          ? `แสดง ${items.length} ทักษะในระดับนี้`
-          : "ยังไม่มีข้อมูลทักษะในระดับนี้"}
-      </div>
-    </article>
-  );
-}
-
-// =====================================================
-// SKILL BAR TABS
-// =====================================================
-
-function SkillBarSection({
-  items,
-  accent,
-}: {
-  items: SkillProgressItem[];
-  accent: string;
-}) {
-  const [activeTab, setActiveTab] = useState<ProgressTab>("all");
-
-  const tabItems = useMemo(() => {
-    if (activeTab === "all") return items;
-    return items.filter(
-      (item) => normalizeSkillLevel(item.level) === activeTab,
-    );
-  }, [activeTab, items]);
-
-  const counts = useMemo(
-    () => ({
-      basic: items.filter(
-        (item) => normalizeSkillLevel(item.level) === "basic",
-      ).length,
-      intermediate: items.filter(
-        (item) => normalizeSkillLevel(item.level) === "intermediate",
-      ).length,
-      advanced: items.filter(
-        (item) => normalizeSkillLevel(item.level) === "advanced",
-      ).length,
-      all: items.length,
-    }),
-    [items],
-  );
-
-  const tabs: Array<{ key: ProgressTab; label: string }> = [
-    { key: "basic", label: "พื้นฐาน" },
-    { key: "intermediate", label: "กลาง" },
-    { key: "advanced", label: "สูง" },
-    { key: "all", label: "รวม" },
-  ];
-
-  return (
-    <div className="mt-4 border-t border-slate-100 pt-4">
-      <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h3 className="text-sm font-semibold text-slate-900">
-            ระดับทักษะ
-          </h3>
-          <p className="mt-0.5 text-xs text-slate-500">
-            เลือกดูคะแนนทักษะตามระดับ หรือดูทั้งหมด
-          </p>
-        </div>
-
-        <div className="grid w-full grid-cols-4 overflow-hidden rounded-lg border border-slate-200 bg-slate-50 p-0.5 sm:w-auto">
-          {tabs.map((tab) => {
-            const active = activeTab === tab.key;
-            return (
-              <button
-                key={tab.key}
-                type="button"
-                onClick={() => setActiveTab(tab.key)}
-                className={`rounded-md px-2 py-1.5 text-[11px] font-semibold transition ${
-                  active
-                    ? "bg-white text-[#1565C0] shadow-sm ring-1 ring-blue-100"
-                    : "text-slate-500 hover:bg-white/70 hover:text-slate-700"
-                }`}
-              >
-                {tab.label}
-                <span className="ml-1 text-[10px] opacity-70">
-                  {counts[tab.key]}
-                </span>
-              </button>
-            );
-          })}
-        </div>
-      </div>
-
-      <ProgressList items={tabItems} accent={accent} />
-    </div>
-  );
-}
-
-// =====================================================
-// DASHBOARD PANEL
+// PANEL (header + tabs + radar + list)
+// accent is fixed for the whole panel — the radar and progress
+// bars always render in the panel's own color regardless of tab.
 // =====================================================
 
 function DashboardPanel({
@@ -751,68 +359,88 @@ function DashboardPanel({
   items: SkillProgressItem[];
   chartId: string;
 }) {
-  const levelItems = useMemo(
+  const [activeTab, setActiveTab] = useState<ProgressTab>("all");
+
+  const grouped = useMemo(
     () => ({
-      basic: items.filter(
-        (item) => normalizeSkillLevel(item.level) === "basic",
-      ),
+      basic: items.filter((item) => normalizeSkillLevel(item.level) === "basic"),
       intermediate: items.filter(
         (item) => normalizeSkillLevel(item.level) === "intermediate",
       ),
-      advanced: items.filter(
-        (item) => normalizeSkillLevel(item.level) === "advanced",
-      ),
+      advanced: items.filter((item) => normalizeSkillLevel(item.level) === "advanced"),
     }),
     [items],
   );
 
+  const visibleItems = activeTab === "all" ? items : grouped[activeTab];
+
+  const tabs: Array<{ key: ProgressTab; count: number }> = [
+    { key: "all", count: items.length },
+    { key: "basic", count: grouped.basic.length },
+    { key: "intermediate", count: grouped.intermediate.length },
+    { key: "advanced", count: grouped.advanced.length },
+  ];
+
   return (
-    <section className="overflow-hidden rounded-2xl border border-blue-100 bg-white shadow-[0_18px_50px_rgba(15,23,42,0.08)]">
-      <div className="border-b border-slate-100 bg-white px-4 py-4 sm:px-5">
-        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+    <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
+      {/* header */}
+      <div className="flex flex-col gap-3 border-b border-slate-100 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex items-start gap-3">
+          <span className="mt-1 h-8 w-1 shrink-0 rounded-full" style={{ backgroundColor: accent }} />
           <div>
-            <div className="flex items-center gap-3">
-              <span
-                className="h-9 w-1.5 rounded-full"
-                style={{ backgroundColor: accent }}
-              />
-              <div>
-                <h2 className="text-base font-semibold text-slate-950">
-                  {title}
-                </h2>
-                <p className="mt-1 text-xs text-slate-500">
-                  {subtitle}
-                </p>
-              </div>
+            <h2 className="text-base font-semibold text-slate-900">{title}</h2>
+            <p className="mt-0.5 text-xs text-slate-500">{subtitle}</p>
+          </div>
+        </div>
+
+        <span className="w-fit rounded-full bg-slate-50 px-3 py-1 text-xs font-semibold text-slate-600">
+          {items.length} ทักษะ
+        </span>
+      </div>
+
+      <div className="px-5 py-5">
+        {/* tabs */}
+        <div className="mb-5 flex flex-wrap gap-1.5">
+          {tabs.map((tab) => {
+            const active = activeTab === tab.key;
+            return (
+              <button
+                key={tab.key}
+                type="button"
+                onClick={() => setActiveTab(tab.key)}
+                className={`rounded-full px-3.5 py-1.5 text-xs font-semibold transition-colors ${
+                  active
+                    ? "text-white shadow-sm"
+                    : "bg-slate-50 text-slate-500 hover:bg-slate-100 hover:text-slate-700"
+                }`}
+                style={active ? { backgroundColor: accent } : undefined}
+              >
+                {levelLabels[tab.key]}
+                <span className="ml-1.5 opacity-70">{tab.count}</span>
+              </button>
+            );
+          })}
+        </div>
+
+        {/* radar + list — radar always uses the panel's fixed accent color */}
+        <div className="grid gap-6 lg:grid-cols-[280px_1fr]">
+          <div className="flex flex-col items-center gap-3 rounded-xl bg-slate-50/60 p-4">
+            <RadarChart
+              accent={accent}
+              values={visibleItems.length >= 3 ? visibleItems.map((item) => item.percent) : []}
+              labels={visibleItems.map((item) => getRadarLabel(item.title))}
+              id={`${chartId}-${activeTab}`}
+            />
+            <div className="text-center">
+              <p className="text-2xl font-semibold tabular-nums text-slate-900">
+                {averagePercent(visibleItems)}%
+              </p>
+              <p className="text-xs text-slate-500">คะแนนเฉลี่ยของหมวดนี้</p>
             </div>
           </div>
 
-          <span className="inline-flex w-fit items-center rounded-full bg-blue-50 px-3 py-1.5 text-xs font-semibold text-[#1565C0]">
-            {items.length} ทักษะ
-          </span>
+          <ProgressList items={visibleItems} accent={accent} />
         </div>
-      </div>
-
-      <div className="p-4 sm:p-5">
-        <div className="grid gap-3 sm:grid-cols-3">
-          <LevelRadarCard
-            level="basic"
-            items={levelItems.basic}
-            chartId={`${chartId}-basic`}
-          />
-          <LevelRadarCard
-            level="intermediate"
-            items={levelItems.intermediate}
-            chartId={`${chartId}-intermediate`}
-          />
-          <LevelRadarCard
-            level="advanced"
-            items={levelItems.advanced}
-            chartId={`${chartId}-advanced`}
-          />
-        </div>
-
-        <SkillBarSection items={items} accent={accent} />
       </div>
     </section>
   );
@@ -823,35 +451,13 @@ function DashboardPanel({
 // =====================================================
 
 export default function StudentDashboard() {
-  const {
-    user,
-    loading: authLoading,
-  } = useAuth();
+  const { user, loading: authLoading } = useAuth();
 
-  const [dashboard, setDashboard] =
-    useState<StudentDashboardData | null>(
-      null,
-    );
+  const [dashboard, setDashboard] = useState<StudentDashboardData | null>(null);
+  const [isLoadingDashboard, setIsLoadingDashboard] = useState(false);
+  const [error, setError] = useState("");
 
-  const [
-    isLoadingDashboard,
-    setIsLoadingDashboard,
-  ] = useState(false);
-
-  const [error, setError] =
-    useState("");
-
-  // ===================================================
-  // DISPLAY NAME
-  // ===================================================
-
-  const displayName = user
-    ? `${user.firstName} ${user.lastName}`.trim()
-    : "นิสิต";
-
-  // ===================================================
-  // LOAD DASHBOARD
-  // ===================================================
+  const displayName = user ? `${user.firstName} ${user.lastName}`.trim() : "นิสิต";
 
   useEffect(() => {
     if (!user?.studentId) {
@@ -859,213 +465,117 @@ export default function StudentDashboard() {
       return;
     }
 
-    const controller =
-      new AbortController();
-
+    const controller = new AbortController();
     setIsLoadingDashboard(true);
     setError("");
 
-    fetch(
-      `/api/students/${user.studentId}/dashboard`,
-      {
-        signal: controller.signal,
-      },
-    )
+    fetch(`/api/students/${user.studentId}/dashboard`, { signal: controller.signal })
       .then(async (response) => {
-        const data =
-          await response
-            .json()
-            .catch(() => ({}));
+        const data = await response.json().catch(() => ({}));
 
         if (!response.ok) {
-          throw new Error(
-            data.message ||
-              "ไม่สามารถโหลดข้อมูลคะแนนนิสิตได้",
-          );
+          throw new Error(data.message || "ไม่สามารถโหลดข้อมูลคะแนนนิสิตได้");
         }
-
-        console.log(
-          "Dashboard data:",
-          data,
-        );
 
         setDashboard(data);
       })
       .catch((fetchError) => {
-        if (
-          fetchError instanceof DOMException &&
-          fetchError.name ===
-            "AbortError"
-        ) {
-          return;
-        }
+        if (fetchError instanceof DOMException && fetchError.name === "AbortError") return;
 
         setError(
           fetchError instanceof Error
             ? fetchError.message
             : "ไม่สามารถโหลดข้อมูลคะแนนนิสิตได้",
         );
-
         setDashboard(null);
       })
-      .finally(() =>
-        setIsLoadingDashboard(false),
-      );
+      .finally(() => setIsLoadingDashboard(false));
 
-    return () =>
-      controller.abort();
+    return () => controller.abort();
   }, [user?.studentId]);
 
-  // ===================================================
-  // SKILL GROUPS
-  // ===================================================
-
-  const {
-    facultySkillProgress,
-    essentialSkillProgress,
-  } = useMemo(() => {
-    const skills =
-      dashboard?.skills.map(
-        toProgressItem,
-      ) ?? [];
-
-    const facultyItems =
-      skills.filter((skill) =>
-        isFacultySkill(skill.title),
-      );
-
-    const essentialItems =
-      skills.filter(
-        (skill) =>
-          !isFacultySkill(
-            skill.title,
-          ),
-      );
-
+  const { facultySkillProgress, essentialSkillProgress } = useMemo(() => {
+    const skills = dashboard?.skills.map(toProgressItem) ?? [];
     return {
-      facultySkillProgress:
-        facultyItems,
-      essentialSkillProgress:
-        essentialItems,
+      facultySkillProgress: skills.filter((skill) => isFacultySkill(skill.title)),
+      essentialSkillProgress: skills.filter((skill) => !isFacultySkill(skill.title)),
     };
   }, [dashboard]);
 
-  // ===================================================
-  // SUMMARY
-  // ===================================================
+  const summary = dashboard?.summary ?? {
+    earnedSkillCount: 0,
+    totalSkillCount: 0,
+    participatedActivities: 0,
+    totalHours: 0,
+    certificates: 0,
+    overallPercent: 0,
+  };
 
-  const summary =
-    dashboard?.summary ?? {
-      earnedSkillCount: 0,
-      totalSkillCount: 0,
-      participatedActivities: 0,
-      totalHours: 0,
-      certificates: 0,
-      overallPercent: 0,
-    };
-
-  // ===================================================
-  // SUMMARY CARDS
-  // ===================================================
-
-  const summaryCards = [
+  const summaryCards: Array<{
+    icon: LucideIcon;
+    value: string;
+    label: string;
+    description: string;
+  }> = [
     {
       icon: Star,
-      value: String(
-        summary.earnedSkillCount,
-      ),
+      value: String(summary.earnedSkillCount),
       label: "ทักษะที่ได้รับ",
       description: `จากทั้งหมด ${summary.totalSkillCount} ทักษะ`,
-      iconClassName:
-        "bg-gradient-to-br from-[#1565C0] to-[#0D47A1] text-white",
     },
-
     {
       icon: CalendarDays,
-      value: String(
-        summary.participatedActivities,
-      ),
+      value: String(summary.participatedActivities),
       label: "กิจกรรมที่เข้าร่วม",
       description: `${summary.totalHours} ชั่วโมงรวม`,
-      iconClassName:
-        "bg-gradient-to-br from-[#FFC107] to-[#FF9800] text-slate-950",
     },
-
     {
       icon: FileBadge,
-      value: String(
-        summary.certificates,
-      ),
+      value: String(summary.certificates),
       label: "ใบรับรองที่ได้รับ",
-      description:
-        "อ้างอิงจากกิจกรรมที่เข้าร่วม",
-      iconClassName:
-        "bg-gradient-to-br from-[#4AA3D8] to-[#1565C0] text-white",
+      description: "อ้างอิงจากกิจกรรมที่เข้าร่วม",
     },
   ];
 
-  // ===================================================
-  // RENDER
-  // ===================================================
-
   return (
     <StudentShell activePath="/student/dashboard">
-      <section className="mx-auto w-full max-w-6xl space-y-4 p-3 sm:space-y-5 sm:p-5">
-        {/* ================================================= */}
-        {/* HERO */}
-        {/* ================================================= */}
+      <section className="mx-auto w-full max-w-6xl space-y-5 p-4 sm:p-6">
+        {/* ================= HERO ================= */}
+        <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-[#0D47A1] to-[#1565C0] px-6 py-7 text-white sm:px-8 sm:py-9">
+          <div className="pointer-events-none absolute -right-20 -top-24 h-64 w-64 rounded-full bg-[#FFC107]/20 blur-3xl" />
 
-        <div className="relative overflow-hidden rounded-xl bg-gradient-to-r from-[#0D47A1] via-[#1565C0] to-[#4AA3D8] p-4 text-white shadow-[0_22px_60px_rgba(13,71,161,0.24)] lg:grid lg:grid-cols-[1fr_280px] lg:items-center lg:p-6">
-          <div className="absolute -right-16 -top-20 h-56 w-56 rounded-full bg-[#FFC107]/20 blur-3xl" />
+          <div className="relative flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
+            <div>
+              <p className="inline-flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-1 text-xs font-medium text-blue-50">
+                <Sparkles className="h-3.5 w-3.5 text-[#FFC107]" aria-hidden="true" />
+                Skill Transcript Dashboard
+              </p>
 
-          <div className="absolute bottom-0 right-0 h-32 w-72 bg-white/10 blur-3xl" />
+              <h1 className="mt-3 text-2xl font-semibold sm:text-3xl">
+                สวัสดี, {displayName}
+              </h1>
 
-          <div className="relative">
-            <p className="inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1 text-xs font-medium text-blue-50 ring-1 ring-white/20">
-              <Sparkles
-                className="h-4 w-4 text-[#FFC107]"
-                aria-hidden="true"
-              />
-
-              Skill Transcript Dashboard
-            </p>
-
-            <h1 className="mt-3 flex items-center gap-2 text-2xl font-semibold leading-tight sm:text-3xl">
-              สวัสดี, {displayName}
-            </h1>
-
-            <p className="mt-2 max-w-2xl text-xs leading-6 text-blue-50">
-              แสดงคะแนนทักษะและกิจกรรมจากฐานข้อมูลของนิสิตที่เข้าสู่ระบบอยู่ในขณะนี้
-            </p>
+              <p className="mt-2 max-w-lg text-sm leading-6 text-blue-50/90">
+                ภาพรวมคะแนนทักษะและกิจกรรมของคุณ อัปเดตล่าสุดจากฐานข้อมูลระบบ
+              </p>
+            </div>
 
             <Link
               href="/student/skilltranscript"
-              className="mt-3 inline-flex items-center gap-2 rounded-lg bg-white px-4 py-2.5 text-sm font-semibold text-[#1565C0] shadow-lg shadow-blue-950/10 transition hover:-translate-y-0.5 hover:bg-blue-50"
+              className="inline-flex w-fit items-center gap-2 rounded-lg bg-white px-4 py-2.5 text-sm font-semibold text-[#1565C0] transition hover:bg-blue-50"
             >
               ดู Skill Transcript ของฉัน
-
-              <Award
-                className="h-4 w-4"
-                aria-hidden="true"
-              />
+              <Award className="h-4 w-4" aria-hidden="true" />
             </Link>
           </div>
         </div>
 
-        {/* ================================================= */}
-        {/* LOADING */}
-        {/* ================================================= */}
-
-        {(authLoading ||
-          isLoadingDashboard) && (
+        {/* ================= STATUS MESSAGES ================= */}
+        {(authLoading || isLoadingDashboard) && (
           <div className="rounded-xl border border-blue-100 bg-blue-50 px-4 py-3 text-sm text-[#1565C0]">
             กำลังโหลดข้อมูลคะแนนจากฐานข้อมูล...
           </div>
         )}
-
-        {/* ================================================= */}
-        {/* ERROR */}
-        {/* ================================================= */}
 
         {error && (
           <div className="rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-600">
@@ -1073,58 +583,30 @@ export default function StudentDashboard() {
           </div>
         )}
 
-        {/* ================================================= */}
-        {/* NO USER */}
-        {/* ================================================= */}
-
         {!authLoading && !user && (
           <div className="rounded-xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-600">
             ไม่พบข้อมูลนิสิต กรุณาเข้าสู่ระบบอีกครั้ง
           </div>
         )}
 
-        {/* ================================================= */}
-        {/* SUMMARY CARDS */}
-        {/* ================================================= */}
-
+        {/* ================= SUMMARY CARDS ================= */}
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-          {summaryCards.map(
-            (card) => (
-              <article
-                key={card.label}
-                className="group flex items-center gap-3 rounded-xl border border-blue-100 bg-white/90 p-4 shadow-sm transition duration-300 hover:-translate-y-1 hover:border-blue-200 hover:shadow-[0_18px_48px_rgba(15,23,42,0.1)]"
-              >
-                <div
-                  className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl shadow-sm transition group-hover:scale-105 ${card.iconClassName}`}
-                >
-                  <card.icon
-                    className="h-5 w-5"
-                    aria-hidden="true"
-                  />
-                </div>
+          {summaryCards.map((card) => (
+            <article key={card.label} className="rounded-xl border border-slate-200 bg-white p-4">
+              <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-slate-50 text-[#1565C0]">
+                <card.icon className="h-4.5 w-4.5" aria-hidden="true" />
+              </div>
 
-                <div>
-                  <p className="text-sm font-medium text-slate-700">
-                    {card.label}
-                  </p>
-
-                  <p className="text-3xl font-semibold text-slate-950">
-                    {card.value}
-                  </p>
-
-                  <p className="text-xs text-slate-500">
-                    {card.description}
-                  </p>
-                </div>
-              </article>
-            ),
-          )}
+              <p className="mt-3 text-2xl font-semibold tabular-nums text-slate-900">
+                {card.value}
+              </p>
+              <p className="text-sm font-medium text-slate-700">{card.label}</p>
+              <p className="text-xs text-slate-500">{card.description}</p>
+            </article>
+          ))}
         </div>
 
-        {/* ================================================= */}
-        {/* FACULTY SKILLS */}
-        {/* ================================================= */}
-
+        {/* ================= PANELS ================= */}
         <DashboardPanel
           title="ทักษะของนิสิตคณะวิทยาศาสตร์ต้องมี"
           subtitle="คำนวณจากกิจกรรมและชั่วโมงที่นิสิตเข้าร่วมในฐานข้อมูล"
@@ -1132,10 +614,6 @@ export default function StudentDashboard() {
           items={facultySkillProgress}
           chartId="faculty-skill-chart"
         />
-
-        {/* ================================================= */}
-        {/* ESSENTIAL SKILLS */}
-        {/* ================================================= */}
 
         <DashboardPanel
           title="ทักษะที่จำเป็นสำหรับนิสิต"
