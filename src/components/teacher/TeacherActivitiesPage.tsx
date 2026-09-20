@@ -1311,10 +1311,8 @@ export default function StaffActivitiesPage() {
 
   // แบ่งกิจกรรมเป็น 3 มุมมองหลัก โดยเน้นกิจกรรมที่เจ้าหน้าที่บัญชีปัจจุบันเป็นผู้สร้าง
   const activityCategories: Array<{ key: ActivityCategory; label: string }> = [
-    { key: "all", label: "กิจกรรมทั้งหมด" },
     { key: "mine", label: "กิจกรรมที่สร้างโดยฉัน" },
     { key: "past", label: "กิจกรรมที่สิ้นสุดแล้ว" },
-    { key: "external", label: "กิจกรรมที่นิสิตขอเพิ่ม" },
   ];
 
   const matchesActivityCategory = useCallback(
