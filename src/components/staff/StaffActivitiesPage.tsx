@@ -1938,93 +1938,6 @@ export default function StaffActivitiesPage() {
     }
   };
 
-  const showVerificationCode = async (activityId: string) => {
-    const activity = activities.find((a) => a.id === activityId);
-    if (!activity) return;
-    if (activity.verificationCode) {
-      setModalActivityId(activityId);
-      setShowCodeModal(true);
-      return;
-    }
-    setGeneratingId(activityId);
-    try {
-      const res = await fetch(`/api/activities/${activityId}/generate-code`, {
-        method: "POST",
-      });
-      if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.message || "สร้างรหัสไม่สำเร็จ");
-      }
-      const data = await res.json();
-      setActivities((prev) =>
-        prev.map((a) =>
-          a.id === activityId
-            ? {
-                ...a,
-                verificationCode: data.code,
-                codeExpiresAt: data.expiresAt,
-              }
-            : a,
-        ),
-      );
-      setModalActivityId(activityId);
-      setShowCodeModal(true);
-    } catch (err) {
-      alert(err instanceof Error ? err.message : "เกิดข้อผิดพลาด");
-    } finally {
-      setGeneratingId(null);
-    }
-  };
-
-  const regenerateCode = async () => {
-    if (!modalActivityId) return;
-    setIsRegenerating(true);
-    try {
-      const res = await fetch(
-        `/api/activities/${modalActivityId}/generate-code`,
-        { method: "POST" },
-      );
-      if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.message || "สร้างรหัสไม่สำเร็จ");
-      }
-      const data = await res.json();
-      setActivities((prev) =>
-        prev.map((a) =>
-          a.id === modalActivityId
-            ? {
-                ...a,
-                verificationCode: data.code,
-                codeExpiresAt: data.expiresAt,
-              }
-            : a,
-        ),
-      );
-    } catch (err) {
-      alert(err instanceof Error ? err.message : "เกิดข้อผิดพลาด");
-    } finally {
-      setIsRegenerating(false);
-    }
-  };
-
-  const handleViewParticipants = async (activityId: string) => {
-    setSelectedParticipantActivityId(activityId);
-    setShowParticipantsModal(true);
-    setLoadingParticipants(true);
-    try {
-      const res = await fetch(`/api/activities/${activityId}/participants`);
-      if (!res.ok) throw new Error("ไม่สามารถโหลดรายชื่อผู้เข้าร่วม");
-      const data = await res.json();
-      setParticipants(data);
-    } catch (err) {
-      alert(err instanceof Error ? err.message : "เกิดข้อผิดพลาด");
-      setParticipants([]);
-    } finally {
-      setLoadingParticipants(false);
-    }
-  };
-
-  // ---------- แก้ไขกิจกรรม ----------
   const handleEdit = (activity: StaffActivity) => {
     setEditingActivity(activity);
 
@@ -2236,10 +2149,6 @@ export default function StaffActivitiesPage() {
     setEditForm((prev) => ({ ...prev, templateId }));
   };
 
-  const modalActivity = modalActivityId
-    ? activities.find((a) => a.id === modalActivityId)
-    : null;
-
   const formatActivityHours = (hours: number | null | undefined): string => {
     if (hours === null || hours === undefined || hours === 0) return "";
     const h = Math.floor(hours);
@@ -2356,13 +2265,7 @@ export default function StaffActivitiesPage() {
                         </div>
 
                         <div className="flex items-center gap-2">
-                          <ActionButton
-                            icon={KeyRound}
-                            label={generatingId === activity.id ? "กำลังสร้าง..." : "รหัสยืนยัน"}
-                            onClick={() => showVerificationCode(activity.id)}
-                            disabled={generatingId === activity.id}
-                          />
-                          <ActionButton
+                              <ActionButton
                             icon={Edit}
                             label="แก้ไข"
                             onClick={() => handleEdit(activity)}
@@ -2458,21 +2361,6 @@ export default function StaffActivitiesPage() {
                             </button>
                           )}
 
-                          {activity.verificationCode && activity.confirmationEnabled && (
-                            <span className="inline-flex items-center gap-1.5 text-emerald-600">
-                              <KeyRound className="h-3.5 w-3.5" />
-                              รหัสเดิม:
-                              <span className="font-mono font-semibold">
-                                {activity.verificationCode}
-                              </span>
-                              (เปิดอยู่)
-                            </span>
-                          )}
-                          {activity.verificationCode && !activity.confirmationEnabled && (
-                            <span className="inline-flex items-center gap-1.5 text-slate-400">
-                              <KeyRound className="h-3.5 w-3.5" /> รหัสถูกซ่อน (ปิดการมองเห็น)
-                            </span>
-                          )}
                         </div>
                       )}
 
@@ -2606,18 +2494,6 @@ export default function StaffActivitiesPage() {
       )}
 
       {/* Modal แสดงรหัสยืนยัน */}
-      {showCodeModal && modalActivity && (
-        <VerificationCodeModal
-          code={modalActivity.verificationCode || ""}
-          expiresAt={modalActivity.codeExpiresAt || new Date().toISOString()}
-          onClose={() => {
-            setShowCodeModal(false);
-            setModalActivityId(null);
-          }}
-          onRegenerate={regenerateCode}
-          isRegenerating={isRegenerating}
-        />
-      )}
 
       {/* Modal สแกน QR นิสิต */}
       {scanActivity && (
