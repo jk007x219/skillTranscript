@@ -1621,15 +1621,22 @@ const updateWorkflow = async (
       if (!form.registrationStart || !form.registrationEnd) {
         throw new Error("กรุณาระบุช่วงเวลาลงทะเบียน");
       }
-      const registrationStartObj = new Date(form.registrationStart);
-      const registrationEndObj = new Date(form.registrationEnd);
-
-      if (registrationEndObj <= registrationStartObj) {
+      // datetime-local อยู่ในรูป YYYY-MM-DDTHH:mm
+      // เปรียบเทียบเป็นค่าข้อความเพื่อไม่ให้ timezone ของเครื่องผู้ใช้
+      // ทำให้วันที่/เวลาเดียวกันคลาดเคลื่อน
+      if (form.registrationEnd <= form.registrationStart) {
         throw new Error("เวลาสิ้นสุดลงทะเบียนต้องอยู่หลังเวลาเริ่มลงทะเบียน");
       }
 
-      if (registrationStartObj > endDateObj || registrationEndObj > endDateObj) {
-        throw new Error("ช่วงเวลาลงทะเบียนต้องอยู่ภายในช่วงเวลาของกิจกรรม และห้ามเกินเวลาสิ้นสุดกิจกรรม");
+      // อนุญาตให้ลงทะเบียนก่อนเริ่มกิจกรรม หรือระหว่างกิจกรรมได้
+      // แต่ห้ามเกินเวลาสิ้นสุดกิจกรรม
+      if (
+        form.registrationStart > endDateTime ||
+        form.registrationEnd > endDateTime
+      ) {
+        throw new Error(
+          "ช่วงเวลาลงทะเบียนต้องอยู่ภายในช่วงเวลาของกิจกรรม และห้ามเกินเวลาสิ้นสุดกิจกรรม",
+        );
       }
 
       const payload = {
@@ -1718,15 +1725,22 @@ const updateWorkflow = async (
       if (!editForm.registrationStart || !editForm.registrationEnd) {
         throw new Error("กรุณาระบุช่วงเวลาลงทะเบียน");
       }
-      const registrationStartObj = new Date(editForm.registrationStart);
-      const registrationEndObj = new Date(editForm.registrationEnd);
-
-      if (registrationEndObj <= registrationStartObj) {
+      // datetime-local อยู่ในรูป YYYY-MM-DDTHH:mm
+      // เปรียบเทียบเป็นค่าข้อความเพื่อไม่ให้ timezone ของเครื่องผู้ใช้
+      // ทำให้วันที่/เวลาเดียวกันคลาดเคลื่อน
+      if (editForm.registrationEnd <= editForm.registrationStart) {
         throw new Error("เวลาสิ้นสุดลงทะเบียนต้องอยู่หลังเวลาเริ่มลงทะเบียน");
       }
 
-      if (registrationStartObj > endDateObj || registrationEndObj > endDateObj) {
-        throw new Error("ช่วงเวลาลงทะเบียนต้องอยู่ภายในช่วงเวลาของกิจกรรม และห้ามเกินเวลาสิ้นสุดกิจกรรม");
+      // อนุญาตให้ลงทะเบียนก่อนเริ่มกิจกรรม หรือระหว่างกิจกรรมได้
+      // แต่ห้ามเกินเวลาสิ้นสุดกิจกรรม
+      if (
+        editForm.registrationStart > endDateTime ||
+        editForm.registrationEnd > endDateTime
+      ) {
+        throw new Error(
+          "ช่วงเวลาลงทะเบียนต้องอยู่ภายในช่วงเวลาของกิจกรรม และห้ามเกินเวลาสิ้นสุดกิจกรรม",
+        );
       }
 
       const updatedSkills = editForm.selectedSkills.map((skill) => {
