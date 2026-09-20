@@ -692,6 +692,9 @@ export async function GET(request: NextRequest) {
                 0,
             ),
 
+          capacity:
+            Number(act.capacity ?? 0),
+
           hasConfirmedParticipants:
             Boolean(
               act.hasConfirmedParticipants,
@@ -850,6 +853,7 @@ export async function POST(
 ) {
   try {
     await ensureActivityRegistrationColumns();
+    await ensureActivityCapacityColumn();
 
     const session = await auth();
 
