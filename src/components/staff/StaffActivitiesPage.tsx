@@ -1966,6 +1966,7 @@ const updateWorkflow = async (
       term: activity.term,
       location: activity.location,
       organizer: activity.organizer || "คณะวิทยาศาสตร์และนวัตกรรมดิจิทัล",
+      capacity: String(activity.capacity ?? 30),
 
       selectedSkills: activity.skills.map((skill) => ({
         skillId: skill.skillId || "",
