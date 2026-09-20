@@ -105,6 +105,7 @@ type StaffActivity = {
   location: string;
   organizer: string;
   attendeeCount: number;
+  evaluationCompletedCount: number;
   capacity: number;
   hasConfirmedParticipants?: boolean;
   confirmationEnabled: boolean;
@@ -2262,7 +2263,7 @@ const updateWorkflow = async (
                 filteredActivities.map((activity) => (
                   <article
                     key={activity.id}
-                    className="grid gap-0 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-[0_6px_20px_rgba(15,23,42,0.05)] transition-shadow hover:shadow-[0_10px_28px_rgba(15,23,42,0.08)] lg:grid-cols-3 xl:grid-cols-[2fr_1.1fr_0.7fr_0.95fr_1.05fr_1.1fr]"
+                    className="grid gap-0 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-[0_6px_20px_rgba(15,23,42,0.05)] transition-shadow hover:shadow-[0_10px_28px_rgba(15,23,42,0.08)] lg:grid-cols-3 xl:grid-cols-[2fr_1.05fr_1fr_1fr_1fr]"
                   >
                     <div className="flex min-h-[150px] flex-col justify-start border-b border-slate-100 p-5 lg:border-b-0 lg:border-r xl:p-5">
                       <h2 className="text-base font-semibold leading-6 text-slate-950">
@@ -2385,19 +2386,64 @@ const updateWorkflow = async (
                     </div>
 
                     <div className="border-b border-slate-100 p-5 lg:border-b-0 lg:border-r xl:p-5">
-                      <p className="mb-5 text-sm font-bold text-slate-950">
-                        รายชื่อ (คน)
+                      <p className="mb-2 text-sm font-bold text-slate-950">
+                        เปิดรับสมัคร
                       </p>
-                      <p className="text-sm text-slate-700">
-                        {activity.attendeeCount > 0 && (
-                          <button
-                            type="button"
-                            onClick={() => handleViewParticipants(activity.id)}
-                            className="mr-3 text-[#1565C0] underline underline-offset-2 hover:text-[#0D47A1]"
-                          >
-                            {activity.attendeeCount}
-                          </button>
-                        )}
+                      <p className="text-lg font-semibold text-slate-900">
+                        {activity.attendeeCount}/{activity.capacity} คน
+                      </p>
+                      <p className="mt-1 text-xs text-slate-500">
+                        สมัครแล้ว / จำนวนที่รับ
+                      </p>
+                      <ToggleSwitch
+                        enabled={Boolean(activity.applicationEnabled)}
+                        onClick={() => updateWorkflow(activity.id, "applicationEnabled")}
+                      />
+                      <p className="mt-1 text-xs text-slate-500">
+                        {activity.applicationEnabled ? "เปิดรับสมัครอยู่" : "ปิดรับสมัคร"}
+                      </p>
+                    </div>
+
+                    <div className="border-b border-slate-100 p-5 lg:border-b-0 lg:border-r xl:p-5">
+                      <p className="mb-2 text-sm font-bold text-slate-950">
+                        ลงทะเบียนนิสิต
+                      </p>
+                      <p className="text-lg font-semibold text-slate-900">
+                        {activity.attendeeCount} คน
+                      </p>
+                      <p className="mt-1 text-xs text-slate-500">
+                        จำนวนผู้ลงทะเบียนเข้าร่วม
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() => openScanModal(activity)}
+                        className="mt-3 inline-flex h-9 w-full items-center justify-center gap-2 rounded-lg border border-[#1565C0] bg-white px-3 text-xs font-semibold text-[#1565C0] transition hover:bg-blue-50"
+                      >
+                        <QrCode className="h-4 w-4" />
+                        สแกน QR นิสิต
+                      </button>
+                    </div>
+
+                    {!isExternalActivity(activity) && (
+                      <div className="border-blue-100 lg:border-l p-5">
+                        <p className="mb-2 text-sm font-bold text-slate-950">
+                          เปิด/ปิดแบบประเมิน
+                        </p>
+                        <p className="text-lg font-semibold text-slate-900">
+                          {activity.evaluationCompletedCount} คน
+                        </p>
+                        <p className="mt-1 text-xs text-slate-500">
+                          ทำแบบประเมินแล้ว
+                        </p>
+                        <ToggleSwitch
+                          enabled={activity.confirmationEnabled}
+                          onClick={() => updateConfirmation(activity.id)}
+                        />
+                        <p className="mt-1 text-xs text-slate-500">
+                          {activity.confirmationEnabled ? "เปิดแบบประเมิน" : "ปิดแบบประเมิน"}
+                        </p>
+                      </div>
+                    )}
                         คน
                       </p>
                     </div>
