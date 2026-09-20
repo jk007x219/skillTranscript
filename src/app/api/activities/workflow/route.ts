@@ -27,6 +27,7 @@ export async function GET() {
               a.location, a.organizer, a.term, a.status, a.hasEvaluation,
               a.applicationEnabled, a.registrationEnabled, a.confirmationEnabled,
               a.registrationStart, a.registrationEnd, a.capacity,
+              (SELECT COUNT(*) FROM participation pc WHERE pc.activityId = a.activityId) AS applicantCount,
               COALESCE(p.status, NULL) AS participationStatus,
               p.registrationQrToken
        FROM activity a
