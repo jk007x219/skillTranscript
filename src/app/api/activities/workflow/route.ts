@@ -121,7 +121,6 @@ export async function PUT(request: NextRequest) {
     const activity = activities[0];
     if (!activity) throw httpError(404, "ไม่พบกิจกรรม");
     if (session.user.role === "teacher" && !session.user.isExecutive && activity.createdBy !== session.user.id) throw httpError(403, "คุณจัดการได้เฉพาะกิจกรรมที่สร้างเอง");
-    if (field === "registrationEnabled" && value && !activity.applicationEnabled) throw httpError(400, "ต้องเปิดรับสมัครก่อน จึงจะเปิดรับลงทะเบียนได้");
     if (field === "confirmationEnabled" && value && !activity.hasEvaluation) throw httpError(400, "ต้องสร้างแบบประเมินก่อน จึงจะเปิดแบบประเมินกิจกรรมได้");
     await pool.query(`UPDATE activity SET ${field} = ? WHERE activityId = ?`, [value ? 1 : 0, activityId]);
     const [updated] = await pool.query<any[]>(`SELECT activityId, applicationEnabled, registrationEnabled, confirmationEnabled FROM activity WHERE activityId = ? LIMIT 1`, [activityId]);
