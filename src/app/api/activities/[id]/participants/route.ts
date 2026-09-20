@@ -22,11 +22,18 @@ export async function GET(request: NextRequest, context: RouteContext) {
          p.status,
          CASE
            WHEN COALESCE(SUM(ps.maxScore), 0) > 0
-             THEN ROUND((COALESCE(SUM(ps.earnedScore), 0) / SUM(ps.maxScore)) * 100, 2)
+             THEN ROUND(COALESCE(SUM(ps.earnedScore), 0), 2)
            WHEN p.score IS NOT NULL
-             THEN ROUND(LEAST(GREATEST(p.score, 0), 1) * 100, 2)
+             THEN ROUND(LEAST(GREATEST(p.score, 0), 1) * 10, 2)
            ELSE NULL
-         END AS score
+         END AS earnedScore,
+         CASE
+           WHEN COALESCE(SUM(ps.maxScore), 0) > 0
+             THEN ROUND(SUM(ps.maxScore), 2)
+           WHEN p.score IS NOT NULL
+             THEN 10
+           ELSE NULL
+         END AS maxScore
        FROM participation p
        JOIN students s ON p.studentId = s.studentId
        LEFT JOIN participation_skill ps ON ps.participationId = p.ParticipationId
