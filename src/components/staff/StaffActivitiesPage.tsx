@@ -105,6 +105,7 @@ type StaffActivity = {
   location: string;
   organizer: string;
   attendeeCount: number;
+  registeredCount: number;
   evaluationCompletedCount: number;
   capacity: number;
   hasConfirmedParticipants?: boolean;
