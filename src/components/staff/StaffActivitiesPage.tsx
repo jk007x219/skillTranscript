@@ -63,7 +63,7 @@ declare global {
 }
 
 type ActivityStatus = "active" | "past";
-type ActivityCategory = "running" | "application" | "registration" | "closed" | "past";
+type ActivityCategory = "all" | "ongoing" | "past";
 
 type ActivitySkill = {
   skillId?: string;
@@ -1160,7 +1160,7 @@ export default function StaffActivitiesPage() {
   const [activities, setActivities] = useState<StaffActivity[]>([]);
   const [skillOptions, setSkillOptions] = useState<SkillOption[]>([]);
   const [templates, setTemplates] = useState<Template[]>([]);
-  const [activeTab, setActiveTab] = useState<ActivityCategory>("running");
+  const [activeTab, setActiveTab] = useState<ActivityCategory>("ongoing");
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [form, setForm] = useState<ActivityForm>(emptyForm);
   const [evaluationActivity, setEvaluationActivity] =
@@ -1248,42 +1248,41 @@ export default function StaffActivitiesPage() {
     fetchActivities();
   }, [fetchSkills, fetchTemplates, fetchActivities]);
 
+  // แบ่งกิจกรรมเป็น 3 มุมมองหลัก เพื่อลดความซับซ้อนของแถบนำทาง
   const activityCategories: Array<{ key: ActivityCategory; label: string }> = [
-    { key: "running", label: "กิจกรรมที่กำลังดำเนิน" },
-    { key: "application", label: "กิจกรรมที่เปิดรับ" },
-    { key: "registration", label: "กิจกรรมที่เปิดลงทะเบียน" },
-    { key: "closed", label: "กิจกรรมที่ปิดลงทะเบียน" },
-    { key: "past", label: "กิจกรรมที่เคยจัด" },
+    { key: "all", label: "กิจกรรมทั้งหมด" },
+    { key: "ongoing", label: "กำลังดำเนินการ" },
+    { key: "past", label: "เคยจัดแล้ว" },
   ];
 
-  const matchesActivityCategory = useCallback((activity: StaffActivity, category: ActivityCategory) => {
-    const past = isActivityPast(activity);
-    if (category === "past") return past;
-    if (past) return false;
-    if (category === "running") {
-      return Boolean(
-        !activity.applicationEnabled &&
-          !activity.registrationEnabled &&
-          !activity.confirmationEnabled,
-      );
-    }
-    if (category === "application") {
-      return Boolean(activity.applicationEnabled && !activity.registrationEnabled && !activity.confirmationEnabled);
-    }
-    if (category === "registration") return Boolean(activity.registrationEnabled);
-    return Boolean(!activity.registrationEnabled && activity.confirmationEnabled);
-  }, []);
+  const matchesActivityCategory = useCallback(
+    (activity: StaffActivity, category: ActivityCategory) => {
+      const past = isActivityPast(activity);
+      if (category === "past") return past;
+      if (category === "ongoing") return !past;
+      return true;
+    },
+    [],
+  );
 
   const filteredActivities = useMemo(
-    () => activities.filter((activity) => matchesActivityCategory(activity, activeTab)),
+    () =>
+      activities.filter((activity) =>
+        matchesActivityCategory(activity, activeTab),
+      ),
     [activities, activeTab, matchesActivityCategory],
   );
 
   const categoryCounts = useMemo(() => {
-    return activityCategories.reduce<Record<ActivityCategory, number>>((counts, category) => {
-      counts[category.key] = activities.filter((activity) => matchesActivityCategory(activity, category.key)).length;
-      return counts;
-    }, { running: 0, application: 0, registration: 0, closed: 0, past: 0 });
+    return activityCategories.reduce<Record<ActivityCategory, number>>(
+      (counts, category) => {
+        counts[category.key] = activities.filter((activity) =>
+          matchesActivityCategory(activity, category.key),
+        ).length;
+        return counts;
+      },
+      { all: 0, ongoing: 0, past: 0 },
+    );
   }, [activities, matchesActivityCategory]);
 
   // ---------- กิจกรรม ----------
@@ -2095,27 +2094,42 @@ const updateWorkflow = async (
             <Plus className="h-5 w-5" /> เพิ่มกิจกรรมใหม่
           </button>
 
-          <div className="mt-5 overflow-x-auto border-b border-blue-100">
-            <div className="flex min-w-max gap-6">
-              {activityCategories.map((category) => (
-                <button
-                  key={category.key}
-                  type="button"
-                  onClick={() => setActiveTab(category.key)}
-                  className={`relative pb-3 text-sm font-semibold transition ${
-                    activeTab === category.key
-                      ? "text-[#1565C0]"
-                      : "text-slate-500 hover:text-slate-800"
-                  }`}
-                >
-                  {category.label}
-                  <span className="ml-1.5 text-xs text-slate-400">{categoryCounts[category.key]}</span>
-                  {activeTab === category.key && (
-                    <span className="absolute inset-x-0 -bottom-px h-0.5 rounded-full bg-[#1565C0]" />
-                  )}
-                </button>
-              ))}
-            </div>
+          <div className="mt-8 border-b border-slate-200">
+            <nav
+              className="flex gap-1 overflow-x-auto"
+              aria-label="ตัวกรองกิจกรรม"
+            >
+              {activityCategories.map((category) => {
+                const isActive = activeTab === category.key;
+                return (
+                  <button
+                    key={category.key}
+                    type="button"
+                    onClick={() => setActiveTab(category.key)}
+                    aria-current={isActive ? "page" : undefined}
+                    className={`relative whitespace-nowrap rounded-t-lg px-5 py-3 text-sm font-semibold transition-colors ${
+                      isActive
+                        ? "bg-blue-50 text-[#1565C0]"
+                        : "text-slate-500 hover:bg-slate-50 hover:text-slate-800"
+                    }`}
+                  >
+                    {category.label}
+                    <span
+                      className={`ml-2 inline-flex min-w-5 items-center justify-center rounded-full px-1.5 py-0.5 text-[11px] font-medium ${
+                        isActive
+                          ? "bg-[#1565C0] text-white"
+                          : "bg-slate-100 text-slate-500"
+                      }`}
+                    >
+                      {categoryCounts[category.key]}
+                    </span>
+                    {isActive && (
+                      <span className="absolute inset-x-3 -bottom-px h-0.5 rounded-full bg-[#1565C0]" />
+                    )}
+                  </button>
+                );
+              })}
+            </nav>
           </div>
 
           {loading ? (
