@@ -433,6 +433,22 @@ export async function GET(request: NextRequest) {
 
         COUNT(p.ParticipationId) AS attendeeCount,
 
+        SUM(
+          CASE
+            WHEN p.status IN ('confirmed', 'completed')
+            THEN 1
+            ELSE 0
+          END
+        ) AS registeredCount,
+
+        SUM(
+          CASE
+            WHEN p.score IS NOT NULL OR p.status = 'completed'
+            THEN 1
+            ELSE 0
+          END
+        ) AS evaluationCompletedCount,
+
         MAX(
           CASE
             WHEN p.status = 'completed'
@@ -689,6 +705,18 @@ export async function GET(request: NextRequest) {
           attendeeCount:
             Number(
               act.attendeeCount ||
+                0,
+            ),
+
+          registeredCount:
+            Number(
+              act.registeredCount ||
+                0,
+            ),
+
+          evaluationCompletedCount:
+            Number(
+              act.evaluationCompletedCount ||
                 0,
             ),
 
