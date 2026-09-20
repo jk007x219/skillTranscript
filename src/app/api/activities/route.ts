@@ -11,6 +11,21 @@ import {
 
 const BANGKOK_OFFSET = "+07:00";
 
+async function ensureActivityCapacityColumn() {
+  const [rows] = await pool.query<any[]>(
+    `SELECT COUNT(*) AS count
+     FROM INFORMATION_SCHEMA.COLUMNS
+     WHERE TABLE_SCHEMA = DATABASE()
+       AND TABLE_NAME = 'activity'
+       AND COLUMN_NAME = 'capacity'`,
+  );
+  if (!Number(rows[0]?.count)) {
+    await pool.query(`ALTER TABLE activity ADD COLUMN capacity INT NOT NULL DEFAULT 30`);
+  }
+}
+
+
+
 /**
  * แยก datetime-local
  *
@@ -370,6 +385,7 @@ function getRegistrationStatus(activity: {
 export async function GET(request: NextRequest) {
   try {
     await ensureActivityRegistrationColumns();
+    await ensureActivityCapacityColumn();
 
     const { searchParams } =
       new URL(request.url);
@@ -413,6 +429,7 @@ export async function GET(request: NextRequest) {
         a.registrationEnd,
         a.registrationEnabled,
         a.applicationEnabled,
+        a.capacity,
 
         COUNT(p.ParticipationId) AS attendeeCount,
 
@@ -881,7 +898,13 @@ export async function POST(
       templateId,
       registrationStart,
       registrationEnd,
+      capacity,
     } = body;
+
+    const activityCapacity = Number(capacity);
+    if (!Number.isInteger(activityCapacity) || activityCapacity < 1) {
+      throw httpError(400, "จำนวนที่รับนิสิตต้องเป็นจำนวนเต็มอย่างน้อย 1 คน");
+    }
 
     /**
      * ตรวจข้อมูลพื้นฐาน
@@ -1123,7 +1146,8 @@ export async function POST(
           templateId,
           registrationStart,
           registrationEnd,
-          registrationEnabled
+          registrationEnabled,
+          capacity
         )
         VALUES
         (
@@ -1183,6 +1207,7 @@ export async function POST(
         toMySqlDateTime(
           registrationEnd,
         ),
+        activityCapacity,
       ],
     );
 
