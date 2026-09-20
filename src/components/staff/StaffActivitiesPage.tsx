@@ -568,12 +568,12 @@ function AddActivityModal({
           return;
         }
 
-        // เริ่มลงทะเบียนต้องก่อนเวลาเริ่มกิจกรรม
+        // เริ่มลงทะเบียนต้องไม่เกินเวลาสิ้นสุดกิจกรรม
         if (
-          form.startDate &&
-          form.startTime &&
+          form.endDate &&
+          form.endTime &&
           value &&
-          value >= `${form.startDate}T${form.startTime}`
+          value > `${form.endDate}T${form.endTime}`
         ) {
           return;
         }
@@ -582,13 +582,10 @@ function AddActivityModal({
       }}
       min={`${today}T00:00`}
       max={
-        form.startDate && form.startTime
-          ? form.registrationEnd &&
-            form.registrationEnd < `${form.startDate}T${form.startTime}`
-            ? form.registrationEnd
-            : `${form.startDate}T${form.startTime}`
-          : form.registrationEnd || undefined
-      }
+          form.endDate && form.endTime
+            ? `${form.endDate}T${form.endTime}`
+            : undefined
+        }
       className="staff-activity-input"
     />
   </Field>
@@ -609,12 +606,12 @@ function AddActivityModal({
           return;
         }
 
-        // สิ้นสุดลงทะเบียนต้องก่อนเวลาเริ่มกิจกรรม
+        // สิ้นสุดลงทะเบียนต้องไม่เกินเวลาสิ้นสุดกิจกรรม
         if (
-          form.startDate &&
-          form.startTime &&
+          form.endDate &&
+          form.endTime &&
           value &&
-          value >= `${form.startDate}T${form.startTime}`
+          value > `${form.endDate}T${form.endTime}`
         ) {
           return;
         }
@@ -625,8 +622,8 @@ function AddActivityModal({
         form.registrationStart || `${today}T00:00`
       }
       max={
-        form.startDate && form.startTime
-          ? `${form.startDate}T${form.startTime}`
+        form.endDate && form.endTime
+          ? `${form.endDate}T${form.endTime}`
           : undefined
       }
       className="staff-activity-input"
@@ -1624,13 +1621,15 @@ const updateWorkflow = async (
       if (!form.registrationStart || !form.registrationEnd) {
         throw new Error("กรุณาระบุช่วงเวลาลงทะเบียน");
       }
-      if (
-        new Date(form.registrationEnd) <= new Date(form.registrationStart) ||
-        new Date(form.registrationEnd) >= startDateObj
-      ) {
-        throw new Error(
-          "เวลาสิ้นสุดลงทะเบียนต้องอยู่หลังเวลาเริ่มลงทะเบียนและก่อนเวลาเริ่มกิจกรรม",
-        );
+      const registrationStartObj = new Date(form.registrationStart);
+      const registrationEndObj = new Date(form.registrationEnd);
+
+      if (registrationEndObj <= registrationStartObj) {
+        throw new Error("เวลาสิ้นสุดลงทะเบียนต้องอยู่หลังเวลาเริ่มลงทะเบียน");
+      }
+
+      if (registrationStartObj > endDateObj || registrationEndObj > endDateObj) {
+        throw new Error("ช่วงเวลาลงทะเบียนต้องอยู่ภายในช่วงเวลาของกิจกรรม และห้ามเกินเวลาสิ้นสุดกิจกรรม");
       }
 
       const payload = {
@@ -1719,14 +1718,15 @@ const updateWorkflow = async (
       if (!editForm.registrationStart || !editForm.registrationEnd) {
         throw new Error("กรุณาระบุช่วงเวลาลงทะเบียน");
       }
-      if (
-        new Date(editForm.registrationEnd) <=
-          new Date(editForm.registrationStart) ||
-        new Date(editForm.registrationEnd) >= startDateObj
-      ) {
-        throw new Error(
-          "เวลาสิ้นสุดลงทะเบียนต้องอยู่หลังเวลาเริ่มลงทะเบียนและก่อนเวลาเริ่มกิจกรรม",
-        );
+      const registrationStartObj = new Date(editForm.registrationStart);
+      const registrationEndObj = new Date(editForm.registrationEnd);
+
+      if (registrationEndObj <= registrationStartObj) {
+        throw new Error("เวลาสิ้นสุดลงทะเบียนต้องอยู่หลังเวลาเริ่มลงทะเบียน");
+      }
+
+      if (registrationStartObj > endDateObj || registrationEndObj > endDateObj) {
+        throw new Error("ช่วงเวลาลงทะเบียนต้องอยู่ภายในช่วงเวลาของกิจกรรม และห้ามเกินเวลาสิ้นสุดกิจกรรม");
       }
 
       const updatedSkills = editForm.selectedSkills.map((skill) => {
