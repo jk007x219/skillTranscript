@@ -12,6 +12,10 @@ import {
   Search,
   Download,
   X,
+  Clock3,
+  Users,
+  Sparkles,
+  BookOpenCheck,
 } from "lucide-react";
 import StudentShell from "@/components/student/StudentShell";
 import { useAuth } from "@/context/auth-context";
@@ -36,6 +40,10 @@ type A = {
   registrationOpen?: boolean;
   participationStatus?: string | null;
   qrPayload?: string | null;
+  hours?: number | null;
+  term?: string | null;
+  attendeeCount?: number;
+  skills?: Array<{ skillId?: string | null; name: string; level: string }>;
 };
 type P = {
   participationId: string;
@@ -49,6 +57,11 @@ type P = {
   organizer: string;
   score: number | null;
   status: string;
+  endDate?: string | null;
+  hours?: number | null;
+  term?: string | null;
+  joinDate?: string | null;
+  skillScores?: Array<{ name: string; earnedScore: number; maxScore: number }>;
 };
 const date = (v?: string | null) =>
   v
@@ -372,25 +385,91 @@ export default function StudentActivitiesPage() {
             >
               <X className="h-5 w-5" />
             </button>
-            <h2 className="pr-8 text-xl font-semibold">
-              {"activityName" in detail ? detail.activityName : detail.title}
-            </h2>
-            <p className="mt-4 text-sm text-slate-500">
-              {date(detail.date)} • {time(detail.time)}
-              {detail.endTime ? ` - ${time(detail.endTime)}` : ""}
-            </p>
-            <p className="mt-2 text-sm text-slate-500">
-              สถานที่: {detail.location || "-"}
-            </p>
-            <p className="mt-2 text-sm text-slate-500">
-              ผู้จัด: {detail.organizer || "-"}
-            </p>
-            <button
-              onClick={() => setDetail(null)}
-              className="mt-6 rounded-lg bg-[#1565C0] px-5 py-2 text-sm font-semibold text-white"
-            >
-              ปิด
-            </button>
+            {(() => {
+              const isParticipation = "activityName" in detail;
+              const title = isParticipation ? detail.activityName : detail.title;
+              const skills = isParticipation ? [] : detail.skills || [];
+              const skillScores = isParticipation ? detail.skillScores || [] : [];
+              const duration = detail.hours ?? null;
+              return (
+                <>
+                  <div className="border-b border-slate-100 pb-4 pr-10">
+                    <div className="flex items-center gap-2 text-xs font-semibold text-[#1565C0]">
+                      <BookOpenCheck className="h-4 w-4" /> รายละเอียดกิจกรรม
+                    </div>
+                    <h2 className="mt-2 text-xl font-semibold leading-7 text-slate-950">{title}</h2>
+                    {"description" in detail && detail.description ? (
+                      <p className="mt-3 whitespace-pre-line text-sm leading-6 text-slate-600">{detail.description}</p>
+                    ) : (
+                      <p className="mt-3 text-sm text-slate-400">ไม่มีรายละเอียดเพิ่มเติม</p>
+                    )}
+                  </div>
+
+                  <div className="mt-5 grid gap-3 sm:grid-cols-2">
+                    <div className="rounded-xl border border-slate-100 bg-slate-50 p-4">
+                      <div className="flex items-center gap-2 text-xs font-semibold text-slate-500"><CalendarDays className="h-4 w-4" /> วันจัดกิจกรรม</div>
+                      <p className="mt-2 text-sm font-semibold text-slate-900">{date(detail.date)}{detail.endDate && detail.endDate !== detail.date ? ` - ${date(detail.endDate)}` : ""}</p>
+                    </div>
+                    <div className="rounded-xl border border-slate-100 bg-slate-50 p-4">
+                      <div className="flex items-center gap-2 text-xs font-semibold text-slate-500"><Clock3 className="h-4 w-4" /> เวลา</div>
+                      <p className="mt-2 text-sm font-semibold text-slate-900">{time(detail.time)}{detail.endTime ? ` - ${time(detail.endTime)}` : ""}{duration ? ` • ${duration} ชม.` : ""}</p>
+                    </div>
+                    <div className="rounded-xl border border-slate-100 bg-slate-50 p-4">
+                      <div className="flex items-center gap-2 text-xs font-semibold text-slate-500"><MapPin className="h-4 w-4" /> สถานที่</div>
+                      <p className="mt-2 text-sm font-semibold text-slate-900">{detail.location || "-"}</p>
+                    </div>
+                    <div className="rounded-xl border border-slate-100 bg-slate-50 p-4">
+                      <div className="flex items-center gap-2 text-xs font-semibold text-slate-500"><Users className="h-4 w-4" /> ผู้จัดกิจกรรม</div>
+                      <p className="mt-2 text-sm font-semibold text-slate-900">{detail.organizer || "-"}</p>
+                    </div>
+                  </div>
+
+                  {("term" in detail && detail.term) || ("attendeeCount" in detail && detail.attendeeCount != null) ? (
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      {"term" in detail && detail.term ? <span className="rounded-full bg-blue-50 px-3 py-1.5 text-xs font-semibold text-[#1565C0]">ภาคเรียน {detail.term}</span> : null}
+                      {"attendeeCount" in detail && detail.attendeeCount != null ? <span className="rounded-full bg-slate-100 px-3 py-1.5 text-xs font-semibold text-slate-600">ผู้เข้าร่วม {detail.attendeeCount} คน</span> : null}
+                    </div>
+                  ) : null}
+
+                  {!isParticipation && (
+                    <div className="mt-6 rounded-2xl border border-amber-100 bg-amber-50/60 p-5">
+                      <div className="flex items-center gap-2 text-sm font-semibold text-slate-900"><Sparkles className="h-4 w-4 text-amber-500" /> ทักษะที่ได้รับจากกิจกรรม</div>
+                      {skills.length > 0 ? (
+                        <div className="mt-4 grid gap-2 sm:grid-cols-2">
+                          {skills.map((skill) => (
+                            <div key={`${skill.skillId || skill.name}-${skill.level}`} className="rounded-xl border border-white bg-white p-3 shadow-sm">
+                              <p className="text-sm font-semibold text-slate-900">{skill.name}</p>
+                              <span className="mt-1 inline-flex rounded-full bg-slate-100 px-2 py-1 text-[11px] font-medium text-slate-600">ระดับ {skill.level}</span>
+                            </div>
+                          ))}
+                        </div>
+                      ) : <p className="mt-3 text-sm text-slate-500">กิจกรรมนี้ยังไม่ได้ระบุทักษะที่ได้รับ</p>}
+                    </div>
+                  )}
+
+                  {isParticipation && (
+                    <div className="mt-6 rounded-2xl border border-emerald-100 bg-emerald-50/50 p-5">
+                      <div className="flex items-center gap-2 text-sm font-semibold text-slate-900"><Sparkles className="h-4 w-4 text-emerald-600" /> ทักษะที่ได้รับและผลการประเมิน</div>
+                      {skillScores.length > 0 ? (
+                        <div className="mt-4 space-y-3">
+                          {skillScores.map((skill) => {
+                            const percent = skill.maxScore > 0 ? Math.min(100, Math.round((skill.earnedScore / skill.maxScore) * 100)) : 0;
+                            return <div key={skill.name} className="rounded-xl border border-white bg-white p-3">
+                              <div className="flex items-center justify-between gap-3"><p className="text-sm font-semibold text-slate-900">{skill.name}</p><span className="text-xs font-semibold text-slate-500">{skill.earnedScore}/{skill.maxScore}</span></div>
+                              <div className="mt-2 h-2 overflow-hidden rounded-full bg-slate-100"><div className="h-full rounded-full bg-emerald-500" style={{ width: `${percent}%` }} /></div>
+                            </div>;
+                          })}
+                        </div>
+                      ) : <p className="mt-3 text-sm text-slate-500">ยังไม่มีคะแนนแยกตามทักษะสำหรับกิจกรรมนี้</p>}
+                    </div>
+                  )}
+
+                  <div className="mt-6 flex justify-end">
+                    <button onClick={() => setDetail(null)} className="rounded-xl bg-[#1565C0] px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-[#0D47A1]">ปิด</button>
+                  </div>
+                </>
+              );
+            })()}
           </div>
         </div>
       )}
