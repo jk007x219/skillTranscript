@@ -23,7 +23,8 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
     await ensureParticipationStatusWorkflow();
 
     const [rows] = await pool.query<any[]>(
-      `SELECT activityId, status, applicationEnabled, registrationEnabled, confirmationEnabled
+      `SELECT activityId, status, applicationEnabled, registrationEnabled, confirmationEnabled,
+              date, time, endDate, endTime, registrationStart, registrationEnd
        FROM activity WHERE activityId = ? LIMIT 1`,
       [id],
     );
@@ -32,11 +33,31 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
     if (!activity || activity.status !== "active") {
       throw httpError(404, "ไม่พบกิจกรรมที่เปิดรับสมัคร");
     }
-    if (!activity.applicationEnabled) {
-      throw httpError(400, "ขณะนี้เจ้าหน้าที่ยังไม่เปิดรับสมัครกิจกรรม");
+    const activityStart = new Date(
+      `${String(activity.date).slice(0, 10)}T${String(activity.time).slice(0, 8)}+07:00`,
+    );
+    const activityEnd = new Date(
+      `${String(activity.endDate || activity.date).slice(0, 10)}T${String(activity.endTime || activity.time).slice(0, 8)}+07:00`,
+    );
+    const registrationStart = activity.registrationStart
+      ? new Date(String(activity.registrationStart).replace(" ", "T") + "+07:00")
+      : null;
+    const registrationEnd = activity.registrationEnd
+      ? new Date(String(activity.registrationEnd).replace(" ", "T") + "+07:00")
+      : null;
+    const now = new Date();
+
+    if (!registrationStart || !registrationEnd) {
+      throw httpError(400, "กิจกรรมนี้ยังไม่ได้กำหนดช่วงเวลาลงทะเบียน");
     }
-    if (activity.registrationEnabled || activity.confirmationEnabled) {
-      throw httpError(400, "กิจกรรมนี้ปิดรับสมัครแล้ว");
+    if (now < registrationStart) {
+      throw httpError(400, "ยังไม่ถึงเวลาเปิดลงทะเบียน");
+    }
+    if (now >= registrationEnd || now >= activityEnd) {
+      throw httpError(400, "หมดเวลาลงทะเบียนสำหรับกิจกรรมนี้แล้ว");
+    }
+    if (activityEnd <= activityStart) {
+      throw httpError(400, "ช่วงเวลากิจกรรมไม่ถูกต้อง");
     }
 
     const [existing] = await pool.query<any[]>(
