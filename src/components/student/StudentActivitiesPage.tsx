@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   CalendarDays,
+  CalendarClock,
   CheckCircle2,
   Eye,
   FileBadge,
@@ -111,16 +112,15 @@ function Card({
       <div className="mt-4 space-y-2 text-xs text-slate-500">
         <p className="flex gap-2">
           <CalendarDays className="h-4 w-4" />
-          {date(a.date)}
+          {date(a.date)}{a.endDate && a.endDate !== a.date ? ` - ${date(a.endDate)}` : ""}
         </p>
         <p className="flex gap-2">
-          <span className="w-4">◷</span>
-          {time(a.time)}
-          {a.endTime ? ` - ${time(a.endTime)}` : ""}
+          <Clock3 className="h-4 w-4 shrink-0" />
+          <span>{time(a.time)}{a.endTime ? ` - ${time(a.endTime)}` : ""}</span>
         </p>
         <p className="flex gap-2">
-          <span className="w-4">ลง</span>
-          ลงทะเบียน {a.registrationStart ? time(a.registrationStart) : "-"}
+          <CalendarClock className="h-4 w-4 shrink-0" />
+          <span>ช่วงลงทะเบียน {a.registrationStart ? time(a.registrationStart) : "-"}
           {a.registrationEnd ? ` - ${time(a.registrationEnd)}` : ""}
         </p>
         <p className="flex gap-2">
@@ -413,6 +413,11 @@ export default function StudentActivitiesPage() {
                     <div className="rounded-xl border border-slate-100 bg-slate-50 p-4">
                       <div className="flex items-center gap-2 text-xs font-semibold text-slate-500"><Clock3 className="h-4 w-4" /> เวลา</div>
                       <p className="mt-2 text-sm font-semibold text-slate-900">{time(detail.time)}{detail.endTime ? ` - ${time(detail.endTime)}` : ""}{duration ? ` • ${duration} ชม.` : ""}</p>
+                    </div>
+                    <div className="rounded-xl border border-slate-100 bg-slate-50 p-4">
+                      <div className="flex items-center gap-2 text-xs font-semibold text-slate-500"><CalendarClock className="h-4 w-4" /> ช่วงลงทะเบียน</div>
+                      <p className="mt-2 text-sm font-semibold text-slate-900">{detail.registrationStart ? `${date(detail.registrationStart)}` : "-"}</p>
+                      <p className="mt-1 text-xs font-medium text-slate-500">{detail.registrationStart ? time(detail.registrationStart) : "-"}{detail.registrationEnd ? ` - ${time(detail.registrationEnd)}` : ""}</p>
                     </div>
                     <div className="rounded-xl border border-slate-100 bg-slate-50 p-4">
                       <div className="flex items-center gap-2 text-xs font-semibold text-slate-500"><MapPin className="h-4 w-4" /> สถานที่</div>
