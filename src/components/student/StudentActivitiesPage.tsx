@@ -30,6 +30,9 @@ type A = {
   applicationEnabled: boolean;
   registrationEnabled: boolean;
   confirmationEnabled: boolean;
+  registrationStart?: string | null;
+  registrationEnd?: string | null;
+  registrationOpen?: boolean;
   participationStatus?: string | null;
   qrPayload?: string | null;
 };
@@ -100,6 +103,11 @@ function Card({
           <span className="w-4">◷</span>
           {time(a.time)}
           {a.endTime ? ` - ${time(a.endTime)}` : ""}
+        </p>
+        <p className="flex gap-2">
+          <span className="w-4">ลง</span>
+          ลงทะเบียน {a.registrationStart ? time(a.registrationStart) : "-"}
+          {a.registrationEnd ? ` - ${time(a.registrationEnd)}` : ""}
         </p>
         <p className="flex gap-2">
           <MapPin className="h-4 w-4" />
@@ -221,7 +229,7 @@ export default function StudentActivitiesPage() {
           tab === "open"
             ? !x.participationStatus &&
               x.applicationEnabled &&
-              !x.registrationEnabled
+              Boolean(x.registrationOpen)
             : ["applied", "registered", "confirmed"].includes(
                 x.participationStatus || "",
               ),
@@ -240,7 +248,7 @@ export default function StudentActivitiesPage() {
             <div>
               <h1 className="text-2xl font-semibold text-slate-950 sm:text-3xl">
                 {tab === "open"
-                  ? "กิจกรรมที่เปิดรับ"
+                  ? "กิจกรรมที่เปิดรับลงทะเบียน"
                   : tab === "applied"
                     ? "กิจกรรมที่สมัคร"
                     : "กิจกรรมที่เคยเข้าร่วม"}
@@ -248,7 +256,7 @@ export default function StudentActivitiesPage() {
               <div className="mt-2 h-0.5 w-24 bg-[#FFC107]" />
               <p className="mt-3 text-sm text-slate-500">
                 {tab === "open"
-                  ? "กิจกรรมที่เจ้าหน้าที่เปิดให้มองเห็นและสมัคร"
+                  ? "กิจกรรมที่อยู่ในช่วงเวลาที่สามารถลงทะเบียนได้"
                   : tab === "applied"
                     ? "สมัครแล้ว → รอลงทะเบียน → รอยืนยันการเข้าร่วม"
                     : "ยืนยันการเข้าร่วมและทำแบบประเมินเสร็จแล้ว"}
