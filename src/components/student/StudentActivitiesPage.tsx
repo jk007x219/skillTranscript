@@ -10,6 +10,7 @@ import {
   MapPin,
   QrCode,
   Search,
+  Download,
   X,
 } from "lucide-react";
 import StudentShell from "@/components/student/StudentShell";
@@ -210,6 +211,28 @@ export default function StudentActivitiesPage() {
         .then((d) => setP(d.participations || []))
         .catch(() => setP([]));
   }, [tab, user?.studentId]);
+  const downloadQr = async (activity: A) => {
+    if (!activity.qrPayload) return;
+
+    try {
+      const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=800x800&margin=24&data=${encodeURIComponent(activity.qrPayload)}`;
+      const response = await fetch(qrUrl);
+      if (!response.ok) throw new Error("ดาวน์โหลด QR ไม่สำเร็จ");
+
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `QR-${activity.title.replace(/[^a-zA-Z0-9ก-๙_-]/g, "_")}.png`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+    } catch {
+      alert("ไม่สามารถดาวน์โหลด QR ได้ กรุณาลองใหม่อีกครั้ง");
+    }
+  };
+
   const apply = async (x: A) => {
     const r = await fetch(`/api/activities/${x.activityId}/register`, {
       method: "POST",
@@ -406,18 +429,20 @@ export default function StudentActivitiesPage() {
                 className="mt-4 h-20 w-full resize-none rounded-xl border border-blue-100 bg-white p-3 text-xs text-slate-500"
               />
             )}
-            <div className="mt-4 flex gap-3">
+            <div className="mt-4 grid grid-cols-2 gap-3">
               <button
                 onClick={() => setQrActivity(null)}
-                className="h-11 flex-1 rounded-xl border"
+                className="h-11 rounded-xl border border-slate-200 bg-white text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
               >
                 ปิด
               </button>
               <button
-                onClick={() => void load()}
-                className="h-11 flex-1 rounded-xl bg-[#1565C0] font-semibold text-white"
+                onClick={() => void downloadQr(qrActivity)}
+                disabled={!qrActivity.qrPayload}
+                className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-[#1565C0] text-sm font-semibold text-white transition hover:bg-[#0D47A1] disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-400"
               >
-                รีเฟรชสถานะ
+                <Download className="h-4 w-4" />
+                ดาวน์โหลด QR
               </button>
             </div>
           </div>
