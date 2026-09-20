@@ -257,7 +257,7 @@ function RadarChart({
 }) {
   if (values.length < 3) {
     return (
-      <div className="mx-auto flex aspect-square w-full max-w-[330px] items-center justify-center rounded-full bg-gradient-to-br from-white via-slate-50 to-blue-50/70 p-6 text-center text-sm text-slate-500 shadow-[inset_0_0_0_1px_rgba(21,101,192,0.08)]">
+      <div className="mx-auto flex aspect-square w-full max-w-[250px] items-center justify-center rounded-full bg-gradient-to-br from-white via-slate-50 to-blue-50/70 p-6 text-center text-sm text-slate-500 shadow-[inset_0_0_0_1px_rgba(21,101,192,0.08)]">
         ยังไม่มีข้อมูลทักษะเพียงพอสำหรับกราฟเรดาร์
       </div>
     );
@@ -610,7 +610,7 @@ function LevelRadarCard({
       : 0;
 
   return (
-    <article className="rounded-2xl border border-blue-100 bg-white p-4 shadow-[0_12px_32px_rgba(15,23,42,0.06)]">
+    <article className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
       <div className="flex items-center justify-between gap-3 px-1">
         <div>
           <h3 className="text-sm font-semibold text-slate-950">
@@ -641,7 +641,7 @@ function LevelRadarCard({
         />
       </div>
 
-      <div className="mt-3 rounded-xl bg-slate-50 px-3 py-2 text-center text-xs text-slate-500">
+      <div className="mt-2 rounded-lg bg-slate-50 px-2 py-1.5 text-center text-[11px] text-slate-500">
         {items.length > 0
           ? `แสดง ${items.length} ทักษะในระดับนี้`
           : "ยังไม่มีข้อมูลทักษะในระดับนี้"}
@@ -694,8 +694,8 @@ function SkillBarSection({
   ];
 
   return (
-    <div className="mt-6 border-t border-blue-50 pt-5">
-      <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+    <div className="mt-4 border-t border-slate-100 pt-4">
+      <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h3 className="text-sm font-semibold text-slate-900">
             ระดับทักษะ
@@ -705,7 +705,7 @@ function SkillBarSection({
           </p>
         </div>
 
-        <div className="grid grid-cols-4 overflow-hidden rounded-xl border border-blue-100 bg-slate-50 p-1">
+        <div className="grid w-full grid-cols-4 overflow-hidden rounded-lg border border-slate-200 bg-slate-50 p-0.5 sm:w-auto">
           {tabs.map((tab) => {
             const active = activeTab === tab.key;
             return (
@@ -713,7 +713,7 @@ function SkillBarSection({
                 key={tab.key}
                 type="button"
                 onClick={() => setActiveTab(tab.key)}
-                className={`min-w-[64px] rounded-lg px-3 py-2 text-xs font-semibold transition ${
+                className={`rounded-md px-2 py-1.5 text-[11px] font-semibold transition ${
                   active
                     ? "bg-white text-[#1565C0] shadow-sm ring-1 ring-blue-100"
                     : "text-slate-500 hover:bg-white/70 hover:text-slate-700"
@@ -768,7 +768,7 @@ function DashboardPanel({
 
   return (
     <section className="overflow-hidden rounded-2xl border border-blue-100 bg-white shadow-[0_18px_50px_rgba(15,23,42,0.08)]">
-      <div className="border-b border-blue-50 bg-gradient-to-r from-white via-blue-50/50 to-white px-5 py-5 sm:px-6">
+      <div className="border-b border-slate-100 bg-white px-4 py-4 sm:px-5">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
           <div>
             <div className="flex items-center gap-3">
@@ -777,7 +777,7 @@ function DashboardPanel({
                 style={{ backgroundColor: accent }}
               />
               <div>
-                <h2 className="text-lg font-semibold text-slate-950">
+                <h2 className="text-base font-semibold text-slate-950">
                   {title}
                 </h2>
                 <p className="mt-1 text-xs text-slate-500">
@@ -793,8 +793,8 @@ function DashboardPanel({
         </div>
       </div>
 
-      <div className="p-5 sm:p-6">
-        <div className="grid gap-4 lg:grid-cols-3">
+      <div className="p-4 sm:p-5">
+        <div className="grid gap-3 sm:grid-cols-3">
           <LevelRadarCard
             level="basic"
             items={levelItems.basic}
@@ -1010,12 +1010,12 @@ export default function StudentDashboard() {
 
   return (
     <StudentShell activePath="/student/dashboard">
-      <section className="space-y-6 p-4 sm:p-6 lg:p-7">
+      <section className="mx-auto w-full max-w-6xl space-y-4 p-3 sm:space-y-5 sm:p-5">
         {/* ================================================= */}
         {/* HERO */}
         {/* ================================================= */}
 
-        <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-[#0D47A1] via-[#1565C0] to-[#4AA3D8] p-6 text-white shadow-[0_22px_60px_rgba(13,71,161,0.24)] lg:grid lg:grid-cols-[1fr_280px] lg:items-center lg:p-8">
+        <div className="relative overflow-hidden rounded-xl bg-gradient-to-r from-[#0D47A1] via-[#1565C0] to-[#4AA3D8] p-4 text-white shadow-[0_22px_60px_rgba(13,71,161,0.24)] lg:grid lg:grid-cols-[1fr_280px] lg:items-center lg:p-6">
           <div className="absolute -right-16 -top-20 h-56 w-56 rounded-full bg-[#FFC107]/20 blur-3xl" />
 
           <div className="absolute bottom-0 right-0 h-32 w-72 bg-white/10 blur-3xl" />
@@ -1030,17 +1030,17 @@ export default function StudentDashboard() {
               Skill Transcript Dashboard
             </p>
 
-            <h1 className="mt-4 flex items-center gap-2 text-3xl font-semibold leading-tight sm:text-4xl">
+            <h1 className="mt-3 flex items-center gap-2 text-2xl font-semibold leading-tight sm:text-3xl">
               สวัสดี, {displayName}
             </h1>
 
-            <p className="mt-4 max-w-2xl text-sm leading-7 text-blue-50">
+            <p className="mt-2 max-w-2xl text-xs leading-6 text-blue-50">
               แสดงคะแนนทักษะและกิจกรรมจากฐานข้อมูลของนิสิตที่เข้าสู่ระบบอยู่ในขณะนี้
             </p>
 
             <Link
               href="/student/skilltranscript"
-              className="mt-5 inline-flex items-center gap-2 rounded-xl bg-white px-6 py-3 text-sm font-semibold text-[#1565C0] shadow-lg shadow-blue-950/10 transition hover:-translate-y-0.5 hover:bg-blue-50"
+              className="mt-3 inline-flex items-center gap-2 rounded-lg bg-white px-4 py-2.5 text-sm font-semibold text-[#1565C0] shadow-lg shadow-blue-950/10 transition hover:-translate-y-0.5 hover:bg-blue-50"
             >
               ดู Skill Transcript ของฉัน
 
@@ -1087,18 +1087,18 @@ export default function StudentDashboard() {
         {/* SUMMARY CARDS */}
         {/* ================================================= */}
 
-        <div className="grid gap-4 md:grid-cols-3">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
           {summaryCards.map(
             (card) => (
               <article
                 key={card.label}
-                className="group flex items-center gap-5 rounded-2xl border border-blue-100 bg-white/90 p-6 shadow-[0_14px_36px_rgba(15,23,42,0.06)] transition duration-300 hover:-translate-y-1 hover:border-blue-200 hover:shadow-[0_18px_48px_rgba(15,23,42,0.1)]"
+                className="group flex items-center gap-3 rounded-xl border border-blue-100 bg-white/90 p-4 shadow-sm transition duration-300 hover:-translate-y-1 hover:border-blue-200 hover:shadow-[0_18px_48px_rgba(15,23,42,0.1)]"
               >
                 <div
-                  className={`flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl shadow-sm transition group-hover:scale-105 ${card.iconClassName}`}
+                  className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl shadow-sm transition group-hover:scale-105 ${card.iconClassName}`}
                 >
                   <card.icon
-                    className="h-7 w-7"
+                    className="h-5 w-5"
                     aria-hidden="true"
                   />
                 </div>
