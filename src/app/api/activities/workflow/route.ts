@@ -1,7 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { httpError, jsonError } from "@/lib/api-error";
-import { ensureActivityRegistrationColumns, ensureParticipationStatusWorkflow } from "@/lib/activity-registration";
+import {
+  buildRegistrationQrPayload,
+  ensureActivityRegistrationColumns,
+  ensureParticipationStatusWorkflow,
+} from "@/lib/activity-registration";
 import { pool } from "@/lib/db";
 
 export const runtime = "nodejs";
@@ -22,7 +26,8 @@ export async function GET() {
       `SELECT a.activityId, a.activityName, a.description, a.date, a.time, a.endDate, a.endTime,
               a.location, a.organizer, a.term, a.status, a.hasEvaluation,
               a.applicationEnabled, a.registrationEnabled, a.confirmationEnabled,
-              COALESCE(p.status, NULL) AS participationStatus
+              COALESCE(p.status, NULL) AS participationStatus,
+              p.registrationQrToken
        FROM activity a
        LEFT JOIN participation p ON p.activityId = a.activityId AND p.studentId = ?
        ${isStudent ? "WHERE a.status = 'active' AND (a.applicationEnabled = 1 OR p.ParticipationId IS NOT NULL)" : ""}
@@ -46,6 +51,8 @@ export async function GET() {
       registrationEnabled: Boolean(r.registrationEnabled),
       confirmationEnabled: Boolean(r.confirmationEnabled),
       participationStatus: r.participationStatus || null,
+      registrationQrToken: r.registrationQrToken || null,
+      qrPayload: r.registrationQrToken ? buildRegistrationQrPayload(r.activityId, r.registrationQrToken) : null,
     })));
   } catch (error) {
     return jsonError(error);
@@ -56,6 +63,7 @@ export async function PUT(request: NextRequest) {
   try {
     const session = await auth();
     if (!canManage(session)) throw httpError(403, "ไม่มีสิทธิ์จัดการ workflow กิจกรรม");
+    if (!session?.user?.id) throw httpError(401, "กรุณาเข้าสู่ระบบ");
     await ensureActivityRegistrationColumns();
     await ensureParticipationStatusWorkflow();
     const body = await request.json();
@@ -67,12 +75,9 @@ export async function PUT(request: NextRequest) {
     const activity = activities[0];
     if (!activity) throw httpError(404, "ไม่พบกิจกรรม");
     if (session.user.role === "teacher" && !session.user.isExecutive && activity.createdBy !== session.user.id) throw httpError(403, "คุณจัดการได้เฉพาะกิจกรรมที่สร้างเอง");
-    if (field === "registrationEnabled" && value && !activity.applicationEnabled) throw httpError(400, "ต้องเปิดการมองเห็นการสมัครก่อน จึงจะเปิดการลงทะเบียนได้");
-    if (field === "confirmationEnabled" && value && !activity.registrationEnabled) throw httpError(400, "ต้องเปิดการลงทะเบียนก่อน จึงจะเปิดยืนยันการเข้าร่วมได้");
-    if (field === "confirmationEnabled" && value && !activity.hasEvaluation) throw httpError(400, "ต้องสร้างแบบประเมินก่อน จึงจะเปิดยืนยันการเข้าร่วมได้");
+    if (field === "registrationEnabled" && value && !activity.applicationEnabled) throw httpError(400, "ต้องเปิดรับสมัครก่อน จึงจะเปิดรับลงทะเบียนได้");
+    if (field === "confirmationEnabled" && value && !activity.hasEvaluation) throw httpError(400, "ต้องสร้างแบบประเมินก่อน จึงจะเปิดแบบประเมินกิจกรรมได้");
     await pool.query(`UPDATE activity SET ${field} = ? WHERE activityId = ?`, [value ? 1 : 0, activityId]);
-    if (field === "applicationEnabled" && !value) await pool.query(`UPDATE activity SET registrationEnabled = 0, confirmationEnabled = 0 WHERE activityId = ?`, [activityId]);
-    if (field === "registrationEnabled" && !value) await pool.query(`UPDATE activity SET confirmationEnabled = 0 WHERE activityId = ?`, [activityId]);
     const [updated] = await pool.query<any[]>(`SELECT activityId, applicationEnabled, registrationEnabled, confirmationEnabled FROM activity WHERE activityId = ? LIMIT 1`, [activityId]);
     return NextResponse.json({ activityId, applicationEnabled: Boolean(updated[0].applicationEnabled), registrationEnabled: Boolean(updated[0].registrationEnabled), confirmationEnabled: Boolean(updated[0].confirmationEnabled) });
   } catch (error) {

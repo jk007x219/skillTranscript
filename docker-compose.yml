@@ -34,8 +34,8 @@ services:
     environment:
       NODE_ENV: production
       PORT: 3000
-      NEXTAUTH_URL: http://miscis.scidi.tsu.ac.th:3086
-      AUTH_URL: http://miscis.scidi.tsu.ac.th:3086
+      NEXTAUTH_URL: https://miscis.scidi.tsu.ac.th:3086
+      AUTH_URL: https://miscis.scidi.tsu.ac.th:3086
       AUTH_TRUST_HOST: "true"
 
       DB_HOST: mysql
@@ -44,9 +44,26 @@ services:
       DB_PASSWORD: skilltranscript
       DB_NAME: skilltranscript
       WATCHPACK_POLLING: "true"
-    ports:
-      - "3086:3000"
+    expose:
+      - "3000"
     restart: unless-stopped
+
+  caddy:
+    image: caddy:2-alpine
+    container_name: skilltranscript-caddy
+    restart: unless-stopped
+    depends_on:
+      - app_skilltranscript086
+    ports:
+      - "80:80"
+      - "443:443"
+      - "3086:3086"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
 
 volumes:
   mysql-data:
+  caddy-data:
+  caddy-config:

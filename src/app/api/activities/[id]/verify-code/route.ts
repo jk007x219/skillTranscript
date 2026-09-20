@@ -53,7 +53,7 @@ export async function POST(
 
     const [activities] = await pool.query<any[]>(
       `
-        SELECT activityId, verification_code, code_expires_at, status
+        SELECT activityId, verification_code, code_expires_at, status, confirmationEnabled
         FROM activity
         WHERE activityId = ?
         LIMIT 1
@@ -69,6 +69,10 @@ export async function POST(
 
     if (activity.status !== "active") {
       throw httpError(400, "กิจกรรมนี้ไม่อยู่ในสถานะที่สามารถยืนยันการเข้าร่วมได้");
+    }
+
+    if (!activity.confirmationEnabled) {
+      throw httpError(400, "ขณะนี้เจ้าหน้าที่ยังไม่เปิดการยืนยันการเข้าร่วม");
     }
 
     if (!activity.verification_code) {

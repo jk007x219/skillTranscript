@@ -19,12 +19,13 @@ export async function GET(request: NextRequest, context: RouteContext) {
          s.lastname, 
          s.major,
          s.program,   -- ✅ เพิ่มหลักสูตร
+         p.status,
          p.score
        FROM participation p
        JOIN students s ON p.studentId = s.studentId
        WHERE p.activityId = ?
-         AND p.status = 'completed'
-       ORDER BY p.joinDate DESC`,
+         AND p.status IN ('confirmed', 'completed')
+       ORDER BY p.joinDate DESC, p.created_at DESC`,
       [id]
     );
 

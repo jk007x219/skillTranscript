@@ -49,7 +49,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
     }
 
     const [activities] = await pool.query<any[]>(
-      `SELECT activityId, activityName, evaluation, hours FROM activity WHERE activityId = ?`,
+      `SELECT activityId, activityName, evaluation, hours, hasEvaluation, confirmationEnabled FROM activity WHERE activityId = ?`,
       [id],
     );
 
@@ -58,6 +58,9 @@ export async function POST(request: NextRequest, context: RouteContext) {
     }
 
     const activity = activities[0];
+    if (!activity.hasEvaluation || !activity.confirmationEnabled) {
+      throw httpError(403, "ขณะนี้เจ้าหน้าที่ยังไม่เปิดแบบประเมินกิจกรรม");
+    }
 
     let evaluation: any[] = [];
     try {

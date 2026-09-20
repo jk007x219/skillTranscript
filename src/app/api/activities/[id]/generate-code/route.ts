@@ -1,5 +1,6 @@
 // app/api/activities/[id]/generate-code/route.ts
 import { NextRequest, NextResponse } from "next/server";
+import { auth } from "@/auth";
 import { pool } from "@/lib/db";
 import { jsonError, httpError } from "@/lib/api-error";
 
@@ -7,13 +8,26 @@ import { jsonError, httpError } from "@/lib/api-error";
 export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params;
+    const session = await auth();
+    const role = session?.user?.role;
+    if (!session?.user?.id || !(["teacher", "officer", "executive"].includes(role || "") || session.user.isExecutive)) {
+      throw httpError(403, "ไม่มีสิทธิ์สร้างรหัสยืนยันการเข้าร่วม");
+    }
 
-    const [activities] = await pool.query(
-      `SELECT activityId FROM activity WHERE activityId = ?`,
+    const [activities] = await pool.query<any[]>(
+      `SELECT activityId, createdBy, status, applicationEnabled, registrationEnabled, hasEvaluation
+       FROM activity WHERE activityId = ? LIMIT 1`,
       [id]
     );
-    if ((activities as any[]).length === 0) {
+    const activity = activities[0];
+    if (!activity) {
       throw httpError(404, "ไม่พบกิจกรรม");
+    }
+    if (role === "teacher" && !session.user.isExecutive && activity.createdBy !== session.user.id) {
+      throw httpError(403, "คุณจัดการได้เฉพาะกิจกรรมที่สร้างเอง");
+    }
+    if (activity.status !== "active" || !activity.hasEvaluation) {
+      throw httpError(400, "ต้องสร้างแบบประเมินก่อน");
     }
 
     const code = Math.floor(100000 + Math.random() * 900000).toString();

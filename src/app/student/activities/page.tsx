@@ -1,5 +1,5 @@
-import StudentActivitiesWorkflowV3 from "@/components/student/StudentActivitiesWorkflowV3";
+import StudentActivitiesPage from "@/components/student/StudentActivitiesPage";
 
 export default function StudentActivitiesRoutePage() {
-  return <StudentActivitiesWorkflowV3 />;
+  return <StudentActivitiesPage />;
 }

@@ -29,6 +29,62 @@ export async function ensureParticipationStatusWorkflow() {
   if (type.startsWith("enum(") && !type.includes("'applied'")) {
     await pool.query(`ALTER TABLE participation MODIFY COLUMN status ENUM('applied','registered','confirmed','completed') NOT NULL DEFAULT 'applied'`);
   }
+
+  const [columnRows] = await pool.query<RowDataPacket[]>(
+    `SELECT COLUMN_NAME
+     FROM information_schema.COLUMNS
+     WHERE TABLE_SCHEMA = DATABASE()
+       AND TABLE_NAME = 'participation'
+       AND COLUMN_NAME IN ('registrationQrToken', 'registeredAt', 'confirmedAt')`,
+  );
+  const columns = new Set(columnRows.map((row) => row.COLUMN_NAME));
+  if (!columns.has("registrationQrToken")) {
+    await pool.query("ALTER TABLE participation ADD COLUMN registrationQrToken VARCHAR(80) NULL");
+    await pool.query("ALTER TABLE participation ADD UNIQUE KEY unique_participation_qr_token (registrationQrToken)");
+  }
+  if (!columns.has("registeredAt")) await pool.query("ALTER TABLE participation ADD COLUMN registeredAt DATETIME NULL");
+  if (!columns.has("confirmedAt")) await pool.query("ALTER TABLE participation ADD COLUMN confirmedAt DATETIME NULL");
+}
+
+export function buildRegistrationQrPayload(activityId: string, token: string) {
+  return JSON.stringify({
+    type: "skilltranscript.activity.registration",
+    activityId,
+    token,
+  });
+}
+
+export function parseRegistrationQrPayload(value: unknown) {
+  if (typeof value !== "string") return null;
+  const raw = value.trim();
+  if (!raw) return null;
+
+  try {
+    const parsed = JSON.parse(raw);
+    if (
+      parsed?.type === "skilltranscript.activity.registration" &&
+      typeof parsed.activityId === "string" &&
+      typeof parsed.token === "string"
+    ) {
+      return {
+        activityId: parsed.activityId.trim(),
+        token: parsed.token.trim(),
+      };
+    }
+  } catch {}
+
+  const match = raw.match(/^skilltranscript:activity:([^:]+):registration:([^:]+)$/);
+  if (match) {
+    return {
+      activityId: match[1],
+      token: match[2],
+    };
+  }
+
+  return {
+    activityId: "",
+    token: raw,
+  };
 }
 
 export function toMySqlDateTime(value: unknown) {

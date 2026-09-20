@@ -1,0 +1,15 @@
+{
+	email admin@miscis.scidi.tsu.ac.th
+}
+
+http://miscis.scidi.tsu.ac.th {
+	redir https://miscis.scidi.tsu.ac.th:3086{uri} permanent
+}
+
+https://miscis.scidi.tsu.ac.th {
+	redir https://miscis.scidi.tsu.ac.th:3086{uri} permanent
+}
+
+https://miscis.scidi.tsu.ac.th:3086 {
+	reverse_proxy app_skilltranscript086:3000
+}

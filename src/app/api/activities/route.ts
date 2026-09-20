@@ -412,6 +412,7 @@ export async function GET(request: NextRequest) {
         a.registrationStart,
         a.registrationEnd,
         a.registrationEnabled,
+        a.applicationEnabled,
 
         COUNT(p.ParticipationId) AS attendeeCount,
 
@@ -682,6 +683,11 @@ export async function GET(request: NextRequest) {
           confirmationEnabled:
             Boolean(
               act.confirmationEnabled,
+            ),
+
+          applicationEnabled:
+            Boolean(
+              act.applicationEnabled,
             ),
 
           /**
@@ -1230,4 +1236,3 @@ export async function POST(
     return jsonError(error);
   }
 }
-

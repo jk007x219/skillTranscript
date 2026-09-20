@@ -2,9 +2,11 @@
 // แก้ไขแล้ว: แยก date/time, แสดงชั่วโมง:นาที, รองรับแก้ไขแบบประเมิน
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { type ChangeEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   CalendarDays,
+  Camera,
+  CameraOff,
   ClipboardList,
   FileWarning,
   KeyRound,
@@ -18,10 +20,50 @@ import {
   Clock,
   Loader2,
   Edit,
+  QrCode,
 } from "lucide-react";
 import StaffShell from "@/components/staff/StaffShell";
 
+type BarcodeDetectorLike = {
+  detect(source: CanvasImageSource): Promise<Array<{ rawValue?: string }>>;
+};
+
+type BarcodeDetectorConstructor = new (options?: {
+  formats?: string[];
+}) => BarcodeDetectorLike;
+
+type JsQrResult = {
+  data: string;
+};
+
+type JsQrFunction = (
+  data: Uint8ClampedArray,
+  width: number,
+  height: number,
+  options?: { inversionAttempts?: "dontInvert" | "onlyInvert" | "attemptBoth" | "invertFirst" },
+) => JsQrResult | null;
+
+type LegacyGetUserMedia = (
+  constraints: MediaStreamConstraints,
+  successCallback: (stream: MediaStream) => void,
+  errorCallback: (error: DOMException) => void,
+) => void;
+
+declare global {
+  interface Window {
+    BarcodeDetector?: BarcodeDetectorConstructor;
+    jsQR?: JsQrFunction;
+  }
+
+  interface Navigator {
+    webkitGetUserMedia?: LegacyGetUserMedia;
+    mozGetUserMedia?: LegacyGetUserMedia;
+    msGetUserMedia?: LegacyGetUserMedia;
+  }
+}
+
 type ActivityStatus = "active" | "past";
+type ActivityCategory = "running" | "application" | "registration" | "closed" | "past";
 
 type ActivitySkill = {
   skillId?: string;
@@ -66,6 +108,7 @@ type StaffActivity = {
   hasConfirmedParticipants?: boolean;
   confirmationEnabled: boolean;
   registrationEnabled: boolean;
+  applicationEnabled?: boolean;
   hasEvaluation: boolean;
   status: ActivityStatus;
   skills: ActivitySkill[];
@@ -212,73 +255,11 @@ function getActivityStartDateTime(activity: StaffActivity): Date | null {
   return new Date(`${date}T${time}`);
 }
 
-function getRegistrationWindowStatus(
-  activity: StaffActivity,
-  now: Date = new Date(),
-) {
-  const activityStart = getActivityStartDateTime(activity);
-  if (!activityStart) {
-    return {
-      normalOpen: false,
-      emergencyOpen: false,
-      open: false,
-      label: "ไม่สามารถตรวจสอบเวลาได้",
-    };
-  }
-
-  if (now >= activityStart) {
-    return {
-      normalOpen: false,
-      emergencyOpen: false,
-      open: false,
-      label: "กิจกรรมเริ่มแล้ว",
-    };
-  }
-
-  const registrationStart = activity.registrationStart
-    ? new Date(String(activity.registrationStart).replace(" ", "T"))
-    : null;
-  const registrationEnd = activity.registrationEnd
-    ? new Date(String(activity.registrationEnd).replace(" ", "T"))
-    : null;
-
-  const normalOpen = Boolean(
-    registrationStart &&
-      registrationEnd &&
-      now >= registrationStart &&
-      now < registrationEnd &&
-      now < activityStart,
-  );
-
-  const emergencyOpen = Boolean(activity.registrationEnabled && now < activityStart);
-
-  return {
-    normalOpen,
-    emergencyOpen,
-    open: normalOpen || emergencyOpen,
-    label: emergencyOpen
-      ? "เปิดด้วย Emergency Override"
-      : normalOpen
-        ? "เปิดตามช่วงเวลาอัตโนมัติ"
-        : registrationStart && now < registrationStart
-          ? "ยังไม่ถึงเวลาเปิด"
-          : registrationEnd && now >= registrationEnd
-            ? "หมดเวลาลงทะเบียน"
-            : "ปิดการลงทะเบียน",
-  };
-}
-
-function formatRegistrationDateTime(value?: string | null): string {
-  if (!value) return "-";
-  const date = new Date(String(value).replace(" ", "T"));
-  if (Number.isNaN(date.getTime())) return "-";
-  return date.toLocaleString("th-TH", {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
+function isActivityPast(activity: StaffActivity, now: Date = new Date()) {
+  const date = String(activity.endDate || activity.date || "").slice(0, 10);
+  const time = String(activity.endTime || activity.time || "00:00").slice(0, 5);
+  const activityEnd = new Date(`${date}T${time}`);
+  return !Number.isNaN(activityEnd.getTime()) && activityEnd < now;
 }
 
 // ---------- helper components ----------
@@ -312,31 +293,6 @@ function ToggleSwitch({
   );
 }
 
-function TabButton({
-  active,
-  onClick,
-  children,
-}: {
-  active: boolean;
-  onClick: () => void;
-  children: React.ReactNode;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={`relative px-2 pb-2 text-sm font-semibold transition ${
-        active ? "text-[#1565C0]" : "text-slate-500 hover:text-slate-800"
-      }`}
-    >
-      {children}
-      {active && (
-        <span className="absolute inset-x-0 -bottom-px h-0.5 rounded-full bg-[#1565C0]" />
-      )}
-    </button>
-  );
-}
-
 function Field({
   label,
   children,
@@ -352,6 +308,53 @@ function Field({
       {children}
     </label>
   );
+}
+
+function loadJsQr() {
+  if (typeof window === "undefined") return Promise.resolve(false);
+  if (window.jsQR) return Promise.resolve(true);
+
+  return new Promise<boolean>((resolve) => {
+    const existing = document.querySelector<HTMLScriptElement>(
+      'script[data-skilltranscript-jsqr="true"]',
+    );
+    if (existing) {
+      existing.addEventListener("load", () => resolve(Boolean(window.jsQR)), {
+        once: true,
+      });
+      existing.addEventListener("error", () => resolve(false), { once: true });
+      return;
+    }
+
+    const script = document.createElement("script");
+    script.src = "https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js";
+    script.async = true;
+    script.dataset.skilltranscriptJsqr = "true";
+    script.onload = () => resolve(Boolean(window.jsQR));
+    script.onerror = () => resolve(false);
+    document.head.appendChild(script);
+  });
+}
+
+function requestCameraStream(constraints: MediaStreamConstraints) {
+  if (navigator.mediaDevices?.getUserMedia) {
+    return navigator.mediaDevices.getUserMedia(constraints);
+  }
+
+  const legacyGetUserMedia =
+    navigator.webkitGetUserMedia ||
+    navigator.mozGetUserMedia ||
+    navigator.msGetUserMedia;
+
+  if (!legacyGetUserMedia) {
+    return Promise.reject(
+      new DOMException("getUserMedia is unavailable", "NotSupportedError"),
+    );
+  }
+
+  return new Promise<MediaStream>((resolve, reject) => {
+    legacyGetUserMedia.call(navigator, constraints, resolve, reject);
+  });
 }
 
 // ---------- AddActivityModal (แก้ไข: แยก date/time, แสดงชั่วโมง:นาที) ----------
@@ -1157,7 +1160,7 @@ export default function StaffActivitiesPage() {
   const [activities, setActivities] = useState<StaffActivity[]>([]);
   const [skillOptions, setSkillOptions] = useState<SkillOption[]>([]);
   const [templates, setTemplates] = useState<Template[]>([]);
-  const [activeTab, setActiveTab] = useState<ActivityStatus>("active");
+  const [activeTab, setActiveTab] = useState<ActivityCategory>("running");
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [form, setForm] = useState<ActivityForm>(emptyForm);
   const [evaluationActivity, setEvaluationActivity] =
@@ -1175,17 +1178,21 @@ export default function StaffActivitiesPage() {
   const [selectedParticipantActivityId, setSelectedParticipantActivityId] =
     useState<string | null>(null);
   const [loadingParticipants, setLoadingParticipants] = useState(false);
-
-  // อัปเดตสถานะลงทะเบียนทุก 30 วินาที เพื่อให้หน้าเจ้าหน้าที่สะท้อนเวลาจริง
-  const [registrationNow, setRegistrationNow] = useState(() => new Date());
-
-  useEffect(() => {
-    const timer = window.setInterval(() => {
-      setRegistrationNow(new Date());
-    }, 30_000);
-
-    return () => window.clearInterval(timer);
-  }, []);
+  const [scanActivity, setScanActivity] = useState<StaffActivity | null>(null);
+  const [scanActivityCode, setScanActivityCode] = useState("");
+  const [scanPayload, setScanPayload] = useState("");
+  const [scanMessage, setScanMessage] = useState("");
+  const [scanError, setScanError] = useState("");
+  const [scanSubmitting, setScanSubmitting] = useState(false);
+  const [cameraActive, setCameraActive] = useState(false);
+  const [cameraStarting, setCameraStarting] = useState(false);
+  const [cameraError, setCameraError] = useState("");
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const qrImageInputRef = useRef<HTMLInputElement | null>(null);
+  const scanStreamRef = useRef<MediaStream | null>(null);
+  const scanFrameRef = useRef<number | null>(null);
+  const barcodeDetectorRef = useRef<BarcodeDetectorLike | null>(null);
 
   // State สำหรับแก้ไขกิจกรรม
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
@@ -1241,10 +1248,43 @@ export default function StaffActivitiesPage() {
     fetchActivities();
   }, [fetchSkills, fetchTemplates, fetchActivities]);
 
+  const activityCategories: Array<{ key: ActivityCategory; label: string }> = [
+    { key: "running", label: "กิจกรรมที่กำลังดำเนิน" },
+    { key: "application", label: "กิจกรรมที่เปิดรับ" },
+    { key: "registration", label: "กิจกรรมที่เปิดลงทะเบียน" },
+    { key: "closed", label: "กิจกรรมที่ปิดลงทะเบียน" },
+    { key: "past", label: "กิจกรรมที่เคยจัด" },
+  ];
+
+  const matchesActivityCategory = useCallback((activity: StaffActivity, category: ActivityCategory) => {
+    const past = isActivityPast(activity);
+    if (category === "past") return past;
+    if (past) return false;
+    if (category === "running") {
+      return Boolean(
+        !activity.applicationEnabled &&
+          !activity.registrationEnabled &&
+          !activity.confirmationEnabled,
+      );
+    }
+    if (category === "application") {
+      return Boolean(activity.applicationEnabled && !activity.registrationEnabled && !activity.confirmationEnabled);
+    }
+    if (category === "registration") return Boolean(activity.registrationEnabled);
+    return Boolean(!activity.registrationEnabled && activity.confirmationEnabled);
+  }, []);
+
   const filteredActivities = useMemo(
-    () => activities.filter((activity) => activity.status === activeTab),
-    [activities, activeTab],
+    () => activities.filter((activity) => matchesActivityCategory(activity, activeTab)),
+    [activities, activeTab, matchesActivityCategory],
   );
+
+  const categoryCounts = useMemo(() => {
+    return activityCategories.reduce<Record<ActivityCategory, number>>((counts, category) => {
+      counts[category.key] = activities.filter((activity) => matchesActivityCategory(activity, category.key)).length;
+      return counts;
+    }, { running: 0, application: 0, registration: 0, closed: 0, past: 0 });
+  }, [activities, matchesActivityCategory]);
 
   // ---------- กิจกรรม ----------
   const updateConfirmation = async (activityId: string) => {
@@ -1253,40 +1293,31 @@ export default function StaffActivitiesPage() {
     const newVal = !activity.confirmationEnabled;
 
     try {
-      if (newVal && activity.hasEvaluation) {
-        const res = await fetch(`/api/activities/${activityId}/generate-code`, {
-          method: "POST",
-        });
-        if (!res.ok) {
-          const err = await res.json();
-          throw new Error(err.message || "สร้างรหัสไม่สำเร็จ");
+      if (newVal) {
+        if (!activity.hasEvaluation) {
+          throw new Error("ต้องสร้างแบบประเมินก่อน จึงจะเปิดแบบประเมินกิจกรรมได้");
         }
-        const data = await res.json();
 
-        const updateRes = await fetch(`/api/activities/${activityId}`, {
+        const updateRes = await fetch("/api/activities/workflow", {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            confirmationEnabled: true,
-            verificationCode: data.code,
-            codeExpiresAt: data.expiresAt,
-            status: "active",
+            activityId,
+            field: "confirmationEnabled",
+            value: true,
           }),
         });
         if (!updateRes.ok) throw new Error("อัปเดตไม่สำเร็จ");
 
         await fetchActivities();
-        setModalActivityId(activityId);
-        setShowCodeModal(true);
       } else {
-        const updateRes = await fetch(`/api/activities/${activityId}`, {
+        const updateRes = await fetch("/api/activities/workflow", {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            confirmationEnabled: false,
-            verificationCode: null,
-            codeExpiresAt: null,
-            status: "past",
+            activityId,
+            field: "confirmationEnabled",
+            value: false,
           }),
         });
         if (!updateRes.ok) throw new Error("อัปเดตไม่สำเร็จ");
@@ -1297,69 +1328,257 @@ export default function StaffActivitiesPage() {
       alert(err instanceof Error ? err.message : "เกิดข้อผิดพลาด");
     }
   };
-const updateRegistration = async (activityId: string) => {
-  const activity = activities.find((item) => item.id === activityId);
-  if (!activity) return;
-
-  const activityStart = getActivityStartDateTime(activity);
-  if (!activityStart) {
-    alert("ไม่สามารถตรวจสอบเวลาเริ่มกิจกรรมได้");
-    return;
-  }
-
-  const now = new Date();
-  const newValue = !activity.registrationEnabled;
-
-  // ปิด Emergency Override ได้ตลอด
-  if (!newValue) {
-    const res = await fetch(`/api/activities/${activityId}`, {
+const updateWorkflow = async (
+  activityId: string,
+  field: "applicationEnabled" | "registrationEnabled",
+) => {
+  try {
+    const activity = activities.find((item) => item.id === activityId);
+    if (!activity) return;
+    const value = field === "applicationEnabled"
+      ? !activity.applicationEnabled
+      : !activity.registrationEnabled;
+    const res = await fetch("/api/activities/workflow", {
       method: "PUT",
       headers: {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        registrationEnabled: false,
+        activityId,
+        field,
+        value,
       }),
     });
-
     if (!res.ok) {
       const data = await res.json().catch(() => ({}));
-      throw new Error(
-        data.message || "ปิด Emergency Override ไม่สำเร็จ",
-      );
+      throw new Error(data.message || "อัปเดตสถานะกิจกรรมไม่สำเร็จ");
+    }
+    await fetchActivities();
+  } catch (err) {
+    alert(err instanceof Error ? err.message : "เกิดข้อผิดพลาด");
+  }
+};
+
+  const stopCamera = useCallback(() => {
+    if (scanFrameRef.current !== null) {
+      window.cancelAnimationFrame(scanFrameRef.current);
+      scanFrameRef.current = null;
+    }
+    if (scanStreamRef.current) {
+      scanStreamRef.current.getTracks().forEach((track) => track.stop());
+      scanStreamRef.current = null;
+    }
+    if (videoRef.current) {
+      videoRef.current.srcObject = null;
+    }
+    setCameraActive(false);
+    setCameraStarting(false);
+  }, []);
+
+  const readCameraFrame = useCallback(async () => {
+    const video = videoRef.current;
+    if (!video) return;
+
+    try {
+      if (video.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA) {
+        let value = "";
+        const detector = barcodeDetectorRef.current;
+
+        if (detector) {
+          const codes = await detector.detect(video);
+          value = codes.find((code) => code.rawValue)?.rawValue?.trim() || "";
+        } else if (window.jsQR) {
+          const canvas = canvasRef.current || document.createElement("canvas");
+          canvasRef.current = canvas;
+          const width = video.videoWidth;
+          const height = video.videoHeight;
+
+          if (width > 0 && height > 0) {
+            canvas.width = width;
+            canvas.height = height;
+            const context = canvas.getContext("2d", { willReadFrequently: true });
+            if (context) {
+              context.drawImage(video, 0, 0, width, height);
+              const imageData = context.getImageData(0, 0, width, height);
+              value =
+                window
+                  .jsQR(imageData.data, imageData.width, imageData.height, {
+                    inversionAttempts: "attemptBoth",
+                  })
+                  ?.data?.trim() || "";
+            }
+          }
+        }
+
+        if (value) {
+          setScanPayload(value);
+          setScanMessage("อ่าน QR สำเร็จ กดบันทึกการลงทะเบียนได้เลย");
+          setScanError("");
+          stopCamera();
+          return;
+        }
+      }
+    } catch (error) {
+      console.error("QR camera scan failed", error);
     }
 
-    await fetchActivities();
-    return;
-  }
+    scanFrameRef.current = window.requestAnimationFrame(readCameraFrame);
+  }, [stopCamera]);
 
-  // ห้ามเปิด Emergency Override หลังเริ่มกิจกรรม
-  if (now >= activityStart) {
-    alert(
-      "ไม่สามารถเปิด Emergency Override ได้ เนื่องจากกิจกรรมเริ่มแล้ว",
-    );
-    return;
-  }
+  const startCamera = useCallback(async () => {
+    setCameraError("");
+    setScanError("");
 
-  const res = await fetch(`/api/activities/${activityId}`, {
-    method: "PUT",
-    headers: {
-      "Content-Type": "application/json",
+    try {
+      setCameraStarting(true);
+      barcodeDetectorRef.current = window.BarcodeDetector
+        ? new window.BarcodeDetector({ formats: ["qr_code"] })
+        : null;
+
+      if (!barcodeDetectorRef.current) {
+        const loaded = await loadJsQr();
+        if (!loaded) {
+          setCameraError("เปิดกล้องได้ แต่ยังโหลดตัวอ่าน QR ไม่สำเร็จ กรุณาต่ออินเทอร์เน็ตหรือวางข้อมูล QR ในช่องด้านล่าง");
+        }
+      }
+
+      const stream = await requestCameraStream({
+        video: {
+          facingMode: { ideal: "environment" },
+          width: { ideal: 1280 },
+          height: { ideal: 720 },
+        },
+        audio: false,
+      });
+      scanStreamRef.current = stream;
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+        await videoRef.current.play();
+      }
+      setCameraActive(true);
+      scanFrameRef.current = window.requestAnimationFrame(readCameraFrame);
+    } catch (error) {
+      console.error("Open QR camera failed", error);
+      stopCamera();
+      const insecureMessage =
+        typeof window !== "undefined" && !window.isSecureContext
+          ? "Chrome อนุญาตกล้องสดเฉพาะ HTTPS หรือ localhost เท่านั้น สำหรับเว็บ HTTP นี้ให้ใช้ปุ่มถ่าย/เลือกภาพ QR หรือเปลี่ยนระบบเป็น HTTPS"
+          : "";
+      setCameraError(
+        error instanceof DOMException && error.name === "NotAllowedError"
+          ? "ไม่สามารถเปิดกล้องได้ เพราะยังไม่ได้อนุญาตสิทธิ์กล้อง"
+          : insecureMessage ||
+              "เปิดกล้องไม่สำเร็จ กรุณาตรวจสอบสิทธิ์กล้องหรือใช้อีกเบราว์เซอร์",
+      );
+    } finally {
+      setCameraStarting(false);
+    }
+  }, [readCameraFrame, stopCamera]);
+
+  const decodeQrImageFile = useCallback(async (file: File) => {
+    setCameraError("");
+    setScanError("");
+    setScanMessage("");
+
+    try {
+      const loaded = await loadJsQr();
+      if (!loaded || !window.jsQR) {
+        setCameraError("โหลดตัวอ่าน QR ไม่สำเร็จ กรุณาลองใหม่หรือนำข้อมูล QR มาวางในช่องด้านล่าง");
+        return;
+      }
+
+      const image = new Image();
+      image.src = URL.createObjectURL(file);
+      await new Promise<void>((resolve, reject) => {
+        image.onload = () => resolve();
+        image.onerror = () => reject(new Error("ไม่สามารถอ่านรูปภาพได้"));
+      });
+
+      const canvas = canvasRef.current || document.createElement("canvas");
+      canvasRef.current = canvas;
+      canvas.width = image.naturalWidth;
+      canvas.height = image.naturalHeight;
+      const context = canvas.getContext("2d", { willReadFrequently: true });
+      if (!context) {
+        throw new Error("ไม่สามารถเตรียมพื้นที่อ่าน QR ได้");
+      }
+
+      context.drawImage(image, 0, 0, canvas.width, canvas.height);
+      URL.revokeObjectURL(image.src);
+
+      const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
+      const result = window.jsQR(imageData.data, imageData.width, imageData.height, {
+        inversionAttempts: "attemptBoth",
+      });
+
+      if (!result?.data?.trim()) {
+        setCameraError("ไม่พบ QR ในรูปภาพ กรุณาถ่ายใหม่ให้ QR ชัดและอยู่เต็มกรอบ");
+        return;
+      }
+
+      setScanPayload(result.data.trim());
+      setScanMessage("อ่าน QR จากรูปภาพสำเร็จ กดบันทึกการลงทะเบียนได้เลย");
+    } catch (error) {
+      setCameraError(error instanceof Error ? error.message : "อ่าน QR จากรูปภาพไม่สำเร็จ");
+    }
+  }, []);
+
+  const handleQrImageChange = useCallback(
+    (event: ChangeEvent<HTMLInputElement>) => {
+      const file = event.target.files?.[0];
+      event.target.value = "";
+      if (!file) return;
+      void decodeQrImageFile(file);
     },
-    body: JSON.stringify({
-      registrationEnabled: true,
-    }),
-  });
+    [decodeQrImageFile],
+  );
 
-  if (!res.ok) {
-    const data = await res.json().catch(() => ({}));
-    throw new Error(
-      data.message || "เปิด Emergency Override ไม่สำเร็จ",
-    );
-  }
+  const closeScanModal = useCallback(() => {
+    stopCamera();
+    setScanActivity(null);
+  }, [stopCamera]);
 
-  await fetchActivities();
-};
+  useEffect(() => {
+    if (!scanActivity) stopCamera();
+    return () => stopCamera();
+  }, [scanActivity, stopCamera]);
+
+  const openScanModal = (activity: StaffActivity) => {
+    stopCamera();
+    setScanActivity(activity);
+    setScanActivityCode(activity.id);
+    setScanPayload("");
+    setScanMessage("");
+    setScanError("");
+    setCameraError("");
+  };
+
+  const submitScan = async () => {
+    if (!scanActivity) return;
+    setScanSubmitting(true);
+    setScanError("");
+    setScanMessage("");
+    try {
+      const res = await fetch(`/api/activities/${scanActivity.id}/scan-qr`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          activityCode: scanActivityCode,
+          qrPayload: scanPayload,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data?.error || data?.message || "สแกน QR ไม่สำเร็จ");
+      const studentName = `${data.student?.firstname || ""} ${data.student?.lastname || ""}`.trim();
+      setScanMessage(`ลงทะเบียนสำเร็จ: ${data.student?.studentId || ""}${studentName ? ` ${studentName}` : ""}`);
+      setScanPayload("");
+      await fetchActivities();
+    } catch (err) {
+      setScanError(err instanceof Error ? err.message : "เกิดข้อผิดพลาด");
+    } finally {
+      setScanSubmitting(false);
+    }
+  };
 
   // ===== สร้างกิจกรรม (ปรับ payload) =====
   const createActivity = async () => {
@@ -1416,9 +1635,13 @@ const updateRegistration = async (activityId: string) => {
         const err = await res.json();
         throw new Error(err.message || "สร้างกิจกรรมไม่สำเร็จ");
       }
+      const data = await res.json();
       await fetchActivities();
       setForm(emptyForm);
       setIsModalOpen(false);
+      if (data?.activityId) {
+        alert(`สร้างกิจกรรมสำเร็จ\nรหัสกิจกรรม: ${data.activityId}`);
+      }
     } catch (err) {
       alert(err instanceof Error ? err.message : "เกิดข้อผิดพลาด");
     }
@@ -1872,19 +2095,27 @@ const updateRegistration = async (activityId: string) => {
             <Plus className="h-5 w-5" /> เพิ่มกิจกรรมใหม่
           </button>
 
-          <div className="mt-5 flex gap-8 border-b border-transparent">
-            <TabButton
-              active={activeTab === "active"}
-              onClick={() => setActiveTab("active")}
-            >
-              กิจกรรมที่กำลังดำเนิน
-            </TabButton>
-            <TabButton
-              active={activeTab === "past"}
-              onClick={() => setActiveTab("past")}
-            >
-              กิจกรรมที่ผ่านมาแล้ว
-            </TabButton>
+          <div className="mt-5 overflow-x-auto border-b border-blue-100">
+            <div className="flex min-w-max gap-6">
+              {activityCategories.map((category) => (
+                <button
+                  key={category.key}
+                  type="button"
+                  onClick={() => setActiveTab(category.key)}
+                  className={`relative pb-3 text-sm font-semibold transition ${
+                    activeTab === category.key
+                      ? "text-[#1565C0]"
+                      : "text-slate-500 hover:text-slate-800"
+                  }`}
+                >
+                  {category.label}
+                  <span className="ml-1.5 text-xs text-slate-400">{categoryCounts[category.key]}</span>
+                  {activeTab === category.key && (
+                    <span className="absolute inset-x-0 -bottom-px h-0.5 rounded-full bg-[#1565C0]" />
+                  )}
+                </button>
+              ))}
+            </div>
           </div>
 
           {loading ? (
@@ -1905,6 +2136,9 @@ const updateRegistration = async (activityId: string) => {
                       <h2 className="text-sm font-bold text-slate-950">
                         {activity.title}
                       </h2>
+                      <p className="mt-2 inline-flex w-fit rounded-full bg-blue-50 px-2.5 py-1 font-mono text-[11px] font-semibold text-[#1565C0]">
+                        รหัสกิจกรรม: {activity.id}
+                      </p>
                       <div className="mt-6 flex gap-3 text-xs leading-5 text-slate-500">
                         <CalendarDays className="mt-0.5 h-4 w-4 shrink-0 text-slate-400" />
                         <div>
@@ -1971,7 +2205,7 @@ const updateRegistration = async (activityId: string) => {
                         activity.confirmationEnabled && (
                           <p className="mt-2 flex items-center gap-2 text-xs text-emerald-600">
                             <KeyRound className="h-3 w-3" />
-                            รหัส:{" "}
+                            รหัสเดิม:{" "}
                             <span className="font-mono font-bold">
                               {activity.verificationCode}
                             </span>
@@ -2028,52 +2262,34 @@ const updateRegistration = async (activityId: string) => {
                     </div>
 
                     <div className="border-blue-100 lg:border-l lg:pl-5">
-                      {(() => {
-                        const registration = getRegistrationWindowStatus(
-                          activity,
-                          registrationNow,
-                        );
-
-                        return (
-                          <>
-                            <p className="mb-2 text-sm font-bold text-slate-950">
-                              Emergency Override
-                            </p>
-
-                            <ToggleSwitch
-                              enabled={activity.registrationEnabled}
-                              onClick={() => updateRegistration(activity.id)}
-                            />
-
-                            <p className="mt-2 text-xs font-medium text-slate-700">
-                              {registration.label}
-                            </p>
-
-                            <div className="mt-2 space-y-1 text-[11px] leading-4 text-slate-500">
-                              <p>
-                                ช่วงเวลาปกติ: {formatRegistrationDateTime(
-                                  activity.registrationStart,
-                                )}
-                                {activity.registrationEnd
-                                  ? ` - ${formatRegistrationDateTime(
-                                      activity.registrationEnd,
-                                    )}`
-                                  : ""}
-                              </p>
-                              <p>
-                                {activity.registrationEnabled
-                                  ? "เปิดรับฉุกเฉินนอกช่วงเวลาได้ จนถึงก่อนเริ่มกิจกรรม"
-                                  : "ระบบเปิด/ปิดตามช่วงเวลาที่กำหนดอัตโนมัติ"}
-                              </p>
-                            </div>
-                          </>
-                        );
-                      })()}
+                      <p className="mb-2 text-sm font-bold text-slate-950">
+                        เปิดรับสมัคร
+                      </p>
+                      <ToggleSwitch
+                        enabled={Boolean(activity.applicationEnabled)}
+                        onClick={() => updateWorkflow(activity.id, "applicationEnabled")}
+                      />
+                      <p className="mt-2 text-xs text-slate-500">
+                        ให้นิสิตมองเห็นและสมัครเข้าร่วมกิจกรรม
+                      </p>
                     </div>
 
                     <div className="border-blue-100 lg:border-l lg:pl-5">
                       <p className="mb-2 text-sm font-bold text-slate-950">
-                        ยืนยันการเข้าร่วม
+                        เปิดการลงทะเบียน
+                      </p>
+                      <ToggleSwitch
+                        enabled={activity.registrationEnabled}
+                        onClick={() => updateWorkflow(activity.id, "registrationEnabled")}
+                      />
+                      <p className="mt-2 text-xs text-slate-500">
+                        เฉพาะนิสิตที่สมัครแล้วเท่านั้นที่ลงทะเบียนได้
+                      </p>
+                    </div>
+
+                    <div className="border-blue-100 lg:border-l lg:pl-5">
+                      <p className="mb-2 text-sm font-bold text-slate-950">
+                        สแกน QR / เปิดแบบประเมิน
                       </p>
                       <ToggleSwitch
                         enabled={activity.confirmationEnabled}
@@ -2081,12 +2297,24 @@ const updateRegistration = async (activityId: string) => {
                       />
                       <button
                         type="button"
+                        disabled={!activity.registrationEnabled}
+                        onClick={() => openScanModal(activity)}
+                        className={`mt-3 inline-flex h-9 w-full items-center justify-center gap-2 rounded-lg border px-3 text-xs font-semibold transition ${
+                          activity.registrationEnabled
+                            ? "border-[#1565C0] bg-white text-[#1565C0] hover:bg-blue-50"
+                            : "border-slate-300 bg-white text-slate-400"
+                        }`}
+                      >
+                        <QrCode className="h-4 w-4" />
+                        สแกน QR นิสิต
+                      </button>
+                      <button
+                        type="button"
                         disabled={
                           !activity.hasEvaluation ||
                           !activity.confirmationEnabled
                         }
-                        onClick={() => showVerificationCode(activity.id)}
-                        className={`mt-3 inline-flex h-9 w-full items-center justify-center gap-2 rounded-lg border px-3 text-xs font-semibold transition ${
+                        className={`mt-2 inline-flex h-9 w-full items-center justify-center gap-2 rounded-lg border px-3 text-xs font-semibold transition ${
                           activity.hasEvaluation && activity.confirmationEnabled
                             ? "border-[#1565C0] bg-white text-[#1565C0] hover:bg-blue-50"
                             : "border-slate-300 bg-white text-slate-400"
@@ -2102,14 +2330,12 @@ const updateRegistration = async (activityId: string) => {
                         ) : !activity.confirmationEnabled ? (
                           <>
                             <ClipboardList className="h-4 w-4" />{" "}
-                            ต้องเปิดการยืนยันก่อน
+                            ยังไม่เปิดแบบประเมิน
                           </>
                         ) : (
                           <>
-                            <KeyRound className="h-4 w-4" />
-                            {activity.verificationCode
-                              ? "ดูรหัสยืนยัน"
-                              : "สร้างรหัสยืนยันการเข้าร่วม"}
+                            <ClipboardList className="h-4 w-4" />
+                            เปิดแบบประเมินแล้ว
                           </>
                         )}
                       </button>
@@ -2223,6 +2449,156 @@ const updateRegistration = async (activityId: string) => {
           onRegenerate={regenerateCode}
           isRegenerating={isRegenerating}
         />
+      )}
+
+      {/* Modal สแกน QR นิสิต */}
+      {scanActivity && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/40 px-4 backdrop-blur-sm">
+          <div className="relative w-full max-w-lg rounded-2xl bg-white p-6 shadow-2xl sm:p-8">
+            <button
+              type="button"
+              onClick={closeScanModal}
+              className="absolute right-4 top-4 rounded-full p-2 text-slate-400 transition hover:bg-slate-100 hover:text-slate-600"
+            >
+              <X className="h-5 w-5" />
+            </button>
+
+            <div className="pr-10">
+              <h2 className="text-2xl font-semibold text-slate-950">
+                สแกน QR ลงทะเบียน
+              </h2>
+              <div className="mt-2 h-0.5 w-20 rounded-full bg-[#FFC107]" />
+              <p className="mt-3 text-sm text-slate-500">
+                {scanActivity.title}
+              </p>
+            </div>
+
+            <div className="mt-6 space-y-4">
+              <Field label="รหัสกิจกรรม">
+                <input
+                  value={scanActivityCode}
+                  onChange={(e) => setScanActivityCode(e.target.value)}
+                  className="staff-activity-input bg-white"
+                />
+              </Field>
+
+              <div className="rounded-2xl border border-blue-100 bg-slate-50 p-3">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <p className="text-sm font-semibold text-slate-800">
+                      กล้องสแกน QR นิสิต
+                    </p>
+                    <p className="mt-1 text-xs text-slate-500">
+                      ใช้ได้ทั้งคอมพิวเตอร์และมือถือ โดยมือถือจะพยายามใช้กล้องหลัง
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={cameraActive ? stopCamera : startCamera}
+                    disabled={cameraStarting}
+                    className="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-[#1565C0] bg-white px-4 text-sm font-semibold text-[#1565C0] transition hover:bg-blue-50 disabled:cursor-wait disabled:border-slate-300 disabled:text-slate-400"
+                  >
+                    {cameraActive ? (
+                      <>
+                        <CameraOff className="h-4 w-4" />
+                        ปิดกล้อง
+                      </>
+                    ) : (
+                      <>
+                        <Camera className="h-4 w-4" />
+                        {cameraStarting ? "กำลังเปิด..." : "เปิดกล้อง"}
+                      </>
+                    )}
+                  </button>
+                </div>
+
+                <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                  <button
+                    type="button"
+                    onClick={() => qrImageInputRef.current?.click()}
+                    className="inline-flex h-10 items-center justify-center gap-2 rounded-xl bg-[#1565C0] px-4 text-sm font-semibold text-white transition hover:bg-[#0D47A1]"
+                  >
+                    <QrCode className="h-4 w-4" />
+                    ถ่าย/เลือกภาพ QR
+                  </button>
+                  <p className="flex items-center text-xs leading-5 text-slate-500">
+                    ใช้ปุ่มนี้เมื่อเปิดผ่าน HTTP เช่น miscis.scidi.tsu.ac.th:3086
+                  </p>
+                  <input
+                    ref={qrImageInputRef}
+                    type="file"
+                    accept="image/*"
+                    capture="environment"
+                    onChange={handleQrImageChange}
+                    className="hidden"
+                  />
+                </div>
+
+                <div className="mt-3 overflow-hidden rounded-xl border border-blue-100 bg-slate-900">
+                  <video
+                    ref={videoRef}
+                    muted
+                    playsInline
+                    className={`aspect-video w-full object-cover ${cameraActive ? "block" : "hidden"}`}
+                  />
+                  {!cameraActive && (
+                    <div className="flex aspect-video w-full items-center justify-center px-6 text-center text-sm text-slate-300">
+                      เปิดกล้องแล้วนำ QR ของนิสิตให้อยู่ในกรอบ
+                    </div>
+                  )}
+                </div>
+
+                {cameraError && (
+                  <p className="mt-2 text-xs font-medium text-red-600">
+                    {cameraError}
+                  </p>
+                )}
+              </div>
+
+              <label className="block">
+                <span className="mb-2 block text-sm font-semibold text-slate-800">
+                  ข้อมูลจาก QR นิสิต
+                </span>
+                <textarea
+                  value={scanPayload}
+                  onChange={(e) => setScanPayload(e.target.value)}
+                  autoFocus
+                  placeholder="สแกน QR ด้วยเครื่องสแกน หรือวางข้อมูล QR ที่นิสิตแสดง"
+                  className="min-h-[140px] w-full resize-none rounded-lg border border-[#7bbaf2] bg-white p-3 text-sm text-slate-800 outline-none transition focus:border-[#1565c0] focus:ring-4 focus:ring-blue-100"
+                />
+              </label>
+
+              {scanMessage && (
+                <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm font-medium text-emerald-700">
+                  {scanMessage}
+                </div>
+              )}
+              {scanError && (
+                <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm font-medium text-red-600">
+                  {scanError}
+                </div>
+              )}
+            </div>
+
+            <div className="mt-6 flex gap-3">
+              <button
+                type="button"
+                onClick={closeScanModal}
+                className="h-11 flex-1 rounded-xl border border-slate-300 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+              >
+                ปิด
+              </button>
+              <button
+                type="button"
+                onClick={submitScan}
+                disabled={!scanActivityCode.trim() || !scanPayload.trim() || scanSubmitting}
+                className="h-11 flex-1 rounded-xl bg-[#1565C0] text-sm font-semibold text-white transition hover:bg-[#0D47A1] disabled:bg-slate-300"
+              >
+                {scanSubmitting ? "กำลังบันทึก..." : "บันทึกการลงทะเบียน"}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Modal แสดงรายชื่อผู้เข้าร่วม */}
