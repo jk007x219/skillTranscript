@@ -175,6 +175,13 @@ function combineDateTime(date: string, time: string): string {
   return `${date}T${time}`;
 }
 
+function parseLocalDateTime(value: string): Date | null {
+  if (!value) return null;
+  const normalized = value.length === 16 ? `${value}:00` : value;
+  const date = new Date(normalized);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
 function isValidEndDateTime(
   startDate: string,
   startTime: string,
@@ -1621,21 +1628,21 @@ const updateWorkflow = async (
       if (!form.registrationStart || !form.registrationEnd) {
         throw new Error("กรุณาระบุช่วงเวลาลงทะเบียน");
       }
-      // datetime-local อยู่ในรูป YYYY-MM-DDTHH:mm
-      // เปรียบเทียบเป็นค่าข้อความเพื่อไม่ให้ timezone ของเครื่องผู้ใช้
-      // ทำให้วันที่/เวลาเดียวกันคลาดเคลื่อน
-      if (form.registrationEnd <= form.registrationStart) {
+      const registrationStartObj = parseLocalDateTime(form.registrationStart);
+      const registrationEndObj = parseLocalDateTime(form.registrationEnd);
+
+      if (!registrationStartObj || !registrationEndObj) {
+        throw new Error("รูปแบบช่วงเวลาลงทะเบียนไม่ถูกต้อง");
+      }
+
+      if (registrationEndObj <= registrationStartObj) {
         throw new Error("เวลาสิ้นสุดลงทะเบียนต้องอยู่หลังเวลาเริ่มลงทะเบียน");
       }
 
-      // อนุญาตให้ลงทะเบียนก่อนเริ่มกิจกรรม หรือระหว่างกิจกรรมได้
-      // แต่ห้ามเกินเวลาสิ้นสุดกิจกรรม
-      if (
-        form.registrationStart > endDateTime ||
-        form.registrationEnd > endDateTime
-      ) {
+      // ช่วงเวลาลงทะเบียนต้องไม่เกินเวลาสิ้นสุดกิจกรรม
+      if (registrationStartObj > endDateObj || registrationEndObj > endDateObj) {
         throw new Error(
-          "ช่วงเวลาลงทะเบียนต้องอยู่ภายในช่วงเวลาของกิจกรรม และห้ามเกินเวลาสิ้นสุดกิจกรรม",
+          "ช่วงเวลาลงทะเบียนต้องไม่เกินเวลาสิ้นสุดกิจกรรม",
         );
       }
 
@@ -1725,21 +1732,21 @@ const updateWorkflow = async (
       if (!editForm.registrationStart || !editForm.registrationEnd) {
         throw new Error("กรุณาระบุช่วงเวลาลงทะเบียน");
       }
-      // datetime-local อยู่ในรูป YYYY-MM-DDTHH:mm
-      // เปรียบเทียบเป็นค่าข้อความเพื่อไม่ให้ timezone ของเครื่องผู้ใช้
-      // ทำให้วันที่/เวลาเดียวกันคลาดเคลื่อน
-      if (editForm.registrationEnd <= editForm.registrationStart) {
+      const registrationStartObj = parseLocalDateTime(editForm.registrationStart);
+      const registrationEndObj = parseLocalDateTime(editForm.registrationEnd);
+
+      if (!registrationStartObj || !registrationEndObj) {
+        throw new Error("รูปแบบช่วงเวลาลงทะเบียนไม่ถูกต้อง");
+      }
+
+      if (registrationEndObj <= registrationStartObj) {
         throw new Error("เวลาสิ้นสุดลงทะเบียนต้องอยู่หลังเวลาเริ่มลงทะเบียน");
       }
 
-      // อนุญาตให้ลงทะเบียนก่อนเริ่มกิจกรรม หรือระหว่างกิจกรรมได้
-      // แต่ห้ามเกินเวลาสิ้นสุดกิจกรรม
-      if (
-        editForm.registrationStart > endDateTime ||
-        editForm.registrationEnd > endDateTime
-      ) {
+      // ช่วงเวลาลงทะเบียนต้องไม่เกินเวลาสิ้นสุดกิจกรรม
+      if (registrationStartObj > endDateObj || registrationEndObj > endDateObj) {
         throw new Error(
-          "ช่วงเวลาลงทะเบียนต้องอยู่ภายในช่วงเวลาของกิจกรรม และห้ามเกินเวลาสิ้นสุดกิจกรรม",
+          "ช่วงเวลาลงทะเบียนต้องไม่เกินเวลาสิ้นสุดกิจกรรม",
         );
       }
 
