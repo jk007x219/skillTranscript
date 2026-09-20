@@ -134,12 +134,9 @@ function Card({
         ) : s === "applied" ? (
           <button
             onClick={onShowQr}
-            disabled={!a.registrationEnabled}
-            className="h-11 flex-1 rounded-xl border border-[#1565C0] text-sm font-semibold text-[#1565C0] disabled:border-slate-200 disabled:bg-slate-100 disabled:text-slate-400"
+            className="h-11 flex-1 rounded-xl border border-[#1565C0] text-sm font-semibold text-[#1565C0]"
           >
-            {a.registrationEnabled
-              ? "แสดง QR ลงทะเบียน"
-              : "รอเจ้าหน้าที่เปิดลงทะเบียน"}
+            "แสดง QR ลงทะเบียน"
           </button>
         ) : s === "registered" || s === "confirmed" ? (
           <button
