@@ -10,6 +10,19 @@ import { pool } from "@/lib/db";
 
 export const runtime = "nodejs";
 
+async function ensureActivityCapacityColumn() {
+  const [rows] = await pool.query<any[]>(
+    `SELECT COUNT(*) AS count
+     FROM INFORMATION_SCHEMA.COLUMNS
+     WHERE TABLE_SCHEMA = DATABASE()
+       AND TABLE_NAME = 'activity'
+       AND COLUMN_NAME = 'capacity'`,
+  );
+  if (!Number(rows[0]?.count)) {
+    await pool.query(`ALTER TABLE activity ADD COLUMN capacity INT NOT NULL DEFAULT 30`);
+  }
+}
+
 function canManage(session: any) {
   const role = session?.user?.role;
   return Boolean(session?.user?.id && (["teacher", "officer", "executive"].includes(role) || session?.user?.isExecutive));
@@ -20,6 +33,7 @@ export async function GET() {
     const session = await auth();
     if (!session?.user?.id) throw httpError(401, "กรุณาเข้าสู่ระบบ");
     await ensureActivityRegistrationColumns();
+    await ensureActivityCapacityColumn();
     await ensureParticipationStatusWorkflow();
     const isStudent = session.user.role === "student";
     const [rows] = await pool.query<any[]>(
