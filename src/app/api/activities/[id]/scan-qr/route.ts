@@ -45,7 +45,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     await ensureParticipationStatusWorkflow();
 
     const [activities] = await pool.query<any[]>(
-      `SELECT activityId, activityName, createdBy, status, registrationEnabled
+      `SELECT activityId, activityName, createdBy, status
        FROM activity
        WHERE activityId = ?
        LIMIT 1`,
@@ -59,10 +59,6 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     if (activity.status !== "active") {
       throw httpError(400, "กิจกรรมนี้ไม่ได้เปิดใช้งาน");
     }
-    if (!activity.registrationEnabled) {
-      throw httpError(400, "กรุณาเปิดรับลงทะเบียนก่อนสแกน QR นิสิต");
-    }
-
     const [registrations] = await pool.query<any[]>(
       `SELECT p.ParticipationId, p.studentId, p.activityId, p.status,
               s.firstname, s.lastname, s.program, s.major
