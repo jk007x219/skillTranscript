@@ -19,6 +19,7 @@ import {
   UsersRound,
   X,
   CalendarDays,
+  Cpu,
   MapPin,
   Clock,
 } from "lucide-react";
@@ -74,7 +75,7 @@ function getSkillIcon(title: string): React.ElementType {
   if (title.includes("ทีม")) return UsersRound;
   if (title.includes("ดิจิทัล") || title.includes("เครื่องมือ")) return MonitorCheck;
   if (title.includes("คิด") || title.includes("แก้ปัญหา")) return GraduationCap;
-  if (title.includes("ปัญญาประดิษฐ์") || title.includes("AI")) return UsersRound;
+  if (title.includes("ปัญญาประดิษฐ์") || title.includes("AI")) return Cpu;
   if (title.includes("ปลอดภัย") || title.includes("ไซเบอร์")) return ShieldCheck;
   if (title.includes("ห้องปฏิบัติการ")) return Network;
   if (title.includes("นวัตกรรม")) return Lightbulb;
@@ -86,133 +87,124 @@ function chartAngles(count: number) {
   return Array.from({ length: count }, (_, index) => -90 + (360 / count) * index);
 }
 
-function polarPoint(percent: number, angle: number) {
-  const radius = 96 * (percent / 100);
+function polarPoint(percent: number, angle: number, radius = 100, center = 130) {
+  const r = radius * (percent / 100);
   const radian = (Math.PI / 180) * angle;
-  return {
-    x: 130 + radius * Math.cos(radian),
-    y: 130 + radius * Math.sin(radian),
-  };
+  return { x: center + r * Math.cos(radian), y: center + r * Math.sin(radian) };
 }
 
-function polygonPoints(values: number[], angles: number[]) {
+function polygonPoints(values: number[], angles: number[], radius = 100, center = 130) {
   return values
     .map((value, index) => {
-      const point = polarPoint(value, angles[index]);
+      const point = polarPoint(value, angles[index], radius, center);
       return `${point.x.toFixed(1)},${point.y.toFixed(1)}`;
     })
     .join(" ");
 }
 
-function gridPolygonPoints(size: number, angles: number[]) {
-  return angles
-    .map((angle) => {
-      const point = polarPoint(size, angle);
-      return `${point.x.toFixed(1)},${point.y.toFixed(1)}`;
-    })
-    .join(" ");
+function getRadarLabel(title: string) {
+  const labels: Record<string, string> = {
+    "ทักษะการสร้างนวัตกรรมสังคม": "สร้างนวัตกรรมสังคม",
+    "ทักษะการใช้ห้องปฏิบัติการและความปลอดภัยในห้องปฏิบัติการ": "ห้องปฏิบัติการ\nและความปลอดภัย",
+    "ทักษะการคิดเชิงออกแบบนวัตกรรม": "คิดเชิงออกแบบ\nนวัตกรรม",
+    "ทักษะการใช้เครื่องมือวิทยาศาสตร์": "ใช้เครื่องมือ\nวิทยาศาสตร์",
+    "ทักษะการใช้ปัญญาประดิษฐ์": "ใช้ปัญญาประดิษฐ์",
+    "ทักษะความปลอดภัยไซเบอร์": "ความปลอดภัย\nไซเบอร์",
+    "ทักษะการสื่อสาร": "การสื่อสาร",
+    "ทักษะการเป็นผู้ประกอบการ": "การเป็น\nผู้ประกอบการ",
+    "ทักษะการทำงานเป็นทีม": "การทำงานเป็นทีม",
+    "ทักษะการคิดและการแก้ปัญหา": "คิดและแก้ปัญหา",
+    "ทักษะดิจิทัล": "ทักษะดิจิทัล",
+  };
+  return labels[title] ?? title.replace(/^ทักษะ/, "").trim();
 }
 
 function RadarChart({
-  accent = "#FFC107",
+  accent,
   values,
   labels,
   id,
 }: {
-  accent?: string;
+  accent: string;
   values: number[];
   labels: string[];
   id: string;
 }) {
+  const size = 280;
+  const center = size / 2;
+  const radius = 100;
+
   if (values.length < 3) {
     return (
-      <div className="mx-auto flex aspect-square w-full max-w-[330px] items-center justify-center rounded-full bg-gradient-to-br from-white via-slate-50 to-blue-50/70 p-6 text-center text-sm text-slate-500 shadow-[inset_0_0_0_1px_rgba(21,101,192,0.08)]">
+      <div className="flex aspect-square w-full max-w-[280px] items-center justify-center rounded-2xl bg-slate-50 p-6 text-center text-sm text-slate-400">
         ยังไม่มีข้อมูลทักษะเพียงพอสำหรับกราฟเรดาร์
       </div>
     );
   }
 
-  const softPoints = values.map((value) => Math.max(0, value - 18));
   const angles = chartAngles(values.length);
 
   return (
-    <div className="relative mx-auto flex aspect-square w-full max-w-[330px] items-center justify-center rounded-full bg-gradient-to-br from-white via-slate-50 to-blue-50/70 p-5 shadow-[inset_0_0_0_1px_rgba(21,101,192,0.08)]">
-      <div className="absolute inset-7 rounded-full bg-white/70 blur-2xl" />
-      <svg viewBox="0 0 260 260" className="relative h-full w-full overflow-visible drop-shadow-sm">
+    <div className="relative mx-auto aspect-square w-full max-w-[280px]">
+      <svg viewBox={`0 0 ${size} ${size}`} className="h-full w-full overflow-visible">
         <defs>
-          <radialGradient id={`${id}-glow`} cx="50%" cy="50%" r="62%">
-            <stop offset="0%" stopColor={accent} stopOpacity="0.34" />
-            <stop offset="100%" stopColor={accent} stopOpacity="0" />
-          </radialGradient>
-          <linearGradient id={`${id}-fill`} x1="50" x2="210" y1="30" y2="230" gradientUnits="userSpaceOnUse">
-            <stop stopColor={accent} stopOpacity="0.34" />
-            <stop offset="1" stopColor={accent} stopOpacity="0.08" />
+          <linearGradient id={`${id}-fill`} x1="0" x2="1" y1="0" y2="1">
+            <stop stopColor={accent} stopOpacity="0.32" />
+            <stop offset="1" stopColor={accent} stopOpacity="0.06" />
           </linearGradient>
-          <filter id={`${id}-shadow`} x="-30%" y="-30%" width="160%" height="160%">
-            <feDropShadow dx="0" dy="10" stdDeviation="8" floodColor={accent} floodOpacity="0.24" />
-          </filter>
         </defs>
-
-        <circle cx="130" cy="130" r="98" fill={`url(#${id}-glow)`} />
-        {[100, 80, 60, 40, 20].map((size) => (
+        {[100, 75, 50, 25].map((ring) => (
           <polygon
-            key={size}
-            points={gridPolygonPoints(size, angles)}
+            key={ring}
+            points={polygonPoints(angles.map(() => ring), angles, radius, center)}
             fill="none"
-            stroke={size === 100 ? "#BFD8F3" : "#D8E7F7"}
+            stroke="#E2E8F0"
             strokeWidth="1"
           />
         ))}
-        {angles.map((angle) => (
-          <line
-            key={angle}
-            x1="130"
-            y1="130"
-            x2="130"
-            y2="26"
-            stroke="#D8E7F7"
-            strokeWidth="1"
-            transform={`rotate(${angle} 130 130)`}
-          />
-        ))}
+        {angles.map((angle) => {
+          const end = polarPoint(100, angle, radius, center);
+          return (
+            <line
+              key={angle}
+              x1={center}
+              y1={center}
+              x2={end.x}
+              y2={end.y}
+              stroke="#E2E8F0"
+              strokeWidth="1"
+            />
+          );
+        })}
         <polygon
-          points={polygonPoints(values, angles)}
+          points={polygonPoints(values, angles, radius, center)}
           fill={`url(#${id}-fill)`}
           stroke={accent}
+          strokeWidth="2.5"
           strokeLinejoin="round"
-          strokeWidth="4"
-          filter={`url(#${id}-shadow)`}
-        />
-        <polygon
-          points={polygonPoints(softPoints, angles)}
-          fill="white"
-          fillOpacity="0.2"
-          stroke={accent}
-          strokeDasharray="4 7"
-          strokeLinecap="round"
-          strokeOpacity="0.55"
-          strokeWidth="2"
         />
         {values.map((value, index) => {
-          const point = polarPoint(value, angles[index]);
+          const point = polarPoint(value, angles[index], radius, center);
           return (
-            <g key={`${id}-${index}`}>
-              <circle cx={point.x} cy={point.y} r="6.5" fill="white" stroke={accent} strokeWidth="3" />
-              <circle cx={point.x} cy={point.y} r="2.5" fill={accent} />
-            </g>
+            <circle
+              key={`${id}-pt-${index}`}
+              cx={point.x}
+              cy={point.y}
+              r="4"
+              fill="white"
+              stroke={accent}
+              strokeWidth="2.5"
+            />
           );
         })}
       </svg>
       {labels.map((label, index) => {
-        const point = polarPoint(122, angles[index]);
+        const point = polarPoint(122, angles[index], radius, center);
         return (
           <span
-            key={label}
-            className="absolute max-w-[7rem] -translate-x-1/2 -translate-y-1/2 rounded-full bg-white/85 px-2 py-1 text-center text-[10px] font-medium leading-4 text-slate-600 shadow-sm ring-1 ring-blue-100"
-            style={{
-              left: `${(point.x / 260) * 100}%`,
-              top: `${(point.y / 260) * 100}%`,
-            }}
+            key={`${id}-label-${index}`}
+            className="absolute w-24 -translate-x-1/2 -translate-y-1/2 whitespace-pre-line text-center text-[10px] font-medium leading-tight text-slate-500"
+            style={{ left: `${(point.x / size) * 100}%`, top: `${(point.y / size) * 100}%` }}
           >
             {label}
           </span>
@@ -266,7 +258,29 @@ function ProgressList({ items, accent, onSkillClick }: { items: SkillWithIcon[];
   );
 }
 
-// ===== DashboardPanel (เพิ่ม onSkillClick) =====
+// ===== DashboardPanel =====
+type SkillLevel = "basic" | "intermediate" | "advanced";
+type ProgressTab = SkillLevel | "all";
+
+function normalizeSkillLevel(level?: string | null): SkillLevel {
+  const value = (level || "").trim().toLowerCase();
+  if (value.includes("สูง") || value.includes("advanced") || value.includes("high") || value === "3") return "advanced";
+  if (value.includes("กลาง") || value.includes("intermediate") || value.includes("medium") || value.includes("mid") || value === "2") return "intermediate";
+  return "basic";
+}
+
+const levelLabels: Record<ProgressTab, string> = {
+  all: "รวม",
+  basic: "พื้นฐาน",
+  intermediate: "กลาง",
+  advanced: "สูง",
+};
+
+function averagePercent(items: SkillWithIcon[]) {
+  if (items.length === 0) return 0;
+  return Math.round(items.reduce((total, item) => total + item.percent, 0) / items.length);
+}
+
 function DashboardPanel({
   title,
   subtitle,
@@ -282,29 +296,75 @@ function DashboardPanel({
   chartId: string;
   onSkillClick?: (skill: SkillWithIcon) => void;
 }) {
-  const average =
-    items.length > 0 ? Math.round(items.reduce((total, item) => total + item.percent, 0) / items.length) : 0;
+  const [activeTab, setActiveTab] = useState<ProgressTab>("all");
+
+  const grouped = useMemo(
+    () => ({
+      basic: items.filter((item) => normalizeSkillLevel(item.level) === "basic"),
+      intermediate: items.filter((item) => normalizeSkillLevel(item.level) === "intermediate"),
+      advanced: items.filter((item) => normalizeSkillLevel(item.level) === "advanced"),
+    }),
+    [items],
+  );
+
+  const visibleItems = activeTab === "all" ? items : grouped[activeTab];
+  const tabs: Array<{ key: ProgressTab; count: number }> = [
+    { key: "all", count: items.length },
+    { key: "basic", count: grouped.basic.length },
+    { key: "intermediate", count: grouped.intermediate.length },
+    { key: "advanced", count: grouped.advanced.length },
+  ];
 
   return (
-    <section className="overflow-hidden rounded-2xl border border-blue-100 bg-white shadow-[0_18px_50px_rgba(15,23,42,0.08)]">
-      <div className="flex flex-col gap-4 border-b border-blue-50 bg-gradient-to-r from-white via-blue-50/60 to-white px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <div className="flex items-center gap-2">
-            <span className="flex h-8 w-8 items-center justify-center rounded-lg text-white shadow-sm" style={{ backgroundColor: accent }}>
-              <Star className="h-4 w-4" aria-hidden="true" />
-            </span>
-            <h2 className="text-base font-semibold text-slate-950">{title}</h2>
+    <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
+      <div className="flex flex-col gap-3 border-b border-slate-100 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex items-start gap-3">
+          <span className="mt-1 h-8 w-1 shrink-0 rounded-full" style={{ backgroundColor: accent }} />
+          <div>
+            <h2 className="text-base font-semibold text-slate-900">{title}</h2>
+            <p className="mt-0.5 text-xs text-slate-500">{subtitle}</p>
           </div>
-          <p className="mt-1 text-xs text-[#1565C0]">{subtitle}</p>
         </div>
-        <div className="inline-flex w-fit items-center gap-2 rounded-full bg-white px-3 py-2 text-xs font-semibold text-slate-700 shadow-sm ring-1 ring-blue-100">
-          <CheckCircle2 className="h-4 w-4" style={{ color: accent }} aria-hidden="true" />
-          ภาพรวม {average}%
-        </div>
+        <span className="w-fit rounded-full bg-slate-50 px-3 py-1 text-xs font-semibold text-slate-600">
+          {items.length} ทักษะ
+        </span>
       </div>
-      <div className="grid gap-6 p-5 lg:grid-cols-[0.9fr_1fr] lg:items-center">
-        <RadarChart accent={accent} values={items.map((item) => item.percent)} labels={items.map((item) => item.skillName)} id={chartId} />
-        <ProgressList items={items} accent={accent} onSkillClick={onSkillClick} />
+
+      <div className="px-5 py-5">
+        <div className="mb-5 flex flex-wrap gap-1.5">
+          {tabs.map((tab) => {
+            const active = activeTab === tab.key;
+            return (
+              <button
+                key={tab.key}
+                type="button"
+                onClick={() => setActiveTab(tab.key)}
+                className={`rounded-full px-3.5 py-1.5 text-xs font-semibold transition-colors ${active ? "text-white shadow-sm" : "bg-slate-50 text-slate-500 hover:bg-slate-100 hover:text-slate-700"}`}
+                style={active ? { backgroundColor: accent } : undefined}
+              >
+                {levelLabels[tab.key]}
+                <span className="ml-1.5 opacity-70">{tab.count}</span>
+              </button>
+            );
+          })}
+        </div>
+
+        <div className="grid gap-6 lg:grid-cols-[280px_1fr]">
+          <div className="flex flex-col items-center gap-3 rounded-xl bg-slate-50/60 p-4">
+            <RadarChart
+              accent={accent}
+              values={visibleItems.length >= 3 ? visibleItems.map((item) => item.percent) : []}
+              labels={visibleItems.map((item) => getRadarLabel(item.skillName))}
+              id={`${chartId}-${activeTab}`}
+            />
+            <div className="text-center">
+              <p className="text-2xl font-semibold tabular-nums text-slate-900">{averagePercent(visibleItems)}%</p>
+              <p className="text-xs text-slate-500">คะแนนเฉลี่ยของหมวดนี้</p>
+            </div>
+          </div>
+
+          <ProgressList items={visibleItems} accent={accent} onSkillClick={onSkillClick} />
+        </div>
       </div>
     </section>
   );
@@ -516,21 +576,11 @@ export default function TeacherStudentSkillsPage() {
     }));
   }, [allSkills]);
 
-  // แยกทักษะตาม "ระดับ" ทั้ง 3 ระดับ
-  // พื้นฐาน / กลาง / สูง
-  const skillsByLevel = useMemo(() => {
-    const groups: Record<string, SkillWithIcon[]> = {
-      "พื้นฐาน": [],
-      "กลาง": [],
-      "สูง": [],
+  const { facultySkillProgress, essentialSkillProgress } = useMemo(() => {
+    return {
+      facultySkillProgress: skillsWithIcon.filter((skill) => isFacultySkill(skill.skillName)),
+      essentialSkillProgress: skillsWithIcon.filter((skill) => !isFacultySkill(skill.skillName)),
     };
-
-    skillsWithIcon.forEach((skill) => {
-      const level = skill.level === "พื้นฐาน" || skill.level === "สูง" ? skill.level : "กลาง";
-      groups[level].push(skill);
-    });
-
-    return groups;
   }, [skillsWithIcon]);
 
   const totalSkills = skillsWithIcon.length;
@@ -700,31 +750,22 @@ export default function TeacherStudentSkillsPage() {
             </div>
           </div>
 
-          {/* กราฟทักษะทั้ง 3 ระดับ */}
+          {/* กราฟทักษะเหมือนหน้า Student Dashboard */}
           <DashboardPanel
-            title="ทักษะระดับพื้นฐาน"
-            subtitle="กราฟแสดงทักษะที่อยู่ในระดับพื้นฐาน"
-            accent="#39b54a"
-            items={skillsByLevel["พื้นฐาน"]}
-            chartId="basic-skill-chart"
-            onSkillClick={handleSkillClick}
-          />
-
-          <DashboardPanel
-            title="ทักษะระดับกลาง"
-            subtitle="กราฟแสดงทักษะที่อยู่ในระดับกลาง"
+            title="ทักษะของนิสิตคณะวิทยาศาสตร์ต้องมี"
+            subtitle="คำนวณจากกิจกรรมและชั่วโมงที่นิสิตเข้าร่วมในฐานข้อมูล"
             accent="#FFC107"
-            items={skillsByLevel["กลาง"]}
-            chartId="intermediate-skill-chart"
+            items={facultySkillProgress}
+            chartId="faculty-skill-chart"
             onSkillClick={handleSkillClick}
           />
 
           <DashboardPanel
-            title="ทักษะระดับสูง"
-            subtitle="กราฟแสดงทักษะที่อยู่ในระดับสูง"
+            title="ทักษะที่จำเป็นสำหรับนิสิต"
+            subtitle="คำนวณจากกิจกรรมและชั่วโมงที่นิสิตเข้าร่วมในฐานข้อมูล"
             accent="#1565C0"
-            items={skillsByLevel["สูง"]}
-            chartId="advanced-skill-chart"
+            items={essentialSkillProgress}
+            chartId="essential-skill-chart"
             onSkillClick={handleSkillClick}
           />
 
