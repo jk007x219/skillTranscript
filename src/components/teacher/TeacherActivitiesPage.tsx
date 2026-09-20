@@ -1317,21 +1317,17 @@ export default function StaffActivitiesPage() {
 
   const matchesActivityCategory = useCallback(
     (activity: TeacherActivity, category: ActivityCategory) => {
-      if (category === "mine") {
-        return Boolean(
-          currentUserId && activity.createdBy === currentUserId,
-        );
+      // อาจารย์ต้องเห็นเฉพาะกิจกรรมที่ตนเองสร้างเท่านั้น
+      if (!currentUserId || activity.createdBy !== currentUserId) {
+        return false;
       }
 
       if (category === "past") {
         return isActivityPast(activity);
       }
 
-      if (category === "external") {
-        return isExternalActivity(activity);
-      }
-
-      return true;
+      // เหลือเฉพาะกิจกรรมของอาจารย์เองเท่านั้น
+      return category === "mine";
     },
     [currentUserId],
   );
