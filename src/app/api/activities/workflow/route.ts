@@ -35,6 +35,27 @@ export async function GET() {
        ORDER BY a.date DESC, a.time DESC`,
       [session.user.studentId || ""],
     );
+
+    const activityIds = rows.map((r: any) => r.activityId).filter(Boolean);
+    const skillMap: Record<string, Array<{ skillId?: string | null; name: string; level: string }>> = {};
+    if (activityIds.length > 0) {
+      const placeholders = activityIds.map(() => "?").join(", ");
+      const [skillRows] = await pool.query<any[]>(
+        `SELECT activityId, skillId, skillname, level
+         FROM activityskill
+         WHERE activityId IN (${placeholders})
+         ORDER BY activityId, skillname`,
+        activityIds,
+      );
+      for (const skill of skillRows) {
+        if (!skillMap[skill.activityId]) skillMap[skill.activityId] = [];
+        skillMap[skill.activityId].push({
+          skillId: skill.skillId || null,
+          name: String(skill.skillname || "ทักษะทั่วไป"),
+          level: String(skill.level || "กลาง"),
+        });
+      }
+    }
     return NextResponse.json(rows.map((r) => ({
       activityId: r.activityId,
       title: r.activityName,
@@ -96,6 +117,7 @@ export async function GET() {
           now < activityEnd,
         );
       })(),
+      skills: skillMap[r.activityId] || [],
       participationStatus: r.participationStatus || null,
       registrationQrToken: r.registrationQrToken || null,
       qrPayload: r.registrationQrToken ? buildRegistrationQrPayload(r.activityId, r.registrationQrToken) : null,
