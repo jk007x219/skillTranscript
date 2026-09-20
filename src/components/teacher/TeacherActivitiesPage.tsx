@@ -2281,12 +2281,6 @@ export default function StaffActivitiesPage() {
 
                         <div className="flex items-center gap-2">
                           <ActionButton
-                            icon={KeyRound}
-                            label={generatingId === activity.id ? "กำลังสร้าง..." : "รหัสยืนยัน"}
-                            onClick={() => showVerificationCode(activity.id)}
-                            disabled={generatingId === activity.id}
-                          />
-                          <ActionButton
                             icon={Edit}
                             label="แก้ไข"
                             onClick={() => handleEdit(activity)}
@@ -2382,21 +2376,6 @@ export default function StaffActivitiesPage() {
                             </button>
                           )}
 
-                          {activity.verificationCode && activity.confirmationEnabled && (
-                            <span className="inline-flex items-center gap-1.5 text-emerald-600">
-                              <KeyRound className="h-3.5 w-3.5" />
-                              รหัสเดิม:
-                              <span className="font-mono font-semibold">
-                                {activity.verificationCode}
-                              </span>
-                              (เปิดอยู่)
-                            </span>
-                          )}
-                          {activity.verificationCode && !activity.confirmationEnabled && (
-                            <span className="inline-flex items-center gap-1.5 text-slate-400">
-                              <KeyRound className="h-3.5 w-3.5" /> รหัสถูกซ่อน (ปิดการมองเห็น)
-                            </span>
-                          )}
                         </div>
                       )}
 
@@ -2526,20 +2505,6 @@ export default function StaffActivitiesPage() {
             saveEvaluation(updatedEvaluation, editingEvaluationActivity.id);
             setEditingEvaluationActivity(null);
           }}
-        />
-      )}
-
-      {/* Modal แสดงรหัสยืนยัน */}
-      {showCodeModal && modalActivity && (
-        <VerificationCodeModal
-          code={modalActivity.verificationCode || ""}
-          expiresAt={modalActivity.codeExpiresAt || new Date().toISOString()}
-          onClose={() => {
-            setShowCodeModal(false);
-            setModalActivityId(null);
-          }}
-          onRegenerate={regenerateCode}
-          isRegenerating={isRegenerating}
         />
       )}
 
