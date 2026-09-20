@@ -18,8 +18,6 @@ import {
   Users,
   X,
   Trash2,
-  Copy,
-  Check,
   Clock,
   Loader2,
   Edit,
@@ -119,8 +117,6 @@ type TeacherActivity = {
   status: ActivityStatus;
   skills: ActivitySkill[];
   evaluation?: EvaluationQuestion[];
-  verificationCode?: string | null;
-  codeExpiresAt?: string | null;
   templateId?: string | null;
   registrationStart?: string | null;
   registrationEnd?: string | null;
@@ -1171,116 +1167,6 @@ function EvaluationModal({
   );
 }
 
-// ---------- VerificationCodeModal ----------
-function VerificationCodeModal({
-  code,
-  expiresAt,
-  onClose,
-  onRegenerate,
-  isRegenerating,
-}: {
-  code: string;
-  expiresAt: string;
-  onClose: () => void;
-  onRegenerate: () => void;
-  isRegenerating: boolean;
-}) {
-  const [copied, setCopied] = useState(false);
-  const handleCopy = () => {
-    navigator.clipboard.writeText(code);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  };
-  const formatDate = (dateStr: string) => {
-    const date = new Date(dateStr);
-    return date.toLocaleString("th-TH", {
-      day: "numeric",
-      month: "long",
-      year: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-    });
-  };
-
-  return (
-    <ModalShell
-      title={code ? "รหัสยืนยันการเข้าร่วม" : "ยังไม่มีรหัสยืนยัน"}
-      onClose={onClose}
-      maxWidthClass="max-w-md"
-      zIndexClass="z-[90]"
-    >
-      <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-blue-50 text-[#2455A4]">
-        <KeyRound className="h-7 w-7" />
-      </div>
-
-      <div className="mt-6 space-y-5">
-        <div className="rounded-xl border border-slate-100 bg-slate-50 p-6 text-center">
-          <p className="text-sm text-slate-500">รหัสยืนยัน</p>
-          {code ? (
-            <p className="mt-2 font-mono text-4xl font-bold tracking-[0.3em] text-[#2455A4]">
-              {code}
-            </p>
-          ) : (
-            <p className="mt-2 text-sm text-slate-400">
-              ยังไม่มีรหัส กรุณาสร้างรหัสใหม่
-            </p>
-          )}
-        </div>
-
-        {code && (
-          <div className="flex items-center justify-between rounded-lg border border-slate-100 bg-slate-50 px-4 py-3">
-            <div className="flex items-center gap-3">
-              <Clock className="h-5 w-5 text-slate-400" />
-              <div>
-                <p className="text-xs text-slate-500">หมดอายุ</p>
-                <p className="text-sm font-medium text-slate-700">
-                  {formatDate(expiresAt)}
-                </p>
-              </div>
-            </div>
-            <button
-              type="button"
-              onClick={handleCopy}
-              className="inline-flex items-center gap-2 rounded-lg border border-[#2455A4] bg-white px-4 py-2 text-sm font-medium text-[#2455A4] transition hover:bg-blue-50"
-            >
-              {copied ? (
-                <>
-                  <Check className="h-4 w-4" /> คัดลอกแล้ว
-                </>
-              ) : (
-                <>
-                  <Copy className="h-4 w-4" /> คัดลอก
-                </>
-              )}
-            </button>
-          </div>
-        )}
-
-        <div className="flex gap-3">
-          {code && (
-            <button
-              type="button"
-              onClick={onRegenerate}
-              disabled={isRegenerating}
-              className="flex-1 h-11 rounded-xl border border-[#2455A4] text-sm font-semibold text-[#2455A4] transition hover:bg-blue-50 disabled:opacity-50"
-            >
-              {isRegenerating ? "กำลังสร้าง..." : "สร้างรหัสใหม่"}
-            </button>
-          )}
-          <button
-            type="button"
-            onClick={onClose}
-            className={`${code ? "flex-1" : "w-full"} h-11 rounded-xl bg-[#2455A4] text-sm font-semibold text-white shadow-md transition hover:bg-[#1B3F80]`}
-          >
-            ปิด
-          </button>
-        </div>
-      </div>
-    </ModalShell>
-  );
-}
-
-// ---------- Main Page ----------
 export default function StaffActivitiesPage() {
   const [activities, setActivities] = useState<TeacherActivity[]>([]);
   const [skillOptions, setSkillOptions] = useState<SkillOption[]>([]);
@@ -1295,10 +1181,6 @@ export default function StaffActivitiesPage() {
     useState<TeacherActivity | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [generatingId, setGeneratingId] = useState<string | null>(null);
-  const [isRegenerating, setIsRegenerating] = useState(false);
-  const [showCodeModal, setShowCodeModal] = useState(false);
-  const [modalActivityId, setModalActivityId] = useState<string | null>(null);
   const [showParticipantsModal, setShowParticipantsModal] = useState(false);
   const [participants, setParticipants] = useState<any[]>([]);
   const [selectedParticipantActivityId, setSelectedParticipantActivityId] =
@@ -2160,8 +2042,6 @@ export default function StaffActivitiesPage() {
     setEditForm((prev) => ({ ...prev, templateId }));
   };
 
-  const modalActivity = modalActivityId
-    ? activities.find((a) => a.id === modalActivityId)
     : null;
 
   const formatActivityHours = (hours: number | null | undefined): string => {
