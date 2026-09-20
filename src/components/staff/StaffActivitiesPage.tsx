@@ -63,7 +63,7 @@ declare global {
 }
 
 type ActivityStatus = "active" | "past";
-type ActivityCategory = "all" | "mine" | "past";
+type ActivityCategory = "all" | "mine" | "past" | "external";
 
 type ActivitySkill = {
   skillId?: string;
@@ -261,6 +261,10 @@ function getActivityStartDateTime(activity: StaffActivity): Date | null {
   const date = String(activity.date).slice(0, 10);
   const time = String(activity.time || "00:00").slice(0, 5);
   return new Date(`${date}T${time}`);
+}
+
+function isExternalActivity(activity: StaffActivity) {
+  return activity.location === "กิจกรรมภายนอก";
 }
 
 function isActivityPast(activity: StaffActivity, now: Date = new Date()) {
@@ -1272,6 +1276,7 @@ export default function StaffActivitiesPage() {
     { key: "all", label: "กิจกรรมทั้งหมด" },
     { key: "mine", label: "กิจกรรมที่สร้างโดยฉัน" },
     { key: "past", label: "กิจกรรมที่สิ้นสุดแล้ว" },
+    { key: "external", label: "กิจกรรมที่นิสิตขอเพิ่ม" },
   ];
 
   const matchesActivityCategory = useCallback(
@@ -1284,6 +1289,10 @@ export default function StaffActivitiesPage() {
 
       if (category === "past") {
         return isActivityPast(activity);
+      }
+
+      if (category === "external") {
+        return isExternalActivity(activity);
       }
 
       return true;
@@ -1307,7 +1316,7 @@ export default function StaffActivitiesPage() {
         ).length;
         return counts;
       },
-      { all: 0, mine: 0, past: 0 },
+      { all: 0, mine: 0, past: 0, external: 0 },
     );
   }, [activities, matchesActivityCategory]);
 
@@ -2237,41 +2246,46 @@ const updateWorkflow = async (
                           ) : null}
                         </div>
                       </div>
-                      {/* แสดงปุ่มสร้าง/แก้ไขแบบประเมิน */}
-                      {!activity.hasEvaluation ? (
-                        <p className="mt-3 flex items-center gap-1 text-[10px] text-red-500">
-                          <FileWarning className="h-3 w-3" />
-                          ยังไม่มีแบบประเมินความรู้
-                          <button
-                            type="button"
-                            onClick={() => setEvaluationActivity(activity)}
-                            className="ml-1 text-[#1565C0] underline underline-offset-2 hover:text-[#0D47A1]"
-                          >
-                            สร้างแบบประเมิน
-                          </button>
-                        </p>
-                      ) : (
-                        <button
-                          type="button"
-                          onClick={() => setEditingEvaluationActivity(activity)}
-                          className="mt-3 text-xs text-[#1565C0] underline underline-offset-2 hover:text-[#0D47A1]"
-                        >
-                          แก้ไขแบบประเมิน
-                        </button>
+                      {!isExternalActivity(activity) && (
+                        <>
+                          {/* แสดงปุ่มสร้าง/แก้ไขแบบประเมิน */}
+                          {!activity.hasEvaluation ? (
+                            <p className="mt-3 flex items-center gap-1 text-[10px] text-red-500">
+                              <FileWarning className="h-3 w-3" />
+                              ยังไม่มีแบบประเมินความรู้
+                              <button
+                                type="button"
+                                onClick={() => setEvaluationActivity(activity)}
+                                className="ml-1 text-[#1565C0] underline underline-offset-2 hover:text-[#0D47A1]"
+                              >
+                                สร้างแบบประเมิน
+                              </button>
+                            </p>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => setEditingEvaluationActivity(activity)}
+                              className="mt-3 text-xs text-[#1565C0] underline underline-offset-2 hover:text-[#0D47A1]"
+                            >
+                              แก้ไขแบบประเมิน
+                            </button>
+                          )}
+                          {activity.verificationCode &&
+                            activity.confirmationEnabled && (
+                              <p className="mt-2 flex items-center gap-2 text-xs text-emerald-600">
+                                <KeyRound className="h-3 w-3" />
+                                รหัสเดิม:{" "}
+                                <span className="font-mono font-bold">
+                                  {activity.verificationCode}
+                                </span>
+                                <span className="text-[10px] text-slate-400">
+                                  (เปิดอยู่)
+                                </span>
+                              </p>
+                            )}
+
+                        </>
                       )}
-                      {activity.verificationCode &&
-                        activity.confirmationEnabled && (
-                          <p className="mt-2 flex items-center gap-2 text-xs text-emerald-600">
-                            <KeyRound className="h-3 w-3" />
-                            รหัสเดิม:{" "}
-                            <span className="font-mono font-bold">
-                              {activity.verificationCode}
-                            </span>
-                            <span className="text-[10px] text-slate-400">
-                              (เปิดอยู่)
-                            </span>
-                          </p>
-                        )}
                       {activity.verificationCode &&
                         !activity.confirmationEnabled && (
                           <p className="mt-2 flex items-center gap-2 text-xs text-slate-400">
@@ -2349,45 +2363,49 @@ const updateWorkflow = async (
                       </p>
                     </div>
 
-                    <div className="border-blue-100 lg:border-l lg:pl-5">
-                      <p className="mb-2 text-sm font-bold text-slate-950">
-                        เปิดแบบประเมิน
-                      </p>
-                      <ToggleSwitch
-                        enabled={activity.confirmationEnabled}
-                        onClick={() => updateConfirmation(activity.id)}
-                      />
-                      <button
-                        type="button"
-                        disabled={
-                          !activity.hasEvaluation ||
-                          !activity.confirmationEnabled
-                        }
-                        className={`mt-3 inline-flex h-9 w-full items-center justify-center gap-2 rounded-lg border px-3 text-xs font-semibold transition ${
-                          activity.hasEvaluation && activity.confirmationEnabled
-                            ? "border-[#1565C0] bg-white text-[#1565C0] hover:bg-blue-50"
-                            : "border-slate-300 bg-white text-slate-400"
-                        }`}
-                      >
-                        {generatingId === activity.id ? (
-                          "กำลังสร้าง..."
-                        ) : !activity.hasEvaluation ? (
-                          <>
-                            <ClipboardList className="h-4 w-4" />{" "}
-                            ต้องมีแบบประเมินก่อน
-                          </>
-                        ) : !activity.confirmationEnabled ? (
-                          <>
-                            <ClipboardList className="h-4 w-4" />{" "}
-                            ยังไม่เปิดแบบประเมิน
-                          </>
-                        ) : (
-                          <>
-                            <ClipboardList className="h-4 w-4" />
-                            เปิดแบบประเมินแล้ว
-                          </>
-                        )}
-                      </button>
+                    {!isExternalActivity(activity) && (
+                                          <div className="border-blue-100 lg:border-l lg:pl-5">
+                                            <p className="mb-2 text-sm font-bold text-slate-950">
+                                              เปิดแบบประเมิน
+                                            </p>
+                                            <ToggleSwitch
+                                              enabled={activity.confirmationEnabled}
+                                              onClick={() => updateConfirmation(activity.id)}
+                                            />
+                                            <button
+                                              type="button"
+                                              disabled={
+                                                !activity.hasEvaluation ||
+                                                !activity.confirmationEnabled
+                                              }
+                                              className={`mt-3 inline-flex h-9 w-full items-center justify-center gap-2 rounded-lg border px-3 text-xs font-semibold transition ${
+                                                activity.hasEvaluation && activity.confirmationEnabled
+                                                  ? "border-[#1565C0] bg-white text-[#1565C0] hover:bg-blue-50"
+                                                  : "border-slate-300 bg-white text-slate-400"
+                                              }`}
+                                            >
+                                              {generatingId === activity.id ? (
+                                                "กำลังสร้าง..."
+                                              ) : !activity.hasEvaluation ? (
+                                                <>
+                                                  <ClipboardList className="h-4 w-4" />{" "}
+                                                  ต้องมีแบบประเมินก่อน
+                                                </>
+                                              ) : !activity.confirmationEnabled ? (
+                                                <>
+                                                  <ClipboardList className="h-4 w-4" />{" "}
+                                                  ยังไม่เปิดแบบประเมิน
+                                                </>
+                                              ) : (
+                                                <>
+                                                  <ClipboardList className="h-4 w-4" />
+                                                  เปิดแบบประเมินแล้ว
+                                                </>
+                                              )}
+                                            </button>
+                      
+                      
+                    )}
 
                       {/* ปุ่มแก้ไขและลบ */}
                       <div className="mt-3 flex gap-2">
