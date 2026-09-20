@@ -24,8 +24,9 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
 
     const [rows] = await pool.query<any[]>(
       `SELECT activityId, status, applicationEnabled, registrationEnabled, confirmationEnabled,
-              date, time, endDate, endTime, registrationStart, registrationEnd
-       FROM activity WHERE activityId = ? LIMIT 1`,
+              date, time, endDate, endTime, registrationStart, registrationEnd, capacity,
+              (SELECT COUNT(*) FROM participation pc WHERE pc.activityId = activity.activityId) AS applicantCount
+       FROM activity activity WHERE activityId = ? LIMIT 1`,
       [id],
     );
     const activity = rows[0];
@@ -58,6 +59,12 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
     }
     if (activityEnd <= activityStart) {
       throw httpError(400, "ช่วงเวลากิจกรรมไม่ถูกต้อง");
+    }
+
+    const capacity = Number(activity.capacity || 0);
+    const applicantCount = Number(activity.applicantCount || 0);
+    if (capacity > 0 && applicantCount >= capacity) {
+      throw httpError(409, `กิจกรรมนี้เต็มแล้ว (${capacity} คน)`);
     }
 
     const [existing] = await pool.query<any[]>(
