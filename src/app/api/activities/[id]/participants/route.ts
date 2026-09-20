@@ -18,13 +18,31 @@ export async function GET(request: NextRequest, context: RouteContext) {
          s.firstname, 
          s.lastname, 
          s.major,
-         s.program,   -- ✅ เพิ่มหลักสูตร
+         s.program,
          p.status,
-         p.score
+         CASE
+           WHEN COALESCE(SUM(ps.maxScore), 0) > 0
+             THEN ROUND((COALESCE(SUM(ps.earnedScore), 0) / SUM(ps.maxScore)) * 100, 2)
+           WHEN p.score IS NOT NULL
+             THEN ROUND(LEAST(GREATEST(p.score, 0), 1) * 100, 2)
+           ELSE NULL
+         END AS score
        FROM participation p
        JOIN students s ON p.studentId = s.studentId
+       LEFT JOIN participation_skill ps ON ps.participationId = p.ParticipationId
        WHERE p.activityId = ?
          AND p.status IN ('confirmed', 'completed')
+       GROUP BY
+         p.ParticipationId,
+         s.studentId,
+         s.firstname,
+         s.lastname,
+         s.major,
+         s.program,
+         p.status,
+         p.score,
+         p.joinDate,
+         p.created_at
        ORDER BY p.joinDate DESC, p.created_at DESC`,
       [id]
     );
