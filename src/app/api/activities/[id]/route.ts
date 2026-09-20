@@ -334,14 +334,14 @@ function getRegistrationStatus(
     );
 
   // เปิดตามช่วงเวลาที่กำหนด
+  // ลงทะเบียนได้ทั้งก่อนเริ่มกิจกรรมและระหว่างกิจกรรม
+  // แต่ต้องไม่เกินเวลาสิ้นสุดการลงทะเบียน
   const normalRegistrationOpen =
     Boolean(
       registrationStart &&
         registrationEnd &&
-        activityStart &&
         now >= registrationStart &&
-        now < registrationEnd &&
-        now < activityStart,
+        now < registrationEnd,
     );
 
   // Emergency Override
@@ -835,98 +835,87 @@ export async function PUT(
     // Registration Start / End
     // ========================================================
 
-    const finalRegistrationStart =
-      registrationStart !==
-      undefined
-        ? registrationStart
-        : activityRows[0]
-            .registrationStart;
+    // ตรวจสอบช่วงเวลาลงทะเบียนเฉพาะเมื่อมีการแก้ไข
+    // กิจกรรมหรือข้อมูลช่วงเวลาลงทะเบียนเท่านั้น
+    // การบันทึกแบบประเมินส่งมาเฉพาะ evaluation/hasEvaluation
+    // จึงไม่ควรนำช่วงเวลาลงทะเบียนเดิมมาตรวจซ้ำ
+    const shouldValidateRegistration =
+      registrationStart !== undefined ||
+      registrationEnd !== undefined ||
+      dateTime !== undefined ||
+      endDateTime !== undefined;
 
-    const finalRegistrationEnd =
-      registrationEnd !==
-      undefined
-        ? registrationEnd
-        : activityRows[0]
-            .registrationEnd;
+    if (shouldValidateRegistration) {
+      const finalRegistrationStart =
+        registrationStart !== undefined
+          ? registrationStart
+          : activityRows[0].registrationStart;
 
-    if (
-      (
-        finalRegistrationStart &&
-        !finalRegistrationEnd
-      ) ||
-      (
-        !finalRegistrationStart &&
-        finalRegistrationEnd
-      )
-    ) {
-      throw httpError(
-        400,
-        "กรุณาระบุเวลาเริ่มและสิ้นสุดลงทะเบียนให้ครบ",
-      );
-    }
-
-    let finalRegistrationStartDate:
-      | Date
-      | null = null;
-
-    let finalRegistrationEndDate:
-      | Date
-      | null = null;
-
-    if (
-      finalRegistrationStart &&
-      finalRegistrationEnd
-    ) {
-      finalRegistrationStartDate =
-        parseMySqlBangkokDateTime(
-          finalRegistrationStart,
-        );
-
-      finalRegistrationEndDate =
-        parseMySqlBangkokDateTime(
-          finalRegistrationEnd,
-        );
+      const finalRegistrationEnd =
+        registrationEnd !== undefined
+          ? registrationEnd
+          : activityRows[0].registrationEnd;
 
       if (
-        !finalRegistrationStartDate ||
-        !finalRegistrationEndDate
+        (finalRegistrationStart && !finalRegistrationEnd) ||
+        (!finalRegistrationStart && finalRegistrationEnd)
       ) {
         throw httpError(
           400,
-          "รูปแบบเวลาลงทะเบียนไม่ถูกต้อง",
+          "กรุณาระบุเวลาเริ่มและสิ้นสุดลงทะเบียนให้ครบ",
         );
       }
 
-      if (
-        finalRegistrationStartDate >=
-        finalRegistrationEndDate
-      ) {
-        throw httpError(
-          400,
-          "เวลาเริ่มลงทะเบียนต้องมาก่อนเวลาสิ้นสุดลงทะเบียน",
-        );
-      }
+      if (finalRegistrationStart && finalRegistrationEnd) {
+        const finalRegistrationStartDate =
+          parseMySqlBangkokDateTime(finalRegistrationStart);
 
-      const activityEnd =
-        endDateTime !== undefined
-          ? parseBangkokDateTime(endDateTime)
-          : getActivityEndDateTime(
-              activityRows[0].endDate,
-              activityRows[0].endTime,
-            );
+        const finalRegistrationEndDate =
+          parseMySqlBangkokDateTime(finalRegistrationEnd);
 
-      if (!activityEnd) {
-        throw httpError(400, "ไม่สามารถอ่านเวลาสิ้นสุดกิจกรรมได้");
-      }
+        if (
+          !finalRegistrationStartDate ||
+          !finalRegistrationEndDate
+        ) {
+          throw httpError(
+            400,
+            "รูปแบบเวลาลงทะเบียนไม่ถูกต้อง",
+          );
+        }
 
-      if (
-        finalRegistrationStartDate > activityEnd ||
-        finalRegistrationEndDate > activityEnd
-      ) {
-        throw httpError(
-          400,
-          "ช่วงเวลาลงทะเบียนต้องอยู่ภายในช่วงเวลาของกิจกรรม และห้ามเกินเวลาสิ้นสุดกิจกรรม",
-        );
+        if (finalRegistrationStartDate >= finalRegistrationEndDate) {
+          throw httpError(
+            400,
+            "เวลาเริ่มลงทะเบียนต้องมาก่อนเวลาสิ้นสุดลงทะเบียน",
+          );
+        }
+
+        const activityEnd =
+          endDateTime !== undefined
+            ? parseBangkokDateTime(endDateTime)
+            : getActivityEndDateTime(
+                activityRows[0].endDate,
+                activityRows[0].endTime,
+              );
+
+        if (!activityEnd) {
+          throw httpError(
+            400,
+            "ไม่สามารถอ่านเวลาสิ้นสุดกิจกรรมได้",
+          );
+        }
+
+        // ลงทะเบียนก่อนเริ่มกิจกรรมได้ หรือเริ่มพร้อมกิจกรรม/ระหว่างกิจกรรมได้
+        // แต่ห้ามเกินเวลาสิ้นสุดกิจกรรม
+        if (
+          finalRegistrationStartDate > activityEnd ||
+          finalRegistrationEndDate > activityEnd
+        ) {
+          throw httpError(
+            400,
+            "ช่วงเวลาลงทะเบียนต้องไม่เกินเวลาสิ้นสุดกิจกรรม",
+          );
+        }
       }
     }
 
