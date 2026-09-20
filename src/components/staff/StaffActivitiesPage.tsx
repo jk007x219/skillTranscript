@@ -11,7 +11,6 @@ import {
   CameraOff,
   ClipboardList,
   FileWarning,
-  KeyRound,
   MapPin,
   Plus,
   ToggleLeft,
@@ -2804,7 +2803,7 @@ export default function StaffActivitiesPage() {
                       </td>
                       <td className="px-4 py-3 text-slate-500">{p.program || "-"}</td>
                       <td className="px-4 py-3 text-center font-semibold text-[#2455A4]">
-                        {p.score !== null && p.score !== undefined ? Number(p.score).toFixed(1) : "-"}
+                        {p.earnedScore !== null && p.earnedScore !== undefined ? `${Number(p.earnedScore).toFixed(Number(p.earnedScore) % 1 === 0 ? 0 : 2)}/${Number(p.maxScore ?? 10).toFixed(Number(p.maxScore ?? 10) % 1 === 0 ? 0 : 2)}` : "-"}
                       </td>
                     </tr>
                   ))}
