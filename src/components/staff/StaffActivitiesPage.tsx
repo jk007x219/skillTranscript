@@ -24,6 +24,7 @@ import {
   Loader2,
   Edit,
   QrCode,
+  KeyRound,
 } from "lucide-react";
 import StaffShell from "@/components/staff/StaffShell";
 
@@ -1990,6 +1991,29 @@ export default function StaffActivitiesPage() {
       alert("ลบกิจกรรมสำเร็จ");
     } catch (err) {
       alert(err instanceof Error ? err.message : "เกิดข้อผิดพลาด");
+    }
+  };
+
+  const handleViewParticipants = async (activityId: string) => {
+    setSelectedParticipantActivityId(activityId);
+    setShowParticipantsModal(true);
+    setLoadingParticipants(true);
+    setParticipants([]);
+    try {
+      const res = await fetch(`/api/activities/${encodeURIComponent(activityId)}/participants`, {
+        cache: "no-store",
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.message || "ไม่สามารถโหลดรายชื่อผู้เข้าร่วมได้");
+      }
+      const data = await res.json();
+      setParticipants(Array.isArray(data) ? data : []);
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "ไม่สามารถโหลดรายชื่อผู้เข้าร่วมได้");
+      setShowParticipantsModal(false);
+    } finally {
+      setLoadingParticipants(false);
     }
   };
 
