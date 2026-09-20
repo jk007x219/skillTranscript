@@ -63,7 +63,7 @@ declare global {
 }
 
 type ActivityStatus = "active" | "past";
-type ActivityCategory = "all" | "ongoing" | "past";
+type ActivityCategory = "all" | "mine" | "past";
 
 type ActivitySkill = {
   skillId?: string;
@@ -118,6 +118,7 @@ type StaffActivity = {
   templateId?: string | null;
   registrationStart?: string | null;
   registrationEnd?: string | null;
+  createdBy?: string | null;
 };
 
 type ActivityForm = {
@@ -1160,7 +1161,8 @@ export default function StaffActivitiesPage() {
   const [activities, setActivities] = useState<StaffActivity[]>([]);
   const [skillOptions, setSkillOptions] = useState<SkillOption[]>([]);
   const [templates, setTemplates] = useState<Template[]>([]);
-  const [activeTab, setActiveTab] = useState<ActivityCategory>("ongoing");
+  const [activeTab, setActiveTab] = useState<ActivityCategory>("mine");
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [form, setForm] = useState<ActivityForm>(emptyForm);
   const [evaluationActivity, setEvaluationActivity] =
@@ -1226,6 +1228,18 @@ export default function StaffActivitiesPage() {
     }
   }, []);
 
+  const fetchCurrentUser = useCallback(async () => {
+    try {
+      const res = await fetch("/api/auth/session");
+      if (!res.ok) return;
+      const session = await res.json();
+      setCurrentUserId(session?.user?.id ? String(session.user.id) : null);
+    } catch (err) {
+      console.error(err);
+      setCurrentUserId(null);
+    }
+  }, []);
+
   const fetchActivities = useCallback(async () => {
     try {
       setLoading(true);
@@ -1243,26 +1257,34 @@ export default function StaffActivitiesPage() {
   }, []);
 
   useEffect(() => {
+    fetchCurrentUser();
     fetchSkills();
     fetchTemplates();
     fetchActivities();
-  }, [fetchSkills, fetchTemplates, fetchActivities]);
+  }, [fetchCurrentUser, fetchSkills, fetchTemplates, fetchActivities]);
 
-  // แบ่งกิจกรรมเป็น 3 มุมมองหลัก เพื่อลดความซับซ้อนของแถบนำทาง
+  // แบ่งกิจกรรมเป็น 3 มุมมองหลัก โดยเน้นกิจกรรมที่เจ้าหน้าที่บัญชีปัจจุบันเป็นผู้สร้าง
   const activityCategories: Array<{ key: ActivityCategory; label: string }> = [
     { key: "all", label: "กิจกรรมทั้งหมด" },
-    { key: "ongoing", label: "กำลังดำเนินการ" },
-    { key: "past", label: "เคยจัดแล้ว" },
+    { key: "mine", label: "กิจกรรมที่สร้างโดยฉัน" },
+    { key: "past", label: "กิจกรรมที่สิ้นสุดแล้ว" },
   ];
 
   const matchesActivityCategory = useCallback(
     (activity: StaffActivity, category: ActivityCategory) => {
-      const past = isActivityPast(activity);
-      if (category === "past") return past;
-      if (category === "ongoing") return !past;
+      if (category === "mine") {
+        return Boolean(
+          currentUserId && activity.createdBy === currentUserId,
+        );
+      }
+
+      if (category === "past") {
+        return isActivityPast(activity);
+      }
+
       return true;
     },
-    [],
+    [currentUserId],
   );
 
   const filteredActivities = useMemo(
@@ -1281,7 +1303,7 @@ export default function StaffActivitiesPage() {
         ).length;
         return counts;
       },
-      { all: 0, ongoing: 0, past: 0 },
+      { all: 0, mine: 0, past: 0 },
     );
   }, [activities, matchesActivityCategory]);
 
