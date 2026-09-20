@@ -44,6 +44,9 @@ type A = {
   hours?: number | null;
   term?: string | null;
   attendeeCount?: number;
+  capacity?: number;
+  applicantCount?: number;
+  isFull?: boolean;
   skills?: Array<{ skillId?: string | null; name: string; level: string }>;
 };
 type P = {
@@ -137,6 +140,13 @@ function Card({
           </span>
         </p>
         <p className="flex gap-2">
+          <Users className="h-4 w-4" />
+          <span>
+            รับ {a.capacity || 0} คน
+            {a.capacity ? ` • สมัครแล้ว ${a.applicantCount || 0}/${a.capacity} คน` : ""}
+          </span>
+        </p>
+        <p className="flex gap-2">
           <MapPin className="h-4 w-4" />
           {a.location || "-"}
         </p>
@@ -153,10 +163,13 @@ function Card({
         ) : tab === "open" ? (
           <button
             onClick={onApply}
-            className="h-11 flex-1 rounded-xl bg-[#1565C0] text-sm font-semibold text-white"
+            disabled={Boolean(a.isFull)}
+            className={a.isFull
+              ? "h-11 flex-1 rounded-xl bg-slate-100 text-sm font-semibold text-slate-400"
+              : "h-11 flex-1 rounded-xl bg-[#1565C0] text-sm font-semibold text-white"}
           >
             <CheckCircle2 className="mr-2 inline h-4 w-4" />
-            สมัครกิจกรรม
+            {a.isFull ? "เต็มแล้ว" : "สมัครกิจกรรม"}
           </button>
         ) : s === "applied" ? (
           <button
