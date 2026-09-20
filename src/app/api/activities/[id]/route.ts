@@ -790,6 +790,27 @@ export async function PUT(
       );
     }
 
+    // เมื่อมีนิสิตส่งแบบประเมินแล้ว ห้ามแก้ไขแบบประเมินอีก
+    const [evaluationSubmissionRows] = await connection.query<any[]>(
+      `
+        SELECT EXISTS(
+          SELECT 1
+          FROM participation p
+          WHERE
+            p.activityId = ?
+            AND (
+              p.score IS NOT NULL
+              OR p.status = 'completed'
+            )
+        ) AS hasEvaluationSubmission
+      `,
+      [id],
+    );
+
+    const hasEvaluationSubmission = Boolean(
+      evaluationSubmissionRows[0]?.hasEvaluationSubmission,
+    );
+
     const {
       title,
       description,
@@ -1149,6 +1170,65 @@ export async function PUT(
     // ========================================================
     // Evaluation
     // ========================================================
+
+    if (
+      hasEvaluation !== undefined ||
+      evaluation !== undefined
+    ) {
+      if (hasEvaluationSubmission) {
+        throw httpError(
+          409,
+          "มีนิสิตทำแบบประเมินกิจกรรมนี้แล้ว จึงไม่สามารถแก้ไขแบบประเมินได้",
+        );
+      }
+
+      if (hasEvaluation === true) {
+        const questionCount = Array.isArray(evaluation)
+          ? evaluation.length
+          : 0;
+
+        if (questionCount < 5) {
+          throw httpError(
+            400,
+            "แบบประเมินต้องมีคำถามอย่างน้อย 5 ข้อ",
+          );
+        }
+
+        const [requiredSkillRows] = await connection.query<any[]>(
+          `
+            SELECT skillname
+            FROM activityskill
+            WHERE activityId = ?
+          `,
+          [id],
+        );
+
+        const requiredSkills = requiredSkillRows
+          .map((row) => String(row.skillname || "").trim())
+          .filter(Boolean);
+
+        const selectedSkills = new Set(
+          (evaluation || []).flatMap((question: any) =>
+            Array.isArray(question?.skillNames)
+              ? question.skillNames
+                  .map((name: any) => String(name || "").trim())
+                  .filter(Boolean)
+              : [],
+          ),
+        );
+
+        const missingSkills = requiredSkills.filter(
+          (skill) => !selectedSkills.has(skill),
+        );
+
+        if (missingSkills.length > 0) {
+          throw httpError(
+            400,
+            `กรุณาเลือกทักษะให้ครบทุกทักษะที่กำหนดไว้: ${missingSkills.join(", ")}`,
+          );
+        }
+      }
+    }
 
     addUpdate(
       "hasEvaluation",
