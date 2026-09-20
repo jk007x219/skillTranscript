@@ -860,6 +860,26 @@ function EvaluationModal({
   };
 
   const handleSave = () => {
+    if (questions.length < 5) {
+      alert("แบบประเมินต้องมีคำถามอย่างน้อย 5 ข้อ");
+      return;
+    }
+
+    const requiredSkills = activity.skills.map((skill) => skill.name.trim()).filter(Boolean);
+    const selectedSkills = new Set(
+      questions.flatMap((question) =>
+        (question.skillNames || []).map((name) => name.trim()).filter(Boolean),
+      ),
+    );
+    const missingSkills = requiredSkills.filter((skill) => !selectedSkills.has(skill));
+
+    if (missingSkills.length > 0) {
+      alert(
+        `กรุณาเลือกทักษะให้ครบทุกทักษะที่กำหนดไว้: ${missingSkills.join(", ")}`,
+      );
+      return;
+    }
+
     const isValid = questions.every(
       (q) =>
         q.question.trim() !== "" &&
@@ -870,10 +890,11 @@ function EvaluationModal({
     );
     if (!isValid) {
       alert(
-        "กรุณากรอกข้อมูลให้ครบถ้วน: คำถาม, ตัวเลือก (อย่างน้อย 2 ตัว), และเลือกทักษะอย่างน้อย 1 ตัว",
+        "กรุณากรอกข้อมูลให้ครบถ้วน: คำถาม, ตัวเลือกอย่างน้อย 2 ตัว และเลือกทักษะให้ทุกข้อ",
       );
       return;
     }
+
     onSave(questions);
   };
 
@@ -1695,6 +1716,32 @@ const updateWorkflow = async (
     evaluation: EvaluationQuestion[],
     activityId: string,
   ) => {
+    const activity = activities.find((item) => item.id === activityId);
+    if (!activity) {
+      alert("ไม่พบกิจกรรม");
+      return;
+    }
+
+    if (evaluation.length < 5) {
+      alert("แบบประเมินต้องมีคำถามอย่างน้อย 5 ข้อ");
+      return;
+    }
+
+    const requiredSkills = activity.skills.map((skill) => skill.name.trim()).filter(Boolean);
+    const selectedSkills = new Set(
+      evaluation.flatMap((question) =>
+        (question.skillNames || []).map((name) => name.trim()).filter(Boolean),
+      ),
+    );
+    const missingSkills = requiredSkills.filter((skill) => !selectedSkills.has(skill));
+
+    if (missingSkills.length > 0) {
+      alert(
+        `กรุณาเลือกทักษะให้ครบทุกทักษะที่กำหนดไว้: ${missingSkills.join(", ")}`,
+      );
+      return;
+    }
+
     try {
       const res = await fetch(`/api/activities/${activityId}`, {
         method: "PUT",
