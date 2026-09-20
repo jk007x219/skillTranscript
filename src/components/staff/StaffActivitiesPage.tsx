@@ -105,6 +105,7 @@ type StaffActivity = {
   location: string;
   organizer: string;
   attendeeCount: number;
+  capacity: number;
   hasConfirmedParticipants?: boolean;
   confirmationEnabled: boolean;
   registrationEnabled: boolean;
@@ -135,6 +136,7 @@ type ActivityForm = {
   templateId?: string;
   registrationStart: string;
   registrationEnd: string;
+  capacity: string;
 };
 
 type SkillOption = {
@@ -158,6 +160,7 @@ const emptyForm: ActivityForm = {
   templateId: "",
   registrationStart: "",
   registrationEnd: "",
+  capacity: "30",
 };
 
 // ===== Helper functions =====
@@ -545,6 +548,18 @@ function AddActivityModal({
               />
             </Field>
           </div>
+
+          <Field label="จำนวนที่รับนิสิต">
+            <input
+              type="number"
+              min="1"
+              value={form.capacity}
+              onChange={(e) => onChange("capacity", e.target.value)}
+              className="staff-activity-input"
+              placeholder="เช่น 30"
+              required
+            />
+          </Field>
 
           <Field label="ผู้จัดกิจกรรม">
             <input
@@ -1688,6 +1703,7 @@ const updateWorkflow = async (
         templateId: form.templateId || undefined,
         registrationStart: form.registrationStart,
         registrationEnd: form.registrationEnd,
+        capacity: Number(form.capacity),
       };
 
       const res = await fetch("/api/activities", {
@@ -1823,6 +1839,7 @@ const updateWorkflow = async (
         templateId: editForm.templateId || undefined,
         registrationStart: editForm.registrationStart,
         registrationEnd: editForm.registrationEnd,
+        capacity: Number(editForm.capacity),
       };
 
       const res = await fetch(`/api/activities/${editingActivity.id}`, {
