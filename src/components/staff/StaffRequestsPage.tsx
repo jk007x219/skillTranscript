@@ -189,18 +189,6 @@ export default function StaffRequestsPage() {
     setSkills((prev) => prev.filter((_, i) => i !== index));
   };
 
-  const updateSkill = (
-    index: number,
-    field: keyof SkillItem,
-    value: string
-  ) => {
-    setSkills((prev) =>
-      prev.map((item, i) =>
-        i === index ? { ...item, [field]: value } : item
-      )
-    );
-  };
-
   // ---------- Submit Decision ----------
   const handleSubmitDecision = async () => {
     if (!selectedRequest) return;
@@ -533,14 +521,20 @@ export default function StaffRequestsPage() {
                 </div>
 
                 <div className="mt-3 rounded-lg border border-[#D8E8F7] bg-[#F8FCFF] p-3">
-                  <div className="grid grid-cols-1 gap-2 sm:grid-cols-[1fr_100px_auto]">
+                  <p className="mb-2 text-[11px] font-medium text-[#64748B]">
+                    เลือกทักษะและระดับที่ต้องการเพิ่ม
+                  </p>
+
+                  <div className="space-y-2">
                     <select
                       value={draftSkill}
                       onChange={(e) => setDraftSkill(e.target.value)}
-                      className="h-9 w-full rounded-md border border-[#B9D7F1] bg-white px-2 text-[12px] text-[#334155] outline-none focus:border-[#1565C0] focus:ring-1 focus:ring-[#1565C0]"
+                      className="h-10 w-full rounded-md border border-[#B9D7F1] bg-white px-3 text-[12px] text-[#334155] outline-none focus:border-[#1565C0] focus:ring-1 focus:ring-[#1565C0]"
                       disabled={loadingSkills}
                     >
-                      <option value="">เลือกทักษะ...</option>
+                      <option value="">
+                        {loadingSkills ? "กำลังโหลดทักษะ..." : "เลือกทักษะ..."}
+                      </option>
                       {skillOptions.map((skill) => (
                         <option key={skill.skillId} value={skill.skillname}>
                           {skill.skillname}
@@ -548,24 +542,30 @@ export default function StaffRequestsPage() {
                       ))}
                     </select>
 
-                    <select
-                      value={draftLevel}
-                      onChange={(e) => setDraftLevel(e.target.value)}
-                      className="h-9 w-full rounded-md border border-[#B9D7F1] bg-white px-2 text-[12px] text-[#334155] outline-none focus:border-[#1565C0] focus:ring-1 focus:ring-[#1565C0]"
-                    >
-                      <option value="">ระดับ...</option>
-                      <option value="พื้นฐาน">พื้นฐาน</option>
-                      <option value="กลาง">กลาง</option>
-                      <option value="สูง">สูง</option>
-                    </select>
+                    <div className="grid grid-cols-3 gap-1.5">
+                      {["พื้นฐาน", "กลาง", "สูง"].map((level) => (
+                        <button
+                          key={level}
+                          type="button"
+                          onClick={() => setDraftLevel(level)}
+                          className={`h-9 rounded-md border text-[11px] font-medium transition ${
+                            draftLevel === level
+                              ? "border-[#1565C0] bg-[#1565C0] text-white shadow-sm"
+                              : "border-[#B9D7F1] bg-white text-[#64748B] hover:border-[#8EC5F4] hover:text-[#1565C0]"
+                          }`}
+                        >
+                          {level}
+                        </button>
+                      ))}
+                    </div>
 
                     <button
                       type="button"
                       onClick={addSkill}
-                      className="inline-flex h-9 items-center justify-center gap-1 rounded-md bg-[#1565C0] px-3 text-[12px] font-medium text-white transition hover:bg-[#0D56A5]"
+                      className="inline-flex h-9 w-full items-center justify-center gap-1 rounded-md bg-[#1565C0] px-3 text-[12px] font-medium text-white transition hover:bg-[#0D56A5]"
                     >
                       <Plus className="h-3.5 w-3.5" />
-                      เพิ่มทักษะ
+                      เพิ่มทักษะที่เลือก
                     </button>
                   </div>
                 </div>
@@ -636,18 +636,21 @@ export default function StaffRequestsPage() {
                   </label>
                 </div>
 
-                <div className="mt-3">
-                  <label className="mb-2 block text-[11px] text-[#64748B]">
-                    เหตุผล (กรณีไม่อนุมัติ)
-                  </label>
+                {decision === "rejected" && (
+                  <div className="mt-3">
+                    <label className="mb-2 block text-[11px] text-[#64748B]">
+                      เหตุผลที่ไม่อนุมัติ
+                    </label>
 
-                  <textarea
-                    value={reason}
-                    onChange={(e) => setReason(e.target.value)}
-                    rows={4}
-                    className="w-full resize-none rounded-lg border border-[#8EC5F4] px-3 py-2 text-[12px] text-[#334155] outline-none focus:border-[#1565C0] focus:ring-1 focus:ring-[#1565C0]"
-                  />
-                </div>
+                    <textarea
+                      value={reason}
+                      onChange={(e) => setReason(e.target.value)}
+                      rows={4}
+                      className="w-full resize-none rounded-lg border border-[#8EC5F4] px-3 py-2 text-[12px] text-[#334155] outline-none focus:border-[#1565C0] focus:ring-1 focus:ring-[#1565C0]"
+                      placeholder="ระบุเหตุผล..."
+                    />
+                  </div>
+                )}
 
                 <button
                   type="button"
