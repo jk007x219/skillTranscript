@@ -2333,20 +2333,24 @@ const updateWorkflow = async (
 
                     <div className="border-blue-100 lg:border-l lg:pl-5">
                       <p className="mb-2 text-sm font-bold text-slate-950">
-                        เปิดการลงทะเบียน
+                        ลงทะเบียนนิสิต
                       </p>
-                      <ToggleSwitch
-                        enabled={activity.registrationEnabled}
-                        onClick={() => updateWorkflow(activity.id, "registrationEnabled")}
-                      />
+                      <button
+                        type="button"
+                        onClick={() => openScanModal(activity)}
+                        className="inline-flex h-9 w-full items-center justify-center gap-2 rounded-lg border border-[#1565C0] bg-white px-3 text-xs font-semibold text-[#1565C0] transition hover:bg-blue-50"
+                      >
+                        <QrCode className="h-4 w-4" />
+                        สแกน QR นิสิต
+                      </button>
                       <p className="mt-2 text-xs text-slate-500">
-                        เฉพาะนิสิตที่สมัครแล้วเท่านั้นที่ลงทะเบียนได้
+                        สแกน QR ของนิสิตที่สมัครกิจกรรมแล้วเพื่อยืนยันการเข้าร่วม
                       </p>
                     </div>
 
                     <div className="border-blue-100 lg:border-l lg:pl-5">
                       <p className="mb-2 text-sm font-bold text-slate-950">
-                        สแกน QR / เปิดแบบประเมิน
+                        เปิดแบบประเมิน
                       </p>
                       <ToggleSwitch
                         enabled={activity.confirmationEnabled}
@@ -2354,24 +2358,11 @@ const updateWorkflow = async (
                       />
                       <button
                         type="button"
-                        disabled={!activity.registrationEnabled}
-                        onClick={() => openScanModal(activity)}
-                        className={`mt-3 inline-flex h-9 w-full items-center justify-center gap-2 rounded-lg border px-3 text-xs font-semibold transition ${
-                          activity.registrationEnabled
-                            ? "border-[#1565C0] bg-white text-[#1565C0] hover:bg-blue-50"
-                            : "border-slate-300 bg-white text-slate-400"
-                        }`}
-                      >
-                        <QrCode className="h-4 w-4" />
-                        สแกน QR นิสิต
-                      </button>
-                      <button
-                        type="button"
                         disabled={
                           !activity.hasEvaluation ||
                           !activity.confirmationEnabled
                         }
-                        className={`mt-2 inline-flex h-9 w-full items-center justify-center gap-2 rounded-lg border px-3 text-xs font-semibold transition ${
+                        className={`mt-3 inline-flex h-9 w-full items-center justify-center gap-2 rounded-lg border px-3 text-xs font-semibold transition ${
                           activity.hasEvaluation && activity.confirmationEnabled
                             ? "border-[#1565C0] bg-white text-[#1565C0] hover:bg-blue-50"
                             : "border-slate-300 bg-white text-slate-400"
