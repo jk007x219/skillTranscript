@@ -2286,7 +2286,8 @@ const updateWorkflow = async (
 
                         </>
                       )}
-                      {activity.verificationCode &&
+                      {!isExternalActivity(activity) &&
+                        activity.verificationCode &&
                         !activity.confirmationEnabled && (
                           <p className="mt-2 flex items-center gap-2 text-xs text-slate-400">
                             <KeyRound className="h-3 w-3" /> รหัสถูกซ่อน
