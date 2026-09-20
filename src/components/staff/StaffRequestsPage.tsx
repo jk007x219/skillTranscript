@@ -87,6 +87,8 @@ export default function StaffRequestsPage() {
 
   // ---------- Local skills state for selected request ----------
   const [skills, setSkills] = useState<SkillItem[]>([]);
+  const [draftSkill, setDraftSkill] = useState("");
+  const [draftLevel, setDraftLevel] = useState("");
 
   const [decision, setDecision] = useState<"approved" | "rejected">(
     "approved"
@@ -146,13 +148,9 @@ export default function StaffRequestsPage() {
     setSelectedRequest(request);
 
     // โหลด skill เดิมของ request ถ้ามี
-    if (request.skills.length > 0) {
-      setSkills(request.skills);
-    } else {
-      // เริ่มต้นด้วยช่องว่าง 1 แถว
-      setSkills([{ skill: "", level: "" }]);
-    }
-
+    setSkills(request.skills ?? []);
+    setDraftSkill("");
+    setDraftLevel("");
     setDecision("approved");
     setReason("");
   };
@@ -164,10 +162,26 @@ export default function StaffRequestsPage() {
 
   // ---------- Skills Management ----------
   const addSkill = () => {
-    // ถ้ามีทักษะในระบบ ให้ใช้ตัวแรกเป็นค่าเริ่มต้น
-    const defaultSkill =
-      skillOptions.length > 0 ? skillOptions[0].skillname : "";
-    setSkills((prev) => [...prev, { skill: defaultSkill, level: "กลาง" }]);
+    if (!draftSkill || !draftLevel) {
+      alert("กรุณาเลือกทักษะและระดับก่อนกดเพิ่ม");
+      return;
+    }
+
+    const alreadyAdded = skills.some(
+      (item) => item.skill === draftSkill && item.level === draftLevel,
+    );
+
+    if (alreadyAdded) {
+      alert("ทักษะนี้ถูกเพิ่มไว้แล้ว");
+      return;
+    }
+
+    setSkills((prev) => [
+      ...prev,
+      { skill: draftSkill, level: draftLevel },
+    ]);
+    setDraftSkill("");
+    setDraftLevel("");
   };
 
   const removeSkill = (index: number) => {
@@ -502,75 +516,91 @@ export default function StaffRequestsPage() {
 
               <div className="border-t border-[#E5E7EB]" />
 
-              {/* ================= SKILLS (Dropdown) ================= */}
+              {/* ================= SKILLS ================= */}
               <div className="py-4">
-                <h3 className="text-[15px] font-semibold text-[#334155]">
-                  ทักษะที่ได้รับ
-                </h3>
-
-                <div className="mb-1 mt-1 flex items-center gap-4 text-[11px] text-[#64748B]">
-                  <span className="w-[134px]">ทักษะที่ได้รับ</span>
-                  <span className="w-[76px]">ระดับ</span>
-                  <span className="w-5" /> {/* space for button */}
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <h3 className="text-[15px] font-semibold text-[#334155]">
+                      ทักษะที่ได้รับ
+                    </h3>
+                    <p className="mt-1 text-[11px] text-[#64748B]">
+                      เลือกทักษะและระดับ แล้วกด “เพิ่มทักษะ” เพื่อบันทึกเข้ารายการ
+                    </p>
+                  </div>
+                  <span className="shrink-0 rounded-full bg-blue-50 px-2 py-1 text-[10px] font-semibold text-[#1565C0]">
+                    {skills.length} รายการ
+                  </span>
                 </div>
 
-                <div className="space-y-2">
-                  {skills.map((item, index) => (
-                    <div key={index} className="flex items-center gap-4">
-                      {/* Select ทักษะ */}
-                      <select
-                        value={item.skill}
-                        onChange={(e) =>
-                          updateSkill(index, "skill", e.target.value)
-                        }
-                        className="h-7 w-[134px] rounded-md border border-[#8EC5F4] bg-white px-1 text-[11px] text-[#334155] outline-none focus:border-[#1565C0] focus:ring-1 focus:ring-[#1565C0] disabled:opacity-70"
-                        disabled={loadingSkills}
+                <div className="mt-3 rounded-lg border border-[#D8E8F7] bg-[#F8FCFF] p-3">
+                  <div className="grid grid-cols-1 gap-2 sm:grid-cols-[1fr_100px_auto]">
+                    <select
+                      value={draftSkill}
+                      onChange={(e) => setDraftSkill(e.target.value)}
+                      className="h-9 w-full rounded-md border border-[#B9D7F1] bg-white px-2 text-[12px] text-[#334155] outline-none focus:border-[#1565C0] focus:ring-1 focus:ring-[#1565C0]"
+                      disabled={loadingSkills}
+                    >
+                      <option value="">เลือกทักษะ...</option>
+                      {skillOptions.map((skill) => (
+                        <option key={skill.skillId} value={skill.skillname}>
+                          {skill.skillname}
+                        </option>
+                      ))}
+                    </select>
+
+                    <select
+                      value={draftLevel}
+                      onChange={(e) => setDraftLevel(e.target.value)}
+                      className="h-9 w-full rounded-md border border-[#B9D7F1] bg-white px-2 text-[12px] text-[#334155] outline-none focus:border-[#1565C0] focus:ring-1 focus:ring-[#1565C0]"
+                    >
+                      <option value="">ระดับ...</option>
+                      <option value="พื้นฐาน">พื้นฐาน</option>
+                      <option value="กลาง">กลาง</option>
+                      <option value="สูง">สูง</option>
+                    </select>
+
+                    <button
+                      type="button"
+                      onClick={addSkill}
+                      className="inline-flex h-9 items-center justify-center gap-1 rounded-md bg-[#1565C0] px-3 text-[12px] font-medium text-white transition hover:bg-[#0D56A5]"
+                    >
+                      <Plus className="h-3.5 w-3.5" />
+                      เพิ่มทักษะ
+                    </button>
+                  </div>
+                </div>
+
+                <div className="mt-3 space-y-2">
+                  {skills.length > 0 ? (
+                    skills.map((item, index) => (
+                      <div
+                        key={`${item.skill}-${item.level}-${index}`}
+                        className="flex items-center justify-between gap-2 rounded-lg border border-slate-100 bg-white px-3 py-2 shadow-sm"
                       >
-                        <option value="">-- เลือก --</option>
-                        {skillOptions.map((skill) => (
-                          <option key={skill.skillId} value={skill.skillname}>
-                            {skill.skillname}
-                          </option>
-                        ))}
-                      </select>
+                        <div className="min-w-0">
+                          <p className="truncate text-[12px] font-medium text-[#334155]">
+                            {item.skill}
+                          </p>
+                          <span className="mt-1 inline-flex rounded-full bg-blue-50 px-2 py-0.5 text-[10px] font-medium text-[#1565C0]">
+                            {item.level}
+                          </span>
+                        </div>
 
-                      {/* Select ระดับ */}
-                      <select
-                        value={item.level}
-                        onChange={(e) =>
-                          updateSkill(index, "level", e.target.value)
-                        }
-                        className="h-7 w-[76px] rounded-md border border-[#8EC5F4] bg-white px-1 text-[11px] text-[#334155] outline-none focus:border-[#1565C0] focus:ring-1 focus:ring-[#1565C0]"
-                      >
-                        <option value="">-- เลือก --</option>
-                        <option value="พื้นฐาน">พื้นฐาน</option>
-                        <option value="กลาง">กลาง</option>
-                        <option value="สูง">สูง</option>
-                      </select>
-
-                      {/* ปุ่ม + (เฉพาะแถวสุดท้าย) */}
-                      {index === skills.length - 1 && (
-                        <button
-                          type="button"
-                          onClick={addSkill}
-                          className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-[#1565C0] text-white transition hover:bg-[#0D56A5]"
-                        >
-                          <Plus className="h-3.5 w-3.5" strokeWidth={2.5} />
-                        </button>
-                      )}
-
-                      {/* ปุ่มลบ (เฉพาะเมื่อมีมากกว่า 1 แถว) */}
-                      {skills.length > 1 && (
                         <button
                           type="button"
                           onClick={() => removeSkill(index)}
-                          className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-red-100 text-red-600 transition hover:bg-red-200"
+                          className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-slate-400 transition hover:bg-red-50 hover:text-red-600"
+                          aria-label={`ลบทักษะ ${item.skill}`}
                         >
-                          <X className="h-3 w-3" strokeWidth={2} />
+                          <X className="h-4 w-4" />
                         </button>
-                      )}
+                      </div>
+                    ))
+                  ) : (
+                    <div className="rounded-lg border border-dashed border-slate-200 bg-white px-3 py-4 text-center text-[11px] text-slate-400">
+                      ยังไม่ได้เพิ่มทักษะ
                     </div>
-                  ))}
+                  )}
                 </div>
               </div>
 
