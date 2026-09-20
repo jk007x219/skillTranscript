@@ -266,6 +266,17 @@ function parseMySqlBangkokDateTime(
 // Helper: เวลาเริ่มกิจกรรม
 // ============================================================
 
+function getActivityEndDateTime(
+  dateValue: unknown,
+  timeValue: unknown,
+): Date | null {
+  const date = normalizeDatePart(dateValue);
+  if (!date) return null;
+  const time = normalizeTimePart(timeValue) || "00:00:00";
+  const result = new Date(`${date}T${time}${BANGKOK_OFFSET}`);
+  return Number.isNaN(result.getTime()) ? null : result;
+}
+
 function getActivityStartDateTime(
   dateValue: unknown,
   timeValue: unknown,
@@ -734,6 +745,8 @@ export async function PUT(
           SELECT
             a.date,
             a.time,
+            a.endDate,
+            a.endTime,
             a.registrationStart,
             a.registrationEnd,
             a.registrationEnabled,
@@ -894,13 +907,25 @@ export async function PUT(
         );
       }
 
+      const activityEnd =
+        endDateTime !== undefined
+          ? parseBangkokDateTime(endDateTime)
+          : getActivityEndDateTime(
+              activityRows[0].endDate,
+              activityRows[0].endTime,
+            );
+
+      if (!activityEnd) {
+        throw httpError(400, "ไม่สามารถอ่านเวลาสิ้นสุดกิจกรรมได้");
+      }
+
       if (
-        finalRegistrationEndDate >=
-        activityStart
+        finalRegistrationStartDate > activityEnd ||
+        finalRegistrationEndDate > activityEnd
       ) {
         throw httpError(
           400,
-          "เวลาสิ้นสุดลงทะเบียนต้องอยู่ก่อนเวลาเริ่มกิจกรรม",
+          "ช่วงเวลาลงทะเบียนต้องอยู่ภายในช่วงเวลาของกิจกรรม และห้ามเกินเวลาสิ้นสุดกิจกรรม",
         );
       }
     }
