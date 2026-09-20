@@ -403,6 +403,7 @@ export async function GET(
     const { id } = await params;
 
     await ensureActivityRegistrationColumns();
+    await ensureActivityCapacityColumn();
 
     const { searchParams } =
       new URL(request.url);
