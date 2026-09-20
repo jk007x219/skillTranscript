@@ -2445,19 +2445,6 @@ const updateWorkflow = async (
                         </p>
                       </div>
                     )}
-                        คน
-                      </p>
-                    </div>
-
-                    <div className="border-b border-slate-100 p-5 lg:border-b-0 lg:border-r xl:p-5">
-                      <p className="mb-2 text-sm font-bold text-slate-950">
-                        เปิดรับสมัคร
-                      </p>
-                      <ToggleSwitch
-                        enabled={Boolean(activity.applicationEnabled)}
-                        onClick={() => updateWorkflow(activity.id, "applicationEnabled")}
-                      />
-                      <p className="mt-2 text-xs text-slate-500">
                         ให้นิสิตมองเห็นและสมัครเข้าร่วมกิจกรรม
                       </p>
                     </div>
