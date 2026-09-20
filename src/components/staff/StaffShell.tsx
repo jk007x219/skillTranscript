@@ -19,6 +19,7 @@ import {
   X,
   AlertTriangle,
   Lock,
+  QrCode,
 } from "lucide-react";
 import { useAuth } from "@/context/auth-context";
 
