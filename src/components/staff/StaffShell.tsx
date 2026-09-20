@@ -37,6 +37,7 @@ const sidebarLinks: SidebarLink[] = [
     label: "จัดการกิจกรรมและการอบรม",
     icon: CalendarDays,
   },
+  { href: "/staff/scan-qr", label: "สแกน QR", icon: QrCode },
   {
     href: "/staff/requests",
     label: "อนุมัติคำขอเพิ่มทักษะ",
