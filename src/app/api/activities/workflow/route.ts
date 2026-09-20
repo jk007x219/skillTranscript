@@ -55,12 +55,46 @@ export async function GET() {
       registrationEnd: r.registrationEnd || null,
       registrationOpen: (() => {
         const now = new Date();
-        const start = r.registrationStart ? new Date(String(r.registrationStart).replace(" ", "T") + "+07:00") : null;
-        const end = r.registrationEnd ? new Date(String(r.registrationEnd).replace(" ", "T") + "+07:00") : null;
-        const activityEnd = new Date(
-          `${String(r.endDate || r.date).slice(0, 10)}T${String(r.endTime || r.time).slice(0, 8)}+07:00`,
+
+        const parseBangkokDateTime = (value: unknown): Date | null => {
+          if (!value) return null;
+
+          if (value instanceof Date) {
+            return Number.isNaN(value.getTime()) ? null : value;
+          }
+
+          const raw = String(value).trim();
+          if (!raw) return null;
+
+          let normalized = raw.replace(" ", "T");
+
+          if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(normalized)) {
+            normalized += ":00";
+          }
+
+          if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}$/.test(normalized)) {
+            normalized += "+07:00";
+          }
+
+          const parsed = new Date(normalized);
+          return Number.isNaN(parsed.getTime()) ? null : parsed;
+        };
+
+        const start = parseBangkokDateTime(r.registrationStart);
+        const end = parseBangkokDateTime(r.registrationEnd);
+
+        const activityEnd = parseBangkokDateTime(
+          `${String(r.endDate || r.date).slice(0, 10)}T${String(r.endTime || r.time).slice(0, 8)}`,
         );
-        return Boolean(start && end && now >= start && now < end && now < activityEnd);
+
+        return Boolean(
+          start &&
+          end &&
+          activityEnd &&
+          now >= start &&
+          now < end &&
+          now < activityEnd,
+        );
       })(),
       participationStatus: r.participationStatus || null,
       registrationQrToken: r.registrationQrToken || null,
