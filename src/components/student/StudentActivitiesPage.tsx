@@ -74,7 +74,12 @@ const date = (v?: string | null) =>
         day: "numeric",
       })
     : "-";
-const time = (v?: string | null) => (v ? String(v).slice(0, 5) : "-");
+const time = (v?: string | null) => {
+  if (!v) return "-";
+  const value = String(v);
+  const match = value.match(/(?:T|\\s)(\\d{2}:\\d{2})/);
+  return match?.[1] || (\\d{2}:\\d{2}/.test(value) ? value.match(/\\d{2}:\\d{2}/)?.[0] || "-" : "-");
+};
 function Card({
   a,
   tab,
@@ -122,7 +127,14 @@ function Card({
         </p>
         <p className="flex gap-2">
           <CalendarClock className="h-4 w-4 shrink-0" />
-          <span>ช่วงลงทะเบียน {a.registrationStart ? time(a.registrationStart) : "-"}{a.registrationEnd ? ` - ${time(a.registrationEnd)}` : ""}</span>
+          <span>
+            <span className="block">
+              ช่วงลงทะเบียน {a.registrationStart ? date(a.registrationStart) : "-"}
+            </span>
+            <span className="mt-0.5 block text-[11px] text-slate-400">
+              เวลา {a.registrationStart ? time(a.registrationStart) : "-"}{a.registrationEnd ? ` - ${time(a.registrationEnd)}` : ""}
+            </span>
+          </span>
         </p>
         <p className="flex gap-2">
           <MapPin className="h-4 w-4" />
