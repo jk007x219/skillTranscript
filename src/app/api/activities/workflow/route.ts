@@ -26,6 +26,7 @@ export async function GET() {
       `SELECT a.activityId, a.activityName, a.description, a.date, a.time, a.endDate, a.endTime,
               a.location, a.organizer, a.term, a.status, a.hasEvaluation,
               a.applicationEnabled, a.registrationEnabled, a.confirmationEnabled,
+              a.registrationStart, a.registrationEnd,
               COALESCE(p.status, NULL) AS participationStatus,
               p.registrationQrToken
        FROM activity a
@@ -50,6 +51,17 @@ export async function GET() {
       applicationEnabled: Boolean(r.applicationEnabled),
       registrationEnabled: Boolean(r.registrationEnabled),
       confirmationEnabled: Boolean(r.confirmationEnabled),
+      registrationStart: r.registrationStart || null,
+      registrationEnd: r.registrationEnd || null,
+      registrationOpen: (() => {
+        const now = new Date();
+        const start = r.registrationStart ? new Date(String(r.registrationStart).replace(" ", "T") + "+07:00") : null;
+        const end = r.registrationEnd ? new Date(String(r.registrationEnd).replace(" ", "T") + "+07:00") : null;
+        const activityEnd = new Date(
+          `${String(r.endDate || r.date).slice(0, 10)}T${String(r.endTime || r.time).slice(0, 8)}+07:00`,
+        );
+        return Boolean(start && end && now >= start && now < end && now < activityEnd);
+      })(),
       participationStatus: r.participationStatus || null,
       registrationQrToken: r.registrationQrToken || null,
       qrPayload: r.registrationQrToken ? buildRegistrationQrPayload(r.activityId, r.registrationQrToken) : null,
