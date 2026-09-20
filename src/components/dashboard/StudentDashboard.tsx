@@ -531,6 +531,210 @@ function ProgressList({
 }
 
 // =====================================================
+// LEVEL GROUPS
+// =====================================================
+
+type SkillLevel = "basic" | "intermediate" | "advanced";
+
+function normalizeSkillLevel(level?: string | null): SkillLevel {
+  const value = (level || "").trim().toLowerCase();
+
+  if (
+    value.includes("สูง") ||
+    value.includes("advanced") ||
+    value.includes("high") ||
+    value === "3"
+  ) {
+    return "advanced";
+  }
+
+  if (
+    value.includes("กลาง") ||
+    value.includes("intermediate") ||
+    value.includes("medium") ||
+    value.includes("mid") ||
+    value === "2"
+  ) {
+    return "intermediate";
+  }
+
+  return "basic";
+}
+
+const levelMeta: Record<
+  SkillLevel,
+  { label: string; shortLabel: string; description: string; accent: string }
+> = {
+  basic: {
+    label: "พื้นฐาน",
+    shortLabel: "พื้นฐาน",
+    description: "ทักษะระดับพื้นฐาน",
+    accent: "#4AA3D8",
+  },
+  intermediate: {
+    label: "กลาง",
+    shortLabel: "กลาง",
+    description: "ทักษะระดับกลาง",
+    accent: "#1565C0",
+  },
+  advanced: {
+    label: "สูง",
+    shortLabel: "สูง",
+    description: "ทักษะระดับสูง",
+    accent: "#0D47A1",
+  },
+};
+
+type ProgressTab = SkillLevel | "all";
+
+// =====================================================
+// LEVEL RADAR
+// =====================================================
+
+function LevelRadarCard({
+  level,
+  items,
+  chartId,
+}: {
+  level: SkillLevel;
+  items: SkillProgressItem[];
+  chartId: string;
+}) {
+  const meta = levelMeta[level];
+  const average =
+    items.length > 0
+      ? Math.round(
+          items.reduce((total, item) => total + item.percent, 0) /
+            items.length,
+        )
+      : 0;
+
+  return (
+    <article className="rounded-2xl border border-blue-100 bg-white p-4 shadow-[0_12px_32px_rgba(15,23,42,0.06)]">
+      <div className="flex items-center justify-between gap-3 px-1">
+        <div>
+          <h3 className="text-sm font-semibold text-slate-950">
+            {meta.label}
+          </h3>
+          <p className="mt-0.5 text-[11px] text-slate-500">
+            {meta.description}
+          </p>
+        </div>
+        <span
+          className="rounded-full px-2.5 py-1 text-[11px] font-semibold text-white"
+          style={{ backgroundColor: meta.accent }}
+        >
+          {average}%
+        </span>
+      </div>
+
+      <div className="mt-3">
+        <RadarChart
+          accent={meta.accent}
+          values={
+            items.length >= 3
+              ? items.map((item) => item.percent)
+              : []
+          }
+          labels={items.map((item) => getRadarLabel(item.title))}
+          id={chartId}
+        />
+      </div>
+
+      <div className="mt-3 rounded-xl bg-slate-50 px-3 py-2 text-center text-xs text-slate-500">
+        {items.length > 0
+          ? `แสดง ${items.length} ทักษะในระดับนี้`
+          : "ยังไม่มีข้อมูลทักษะในระดับนี้"}
+      </div>
+    </article>
+  );
+}
+
+// =====================================================
+// SKILL BAR TABS
+// =====================================================
+
+function SkillBarSection({
+  items,
+  accent,
+}: {
+  items: SkillProgressItem[];
+  accent: string;
+}) {
+  const [activeTab, setActiveTab] = useState<ProgressTab>("all");
+
+  const tabItems = useMemo(() => {
+    if (activeTab === "all") return items;
+    return items.filter(
+      (item) => normalizeSkillLevel(item.level) === activeTab,
+    );
+  }, [activeTab, items]);
+
+  const counts = useMemo(
+    () => ({
+      basic: items.filter(
+        (item) => normalizeSkillLevel(item.level) === "basic",
+      ).length,
+      intermediate: items.filter(
+        (item) => normalizeSkillLevel(item.level) === "intermediate",
+      ).length,
+      advanced: items.filter(
+        (item) => normalizeSkillLevel(item.level) === "advanced",
+      ).length,
+      all: items.length,
+    }),
+    [items],
+  );
+
+  const tabs: Array<{ key: ProgressTab; label: string }> = [
+    { key: "basic", label: "พื้นฐาน" },
+    { key: "intermediate", label: "กลาง" },
+    { key: "advanced", label: "สูง" },
+    { key: "all", label: "รวม" },
+  ];
+
+  return (
+    <div className="mt-6 border-t border-blue-50 pt-5">
+      <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h3 className="text-sm font-semibold text-slate-900">
+            ระดับทักษะ
+          </h3>
+          <p className="mt-0.5 text-xs text-slate-500">
+            เลือกดูคะแนนทักษะตามระดับ หรือดูทั้งหมด
+          </p>
+        </div>
+
+        <div className="grid grid-cols-4 overflow-hidden rounded-xl border border-blue-100 bg-slate-50 p-1">
+          {tabs.map((tab) => {
+            const active = activeTab === tab.key;
+            return (
+              <button
+                key={tab.key}
+                type="button"
+                onClick={() => setActiveTab(tab.key)}
+                className={`min-w-[64px] rounded-lg px-3 py-2 text-xs font-semibold transition ${
+                  active
+                    ? "bg-white text-[#1565C0] shadow-sm ring-1 ring-blue-100"
+                    : "text-slate-500 hover:bg-white/70 hover:text-slate-700"
+                }`}
+              >
+                {tab.label}
+                <span className="ml-1 text-[10px] opacity-70">
+                  {counts[tab.key]}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      <ProgressList items={tabItems} accent={accent} />
+    </div>
+  );
+}
+
+// =====================================================
 // DASHBOARD PANEL
 // =====================================================
 
@@ -547,66 +751,68 @@ function DashboardPanel({
   items: SkillProgressItem[];
   chartId: string;
 }) {
-  const average =
-    items.length > 0
-      ? Math.round(
-          items.reduce(
-            (total, item) =>
-              total + item.percent,
-            0,
-          ) / items.length,
-        )
-      : 0;
-
-  // ป้องกัน unused variable warning
-  void average;
+  const levelItems = useMemo(
+    () => ({
+      basic: items.filter(
+        (item) => normalizeSkillLevel(item.level) === "basic",
+      ),
+      intermediate: items.filter(
+        (item) => normalizeSkillLevel(item.level) === "intermediate",
+      ),
+      advanced: items.filter(
+        (item) => normalizeSkillLevel(item.level) === "advanced",
+      ),
+    }),
+    [items],
+  );
 
   return (
     <section className="overflow-hidden rounded-2xl border border-blue-100 bg-white shadow-[0_18px_50px_rgba(15,23,42,0.08)]">
-      {/* Header */}
-      <div className="flex flex-col gap-4 border-b border-blue-50 bg-gradient-to-r from-white via-blue-50/60 to-white px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <div className="flex items-center gap-2">
-            <span
-              className="flex h-8 w-8 items-center justify-center rounded-lg text-white shadow-sm"
-              style={{
-                backgroundColor: accent,
-              }}
-            >
-              <LayoutDashboard
-                className="h-4 w-4"
-                aria-hidden="true"
+      <div className="border-b border-blue-50 bg-gradient-to-r from-white via-blue-50/50 to-white px-5 py-5 sm:px-6">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+          <div>
+            <div className="flex items-center gap-3">
+              <span
+                className="h-9 w-1.5 rounded-full"
+                style={{ backgroundColor: accent }}
               />
-            </span>
-
-            <h2 className="text-base font-semibold text-slate-950">
-              {title}
-            </h2>
+              <div>
+                <h2 className="text-lg font-semibold text-slate-950">
+                  {title}
+                </h2>
+                <p className="mt-1 text-xs text-slate-500">
+                  {subtitle}
+                </p>
+              </div>
+            </div>
           </div>
 
-          <p className="mt-1 text-xs text-[#1565C0]">
-            {subtitle}
-          </p>
+          <span className="inline-flex w-fit items-center rounded-full bg-blue-50 px-3 py-1.5 text-xs font-semibold text-[#1565C0]">
+            {items.length} ทักษะ
+          </span>
         </div>
       </div>
 
-      {/* Content */}
-      <div className="grid gap-6 p-5 lg:grid-cols-[0.9fr_1fr] lg:items-center">
-        <RadarChart
-          accent={accent}
-          values={items.map(
-            (item) => item.percent,
-          )}
-          labels={items.map((item) =>
-            getRadarLabel(item.title),
-          )}
-          id={chartId}
-        />
+      <div className="p-5 sm:p-6">
+        <div className="grid gap-4 lg:grid-cols-3">
+          <LevelRadarCard
+            level="basic"
+            items={levelItems.basic}
+            chartId={`${chartId}-basic`}
+          />
+          <LevelRadarCard
+            level="intermediate"
+            items={levelItems.intermediate}
+            chartId={`${chartId}-intermediate`}
+          />
+          <LevelRadarCard
+            level="advanced"
+            items={levelItems.advanced}
+            chartId={`${chartId}-advanced`}
+          />
+        </div>
 
-        <ProgressList
-          items={items}
-          accent={accent}
-        />
+        <SkillBarSection items={items} accent={accent} />
       </div>
     </section>
   );
