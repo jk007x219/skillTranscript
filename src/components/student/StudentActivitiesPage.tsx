@@ -248,7 +248,7 @@ export default function StudentActivitiesPage() {
             <div>
               <h1 className="text-2xl font-semibold text-slate-950 sm:text-3xl">
                 {tab === "open"
-                  ? "กิจกรรมที่เปิดรับลงทะเบียน"
+                  ? "กิจกรรมที่เปิดรับนิสิต"
                   : tab === "applied"
                     ? "กิจกรรมที่สมัคร"
                     : "กิจกรรมที่เคยเข้าร่วม"}
@@ -256,7 +256,7 @@ export default function StudentActivitiesPage() {
               <div className="mt-2 h-0.5 w-24 bg-[#FFC107]" />
               <p className="mt-3 text-sm text-slate-500">
                 {tab === "open"
-                  ? "กิจกรรมที่อยู่ในช่วงเวลาที่สามารถลงทะเบียนได้"
+                  ? "กิจกรรมที่เจ้าหน้าที่เปิดรับสมัครนิสิต"
                   : tab === "applied"
                     ? "สมัครแล้ว → รอลงทะเบียน → รอยืนยันการเข้าร่วม"
                     : "ยืนยันการเข้าร่วมและทำแบบประเมินเสร็จแล้ว"}
