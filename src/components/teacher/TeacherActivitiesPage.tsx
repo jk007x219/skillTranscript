@@ -2042,7 +2042,6 @@ export default function StaffActivitiesPage() {
     setEditForm((prev) => ({ ...prev, templateId }));
   };
 
-    : null;
 
   const formatActivityHours = (hours: number | null | undefined): string => {
     if (hours === null || hours === undefined || hours === 0) return "";
