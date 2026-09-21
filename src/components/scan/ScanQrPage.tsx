@@ -348,7 +348,12 @@ export default function ScanQrPage({
 
           if (!data) throw new Error("ไม่สามารถอ่านรูป QR ได้");
 
-          const result = window.jsQR(data.data, data.width, data.height, {
+          if (typeof window.jsQR !== "function") {
+            throw new Error("ไม่สามารถโหลดตัวอ่าน QR ได้");
+          }
+
+          const jsQR = window.jsQR;
+          const result = jsQR(data.data, data.width, data.height, {
             inversionAttempts: "attemptBoth",
           });
 
