@@ -57,6 +57,7 @@ type ActivityRow = RowDataPacket & {
   organizer: string | null;
   location: string | null;
   score: number | string | null;
+  hasEvaluation: number | boolean | null;
 
   /**
    * รูปแบบ:
@@ -264,17 +265,25 @@ export async function GET(
            */
           COALESCE(SUM(
             CASE
-              WHEN acs.level LIKE '%สูง%' THEN ps.earnedScore / 3
-              WHEN acs.level LIKE '%กลาง%' THEN ps.earnedScore / 2
-              ELSE ps.earnedScore
+              WHEN a_score.hasEvaluation = 1 THEN
+                CASE
+                  WHEN acs.level LIKE '%สูง%' THEN ps.earnedScore / 3
+                  WHEN acs.level LIKE '%กลาง%' THEN ps.earnedScore / 2
+                  ELSE ps.earnedScore
+                END
+              ELSE 0
             END
           ), 0) AS assessmentCorrectCount,
 
           COALESCE(SUM(
             CASE
-              WHEN acs.level LIKE '%สูง%' THEN ps.maxScore / 3
-              WHEN acs.level LIKE '%กลาง%' THEN ps.maxScore / 2
-              ELSE ps.maxScore
+              WHEN a_score.hasEvaluation = 1 THEN
+                CASE
+                  WHEN acs.level LIKE '%สูง%' THEN ps.maxScore / 3
+                  WHEN acs.level LIKE '%กลาง%' THEN ps.maxScore / 2
+                  ELSE ps.maxScore
+                END
+              ELSE 0
             END
           ), 0) AS assessmentTotalCount
 
@@ -282,6 +291,9 @@ export async function GET(
 
         LEFT JOIN activityskill acs
           ON acs.skillId = s.skillId
+
+        LEFT JOIN activity a_score
+          ON a_score.activityId = acs.activityId
 
         LEFT JOIN participation p
           ON p.activityId = acs.activityId
@@ -504,6 +516,7 @@ export async function GET(
           p.joinDate,
 
           p.score,
+          a.hasEvaluation,
 
           GROUP_CONCAT(
             DISTINCT CONCAT(
@@ -696,7 +709,10 @@ export async function GET(
                 row.location ||
                 null,
 
-              skillScores,
+              skillScores:
+                Number(row.hasEvaluation ?? 0) === 1
+                  ? skillScores
+                  : [],
             };
           }
         ),
