@@ -70,6 +70,7 @@ declare global {
 
 type ActivityStatus = "active" | "past";
 type ActivityCategory = "all" | "mine" | "past" | "external";
+type MineStatusFilter = "all" | "active" | "past";
 
 type ActivitySkill = {
   skillId?: string;
@@ -1308,6 +1309,7 @@ export default function StaffActivitiesPage() {
   const [skillOptions, setSkillOptions] = useState<SkillOption[]>([]);
   const [templates, setTemplates] = useState<Template[]>([]);
   const [activeTab, setActiveTab] = useState<ActivityCategory>("mine");
+  const [mineStatusFilter, setMineStatusFilter] = useState<MineStatusFilter>("all");
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [form, setForm] = useState<ActivityForm>(emptyForm);
@@ -1418,9 +1420,17 @@ export default function StaffActivitiesPage() {
   const matchesActivityCategory = useCallback(
     (activity: StaffActivity, category: ActivityCategory) => {
       if (category === "mine") {
-        return Boolean(
-          currentUserId && activity.createdBy === currentUserId && activity.status !== "past",
-        );
+        if (!currentUserId || activity.createdBy !== currentUserId) return false;
+
+        if (mineStatusFilter === "past") {
+          return activity.status === "past" || isActivityPast(activity);
+        }
+
+        if (mineStatusFilter === "active") {
+          return activity.status !== "past" && !isActivityPast(activity);
+        }
+
+        return true;
       }
 
       if (category === "past") {
@@ -1435,7 +1445,7 @@ export default function StaffActivitiesPage() {
       // ไม่รวมกิจกรรมที่ถูกสิ้นสุดแล้ว หรือหมดเวลาจัดกิจกรรม
       return activity.status !== "past" && !isActivityPast(activity);
     },
-    [currentUserId],
+    [currentUserId, mineStatusFilter],
   );
 
   const filteredActivities = useMemo(
@@ -2302,6 +2312,25 @@ export default function StaffActivitiesPage() {
               );
             })}
           </nav>
+
+          {activeTab === "mine" && (
+            <div className="mt-4 flex flex-wrap items-center gap-3">
+              <span className="text-sm font-medium text-slate-600">
+                สถานะกิจกรรม
+              </span>
+              <select
+                value={mineStatusFilter}
+                onChange={(e) =>
+                  setMineStatusFilter(e.target.value as MineStatusFilter)
+                }
+                className="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-700 outline-none transition focus:border-[#2455A4] focus:ring-2 focus:ring-blue-100"
+              >
+                <option value="all">ทั้งหมด</option>
+                <option value="active">กำลังดำเนินอยู่</option>
+                <option value="past">สิ้นสุดแล้ว</option>
+              </select>
+            </div>
+          )}
 
           {/* รายการกิจกรรม */}
           {loading ? (
