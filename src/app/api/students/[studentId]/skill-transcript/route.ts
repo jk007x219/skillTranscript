@@ -1,3 +1,325 @@
+// app/api/students/[studentId]/skill-transcript/route.ts
+
+import { NextResponse } from "next/server";
+import type { RowDataPacket } from "mysql2";
+
+import { httpError, jsonError } from "@/lib/api-error";
+import { pool } from "@/lib/db";
+import { cleanThaiText } from "@/lib/thai-text";
+import { getDeanSettings } from "@/lib/certificate-settings";
+
+export const runtime = "nodejs";
+
+type RouteContext = {
+  params: Promise<{ studentId: string }>;
+};
+
+// ============================================================
+// Student
+// ============================================================
+
+type StudentRow = RowDataPacket & {
+  studentId: string;
+  firstname: string | null;
+  lastname: string | null;
+  faculty: string | null;
+  major: string | null;
+  phone: string | null;
+  profileImageUrl: string | null;
+  email: string | null;
+};
+
+// ============================================================
+// Skill score
+// ============================================================
+
+type SkillScoreRow = RowDataPacket & {
+  skillId: string;
+  skillName: string | null;
+  level: string | null;
+  earnedScore: number | string | null;
+  maxPossibleScore: number | string | null;
+};
+
+// ============================================================
+// Activity
+// ============================================================
+
+type ActivityRow = RowDataPacket & {
+  activityId: string;
+  activityName: string | null;
+  description: string | null;
+  date: Date | string | null;
+  joinDate: Date | string | null;
+  organizer: string | null;
+  location: string | null;
+  score: number | string | null;
+
+  /**
+   * รูปแบบ:
+   *
+   * ทักษะดิจิทัล|2|4||
+   * ทักษะการใช้ปัญญาประดิษฐ์|3|3
+   */
+  skillScores: string | null;
+
+  /**
+   * รายชื่อทักษะของกิจกรรม
+   */
+  skills: string | null;
+};
+
+// ============================================================
+// Helper
+// ============================================================
+
+function toNumber(value: unknown) {
+  const numberValue = Number(value ?? 0);
+
+  return Number.isFinite(numberValue)
+    ? numberValue
+    : 0;
+}
+
+// ============================================================
+// Thai date
+// ============================================================
+
+function formatThaiDate(
+  value: Date | string | null
+) {
+  if (!value) return "-";
+
+  const date =
+    value instanceof Date
+      ? value
+      : new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return "-";
+  }
+
+  return new Intl.DateTimeFormat("th-TH", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  }).format(date);
+}
+
+// ============================================================
+// Normalize skill name
+// ============================================================
+
+function normalizeSkillName(name: string) {
+  return name
+    .replace(/^ทักษะ/, "")
+    .trim();
+}
+
+// ============================================================
+// Parse activity skill scores
+// ============================================================
+
+function parseActivitySkillScores(
+  value: string | null
+) {
+  if (!value) {
+    return [];
+  }
+
+  return String(value)
+    .split("||")
+    .map((item) => {
+      const parts = item.split("|");
+
+      if (parts.length < 3) {
+        return null;
+      }
+
+      const skillName =
+        parts[0]?.trim() || "";
+
+      const earnedScore =
+        toNumber(parts[1]);
+
+      const maxScore =
+        toNumber(parts[2]);
+
+      if (!skillName) {
+        return null;
+      }
+
+      return {
+        skillName:
+          normalizeSkillName(skillName),
+
+        earnedScore,
+
+        maxScore,
+      };
+    })
+    .filter(
+      (
+        item
+      ): item is {
+        skillName: string;
+        earnedScore: number;
+        maxScore: number;
+      } => item !== null
+    );
+}
+
+// ============================================================
+// GET
+// ============================================================
+
+export async function GET(
+  _request: Request,
+  context: RouteContext
+) {
+  try {
+    const { studentId } =
+      await context.params;
+
+    if (!studentId) {
+      throw httpError(
+        400,
+        "ไม่พบรหัสนิสิต"
+      );
+    }
+
+    // ========================================================
+    // 1. ตรวจสอบว่านิสิตมีอยู่จริง
+    // ========================================================
+
+    const [studentRows] =
+      await pool.query<StudentRow[]>(
+        `
+        SELECT
+          s.studentId,
+          s.firstname,
+          s.lastname,
+          s.faculty,
+          s.major,
+          s.phone,
+          s.profileImageUrl,
+          u.email
+
+        FROM students s
+
+        INNER JOIN users u
+          ON u.userId = s.userId
+
+        WHERE s.studentId = ?
+        `,
+        [studentId]
+      );
+
+    if (studentRows.length === 0) {
+      throw httpError(
+        404,
+        "ไม่พบข้อมูลนิสิต"
+      );
+    }
+
+    const student =
+      studentRows[0];
+
+    // ========================================================
+    // 2. ดึงข้อมูลคณบดี
+    //
+    // ใช้ข้อมูลเดียวกับหน้าใบรับรอง
+    // /student/activities
+    // ========================================================
+
+    const deanSettings =
+      await getDeanSettings();
+
+    // ========================================================
+    // 3. ดึงคะแนนทักษะทั้งหมดของนิสิต
+    //
+    // เริ่มจากตาราง skill
+    // เพื่อให้ทักษะที่ยังไม่เคยเข้ากิจกรรม
+    // ยังคงแสดงเป็น 0%
+    // ========================================================
+
+    const [skillRows] =
+      await pool.query<SkillScoreRow[]>(
+        `
+        SELECT
+          s.skillId,
+          s.skillname AS skillName,
+
+          COALESCE(
+            GROUP_CONCAT(
+              DISTINCT COALESCE(
+                acs.level,
+                'กลาง'
+              )
+              ORDER BY acs.level
+              SEPARATOR ','
+            ),
+            'กลาง'
+          ) AS level,
+
+          COALESCE(
+            SUM(
+              student_scores.earnedScore
+            ),
+            0
+          ) AS earnedScore,
+
+          COALESCE(
+            SUM(
+              student_scores.maxScore
+            ),
+            0
+          ) AS maxPossibleScore
+
+        FROM skill s
+
+        LEFT JOIN (
+          SELECT
+            p.ParticipationId,
+            p.activityId,
+            ps.skillName,
+            ps.earnedScore,
+            ps.maxScore
+
+          FROM participation p
+
+          INNER JOIN participation_skill ps
+            ON ps.participationId =
+               p.ParticipationId
+
+          WHERE
+            p.studentId = ?
+            AND p.status = 'completed'
+        ) AS student_scores
+          ON student_scores.skillName =
+             s.skillname
+
+        LEFT JOIN activityskill acs
+          ON acs.skillname =
+             s.skillname
+
+          AND acs.activityId =
+              student_scores.activityId
+
+        GROUP BY
+          s.skillId,
+          s.skillname
+
+        ORDER BY
+          s.skillId
+        `,
+        [studentId]
+      );
+
+    // ========================================================
+    // 4. สร้างข้อมูลทักษะ
+    // ========================================================
+
     const skills =
       skillRows.map((row) => {
         const earnedScore =
@@ -47,7 +369,8 @@
             ),
         };
       });
-\n    // ========================================================
+
+    // ========================================================
     // 5. ดึงกิจกรรมที่นิสิตเข้าร่วม
     //
     // พร้อม:
