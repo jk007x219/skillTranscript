@@ -26,6 +26,7 @@ import {
   Edit,
   QrCode,
   KeyRound,
+  CheckCircle2,
 } from "lucide-react";
 import StaffShell from "@/components/staff/StaffShell";
 
@@ -1418,12 +1419,12 @@ export default function StaffActivitiesPage() {
     (activity: StaffActivity, category: ActivityCategory) => {
       if (category === "mine") {
         return Boolean(
-          currentUserId && activity.createdBy === currentUserId,
+          currentUserId && activity.createdBy === currentUserId && activity.status !== "past",
         );
       }
 
       if (category === "past") {
-        return isActivityPast(activity);
+        return activity.status === "past" || isActivityPast(activity);
       }
 
       if (category === "external") {
@@ -1993,6 +1994,38 @@ export default function StaffActivitiesPage() {
     setIsEditModalOpen(true);
   };
 
+  const handleEndActivity = async (activityId: string) => {
+    const activity = activities.find((a) => a.id === activityId);
+    if (!activity || activity.status === "past") return;
+
+    if (!confirm(`ต้องการสิ้นสุดกิจกรรม "${activity.title}" ใช่หรือไม่?\\n\\nเมื่อสิ้นสุดแล้ว กิจกรรมจะย้ายไปอยู่ใน "กิจกรรมที่สิ้นสุดแล้ว"`)) {
+      return;
+    }
+
+    try {
+      const res = await fetch(apiPath("/api/activities/workflow"), {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          activityId,
+          field: "status",
+          value: "past",
+        }),
+      });
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.message || "สิ้นสุดกิจกรรมไม่สำเร็จ");
+      }
+
+      await fetchActivities();
+      setActiveTab("past");
+      alert("สิ้นสุดกิจกรรมเรียบร้อยแล้ว");
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "เกิดข้อผิดพลาด");
+    }
+  };
+
   const handleDelete = async (activityId: string) => {
     if (
       !confirm(
@@ -2310,7 +2343,15 @@ export default function StaffActivitiesPage() {
                         </div>
 
                         <div className="flex items-center gap-2">
-                              <ActionButton
+                          {!past && (
+                            <ActionButton
+                              icon={CheckCircle2}
+                              label="สิ้นสุดกิจกรรม"
+                              onClick={() => handleEndActivity(activity.id)}
+                              title="ย้ายกิจกรรมไปยังกิจกรรมที่สิ้นสุดแล้ว"
+                            />
+                          )}
+                          <ActionButton
                             icon={Edit}
                             label="แก้ไข"
                             onClick={() => handleEdit(activity)}
