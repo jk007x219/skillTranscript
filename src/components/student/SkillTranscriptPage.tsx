@@ -1146,8 +1146,8 @@ export default function SkillTranscriptPage() {
               </div>
 
               {/* คะแนนประเมิน — แสดงเฉพาะเมื่อมีแบบประเมิน */}
-              {transcript.skills.some(
-                (skill) => skill.assessmentTotalCount > 0
+              {data.skillsScores.some(
+                (skill) => skill.score !== "0/0 ข้อ"
               ) && (
               <div className="transcript-card skills-card">
 
