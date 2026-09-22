@@ -44,7 +44,7 @@ export async function GET() {
               a.registrationStart, a.registrationEnd, a.capacity,
               (SELECT COUNT(*) FROM participation pc WHERE pc.activityId = a.activityId) AS applicantCount,
               COALESCE(p.status, NULL) AS participationStatus,
-              p.registrationQrToken
+              p.registrationQrToken, p.studentId
        FROM activity a
        LEFT JOIN participation p ON p.activityId = a.activityId AND p.studentId = ?
        ${isPublic || isStudent ? "WHERE a.status = 'active'" : ""}
@@ -116,7 +116,7 @@ export async function GET() {
       skills: skillMap[r.activityId] || [],
       participationStatus: isPublic ? null : r.participationStatus || null,
       registrationQrToken: isPublic ? null : r.registrationQrToken || null,
-      qrPayload: isPublic ? null : (r.registrationQrToken ? buildRegistrationQrPayload(r.activityId, r.registrationQrToken) : null),
+      qrPayload: isPublic ? null : (r.studentId ? buildRegistrationQrPayload(r.activityId, r.studentId) : null),
     })));
   } catch (error) {
     return jsonError(error);
