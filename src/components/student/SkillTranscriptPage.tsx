@@ -1145,7 +1145,10 @@ export default function SkillTranscriptPage() {
 
               </div>
 
-              {/* คะแนนประเมิน */}
+              {/* คะแนนประเมิน — แสดงเฉพาะเมื่อมีแบบประเมิน */}
+              {transcript.skills.some(
+                (skill) => skill.assessmentTotalCount > 0
+              ) && (
               <div className="transcript-card skills-card">
 
                 <div className="flex items-center justify-between border-b border-[#e3e6eb] pb-[5px]">
@@ -1192,6 +1195,7 @@ export default function SkillTranscriptPage() {
                 </div>
 
               </div>
+              )}
 
             </section>
 
