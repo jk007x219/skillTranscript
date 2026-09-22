@@ -40,6 +40,8 @@ type SkillScoreRow = RowDataPacket & {
   activityCount: number | string | null;
   earnedScore: number | string | null;
   maxPossibleScore: number | string | null;
+  assessmentCorrectCount: number | string | null;
+  assessmentTotalCount: number | string | null;
 };
 
 // ============================================================
@@ -253,7 +255,28 @@ export async function GET(
           COALESCE(acs.level, 'พื้นฐาน') AS skillLevel,
           COUNT(DISTINCT p.activityId) AS activityCount,
           COALESCE(SUM(ps.earnedScore), 0) AS earnedScore,
-          COALESCE(SUM(ps.maxScore), 0) AS maxPossibleScore
+          COALESCE(SUM(ps.maxScore), 0) AS maxPossibleScore,
+
+          /*
+           * คะแนนดิบของแบบประเมินเป็นคะแนนถ่วงน้ำหนักตามระดับกิจกรรม:
+           * พื้นฐาน = 1, กลาง = 2, สูง = 3
+           * ดังนั้นหารคะแนนด้วยน้ำหนักจะได้จำนวนข้อที่ตอบถูก
+           */
+          COALESCE(SUM(
+            CASE
+              WHEN acs.level LIKE '%สูง%' THEN ps.earnedScore / 3
+              WHEN acs.level LIKE '%กลาง%' THEN ps.earnedScore / 2
+              ELSE ps.earnedScore
+            END
+          ), 0) AS assessmentCorrectCount,
+
+          COALESCE(SUM(
+            CASE
+              WHEN acs.level LIKE '%สูง%' THEN ps.maxScore / 3
+              WHEN acs.level LIKE '%กลาง%' THEN ps.maxScore / 2
+              ELSE ps.maxScore
+            END
+          ), 0) AS assessmentTotalCount
 
         FROM skill s
 
@@ -313,6 +336,8 @@ export async function GET(
       activityCount: number;
       earned: number;
       max: number;
+      assessmentCorrect: number;
+      assessmentTotal: number;
     };
 
     const skillsById = new Map<
@@ -337,11 +362,15 @@ export async function GET(
         activityCount: 0,
         earned: 0,
         max: 0,
+        assessmentCorrect: 0,
+        assessmentTotal: 0,
       };
 
       current.activityCount += toNumber(row.activityCount);
       current.earned += toNumber(row.earnedScore);
       current.max += toNumber(row.maxPossibleScore);
+      current.assessmentCorrect += toNumber(row.assessmentCorrectCount);
+      current.assessmentTotal += toNumber(row.assessmentTotalCount);
 
       existing.levels[level] = current;
       skillsById.set(skillId, existing);
@@ -352,18 +381,24 @@ export async function GET(
         activityCount: 0,
         earned: 0,
         max: 0,
+        assessmentCorrect: 0,
+        assessmentTotal: 0,
       };
 
       const intermediate = skill.levels.intermediate || {
         activityCount: 0,
         earned: 0,
         max: 0,
+        assessmentCorrect: 0,
+        assessmentTotal: 0,
       };
 
       const advanced = skill.levels.advanced || {
         activityCount: 0,
         earned: 0,
         max: 0,
+        assessmentCorrect: 0,
+        assessmentTotal: 0,
       };
 
       const totalActivities =
@@ -420,6 +455,18 @@ export async function GET(
           basic.max +
           intermediate.max +
           advanced.max,
+        assessmentCorrectCount:
+          Math.round(
+            (basic.assessmentCorrect +
+              intermediate.assessmentCorrect +
+              advanced.assessmentCorrect) * 100
+          ) / 100,
+        assessmentTotalCount:
+          Math.round(
+            (basic.assessmentTotal +
+              intermediate.assessmentTotal +
+              advanced.assessmentTotal) * 100
+          ) / 100,
         percent,
       };
     });
