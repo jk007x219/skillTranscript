@@ -1851,6 +1851,16 @@ export default function StaffActivitiesPage() {
       return;
     }
 
+    if (activity.evaluationCompletedCount > 0) {
+      alert("มีนิสิตทำแบบประเมินแล้ว จึงไม่สามารถแก้ไขแบบประเมินได้");
+      return;
+    }
+
+    if (activity.confirmationEnabled) {
+      alert("แบบประเมินกำลังเปิดอยู่ กรุณาปิดแบบประเมินก่อนจึงจะแก้ไขได้");
+      return;
+    }
+
     if (evaluation.length < 5) {
       alert("แบบประเมินต้องมีคำถามอย่างน้อย 5 ข้อ");
       return;
@@ -2472,6 +2482,16 @@ export default function StaffActivitiesPage() {
                               >
                                 สร้างแบบประเมิน
                               </button>
+                            </span>
+                          ) : activity.evaluationCompletedCount > 0 ? (
+                            <span className="inline-flex items-center gap-1 text-slate-500">
+                              <ClipboardList className="h-3.5 w-3.5" />
+                              มีนิสิตทำแบบประเมินแล้ว ไม่สามารถแก้ไขได้
+                            </span>
+                          ) : activity.confirmationEnabled ? (
+                            <span className="inline-flex items-center gap-1 text-amber-600">
+                              <ClipboardList className="h-3.5 w-3.5" />
+                              แบบประเมินเปิดอยู่ ไม่สามารถแก้ไขได้
                             </span>
                           ) : (
                             <button
