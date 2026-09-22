@@ -931,6 +931,7 @@ export async function POST(
       registrationStart,
       registrationEnd,
       capacity,
+      activityCode,
     } = body;
 
     const activityCapacity = Number(capacity);
@@ -1137,8 +1138,26 @@ export async function POST(
      * CREATE ACTIVITY
      * =====================================================
      */
-    const activityId =
-      nanoid(20);
+    const requestedActivityCode =
+      typeof activityCode === "string"
+        ? activityCode.trim().toUpperCase()
+        : "";
+
+    if (!/^[A-Z0-9_-]{1,20}$/.test(requestedActivityCode)) {
+      throw httpError(400, "กรุณากำหนดรหัสกิจกรรม 1-20 ตัวอักษร โดยใช้ A-Z, 0-9, - หรือ _");
+    }
+
+    const [existingActivityCode] = await pool.query<any[]>(
+      "SELECT activityId FROM activity WHERE activityId = ? LIMIT 1",
+      [requestedActivityCode],
+    );
+
+    if (existingActivityCode.length > 0) {
+      throw httpError(409, "รหัสกิจกรรมนี้ถูกใช้งานแล้ว กรุณากำหนดรหัสใหม่");
+    }
+
+    // ใช้รหัสที่เจ้าหน้าที่กำหนดเป็น activityId เพื่อไม่ต้องเพิ่มคอลัมน์ใหม่
+    const activityId = requestedActivityCode;
 
     const start =
       splitDateTime(
