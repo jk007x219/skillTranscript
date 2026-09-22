@@ -1379,7 +1379,12 @@ export default function StaffActivitiesPage() {
     try {
       const res = await fetch(apiPath("/api/auth/session"));
       if (!res.ok) return;
-      const session = await res.json();
+      const text = await res.text();
+      if (!text.trim()) {
+        setCurrentUserId(null);
+        return;
+      }
+      const session = JSON.parse(text);
       setCurrentUserId(session?.user?.id ? String(session.user.id) : null);
     } catch (err) {
       console.error(err);
@@ -1987,6 +1992,7 @@ export default function StaffActivitiesPage() {
     setEditingActivity(activity);
 
     setEditForm({
+      activityCode: activity.id,
       title: activity.title,
       description: activity.description,
       startDate: toDateInputValue(activity.date),
