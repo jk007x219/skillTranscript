@@ -21,11 +21,7 @@ function canManage(session: any) {
 export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const session = await auth();
-    if (!canManage(session)) {
-      throw httpError(403, "ไม่มีสิทธิ์สแกน QR ลงทะเบียนกิจกรรม");
-    }
-    const user = session!.user;
-
+    const user = session?.user;
     const { id } = await params;
     const body = await request.json();
     const activityCode = typeof body.activityCode === "string" ? body.activityCode.trim() : id;
@@ -53,12 +49,13 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     );
     const activity = activities[0];
     if (!activity) throw httpError(404, "ไม่พบกิจกรรม");
-    if (user.role === "teacher" && !user.isExecutive && activity.createdBy !== user.id) {
+    if (user?.role === "teacher" && !user.isExecutive && activity.createdBy !== user.id) {
       throw httpError(403, "คุณจัดการได้เฉพาะกิจกรรมที่สร้างเอง");
     }
     if (activity.status !== "active") {
       throw httpError(400, "กิจกรรมนี้ไม่ได้เปิดใช้งาน");
     }
+
     const [registrations] = await pool.query<any[]>(
       `SELECT p.ParticipationId, p.studentId, p.activityId, p.status,
               s.firstname, s.lastname, s.program, s.major
