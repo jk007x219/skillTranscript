@@ -4,6 +4,7 @@ import NextAuth from "next-auth";
 import Credentials from "next-auth/providers/credentials";
 import type { RowDataPacket } from "mysql2";
 import { pool } from "@/lib/db";
+import { apiPath } from "@/lib/api-path";
 
 type LoginUserRow = RowDataPacket & {
   userId: string;
@@ -44,8 +45,16 @@ export const {
   trustHost: true,
   secret: process.env.AUTH_SECRET || process.env.NEXTAUTH_SECRET,
 
+  // Next.js strips the "/662021086" basePath before this route handler ever
+  // sees the request, so Auth.js's own action-parsing must match against the
+  // *unprefixed* path. Without this, Auth.js falls back to inferring
+  // basePath from AUTH_URL/NEXTAUTH_URL's pathname, which (if that env var
+  // includes "/662021086") no longer matches the stripped path and makes
+  // every request 400 with a bare "Bad request." response.
+  basePath: "/api/auth",
+
   pages: {
-    signIn: "/login",
+    signIn: apiPath("/login"),
   },
 
   providers: [
