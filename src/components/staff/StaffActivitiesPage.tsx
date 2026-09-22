@@ -1996,11 +1996,15 @@ export default function StaffActivitiesPage() {
 
   const handleEndActivity = async (activityId: string) => {
     const activity = activities.find((a) => a.id === activityId);
-    if (!activity || activity.status === "past") return;
+    if (!activity) return;
 
-    if (!confirm(`ต้องการสิ้นสุดกิจกรรม "${activity.title}" ใช่หรือไม่?\\n\\nเมื่อสิ้นสุดแล้ว กิจกรรมจะย้ายไปอยู่ใน "กิจกรรมที่สิ้นสุดแล้ว"`)) {
-      return;
-    }
+    const isPast = activity.status === "past";
+
+    const message = isPast
+      ? `ต้องการเปิดกิจกรรม "${activity.title}" กลับมาใช้งานหรือไม่?\\n\\nเมื่อเปิดกลับมา กิจกรรมจะย้ายไปอยู่ใน "กิจกรรมที่กำลังดำเนินอยู่"`
+      : `ต้องการสิ้นสุดกิจกรรม "${activity.title}" ใช่หรือไม่?\\n\\nเมื่อสิ้นสุดแล้ว กิจกรรมจะย้ายไปอยู่ใน "กิจกรรมที่สิ้นสุดแล้ว"`;
+
+    if (!confirm(message)) return;
 
     try {
       const res = await fetch(apiPath("/api/activities/workflow"), {
@@ -2009,18 +2013,18 @@ export default function StaffActivitiesPage() {
         body: JSON.stringify({
           activityId,
           field: "status",
-          value: "past",
+          value: isPast ? "active" : "past",
         }),
       });
 
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
-        throw new Error(err.message || "สิ้นสุดกิจกรรมไม่สำเร็จ");
+        throw new Error(err.message || (isPast ? "เปิดกิจกรรมกลับไม่สำเร็จ" : "สิ้นสุดกิจกรรมไม่สำเร็จ"));
       }
 
       await fetchActivities();
-      setActiveTab("past");
-      alert("สิ้นสุดกิจกรรมเรียบร้อยแล้ว");
+      setActiveTab(isPast ? "all" : "past");
+      alert(isPast ? "เปิดกิจกรรมกลับมาเรียบร้อยแล้ว" : "สิ้นสุดกิจกรรมเรียบร้อยแล้ว");
     } catch (err) {
       alert(err instanceof Error ? err.message : "เกิดข้อผิดพลาด");
     }
@@ -2343,17 +2347,15 @@ export default function StaffActivitiesPage() {
                         </div>
 
                         <div className="flex items-center gap-2">
-                          {!past && (
-                            <div className="inline-flex items-center rounded-lg border border-slate-100 bg-white px-2">
-                              <span className="mr-2 text-xs font-medium text-slate-600">
-                                สิ้นสุดกิจกรรม
-                              </span>
-                              <ToggleSwitch
-                                enabled={false}
-                                onClick={() => handleEndActivity(activity.id)}
-                              />
-                            </div>
-                          )}
+                          <div className="inline-flex items-center rounded-lg border border-slate-100 bg-white px-2">
+                            <span className="mr-2 text-xs font-medium text-slate-600">
+                              สิ้นสุดกิจกรรม
+                            </span>
+                            <ToggleSwitch
+                              enabled={past}
+                              onClick={() => handleEndActivity(activity.id)}
+                            />
+                          </div>
                           <ActionButton
                             icon={Edit}
                             label="แก้ไข"
