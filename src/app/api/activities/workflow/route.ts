@@ -31,11 +31,12 @@ function canManage(session: any) {
 export async function GET() {
   try {
     const session = await auth();
-    if (!session?.user?.id) throw httpError(401, "กรุณาเข้าสู่ระบบ");
     await ensureActivityRegistrationColumns();
     await ensureActivityCapacityColumn();
     await ensureParticipationStatusWorkflow();
-    const isStudent = session.user.role === "student";
+
+    const isStudent = session?.user?.role === "student";
+    const isPublic = !session?.user?.id;
     const [rows] = await pool.query<any[]>(
       `SELECT a.activityId, a.activityName, a.description, a.date, a.time, a.endDate, a.endTime,
               a.location, a.organizer, a.term, a.status, a.hasEvaluation,
@@ -46,9 +47,10 @@ export async function GET() {
               p.registrationQrToken
        FROM activity a
        LEFT JOIN participation p ON p.activityId = a.activityId AND p.studentId = ?
-       ${isStudent ? "WHERE a.status = 'active' AND (a.applicationEnabled = 1 OR p.ParticipationId IS NOT NULL)" : ""}
+       ${isPublic || isStudent ? "WHERE a.status = 'active'" : ""}
+       ${isStudent ? "AND (a.applicationEnabled = 1 OR p.ParticipationId IS NOT NULL)" : ""}
        ORDER BY a.date DESC, a.time DESC`,
-      [session.user.studentId || ""],
+      [session?.user?.studentId || ""],
     );
 
     const activityIds = rows.map((r: any) => r.activityId).filter(Boolean);
@@ -71,6 +73,7 @@ export async function GET() {
         });
       }
     }
+
     return NextResponse.json(rows.map((r) => ({
       activityId: r.activityId,
       title: r.activityName,
@@ -94,51 +97,26 @@ export async function GET() {
       isFull: Number(r.capacity ?? 0) > 0 && Number(r.applicantCount ?? 0) >= Number(r.capacity ?? 0),
       registrationOpen: (() => {
         const now = new Date();
-
         const parseBangkokDateTime = (value: unknown): Date | null => {
           if (!value) return null;
-
-          if (value instanceof Date) {
-            return Number.isNaN(value.getTime()) ? null : value;
-          }
-
+          if (value instanceof Date) return Number.isNaN(value.getTime()) ? null : value;
           const raw = String(value).trim();
           if (!raw) return null;
-
           let normalized = raw.replace(" ", "T");
-
-          if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(normalized)) {
-            normalized += ":00";
-          }
-
-          if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}$/.test(normalized)) {
-            normalized += "+07:00";
-          }
-
+          if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(normalized)) normalized += ":00";
+          if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}$/.test(normalized)) normalized += "+07:00";
           const parsed = new Date(normalized);
           return Number.isNaN(parsed.getTime()) ? null : parsed;
         };
-
         const start = parseBangkokDateTime(r.registrationStart);
         const end = parseBangkokDateTime(r.registrationEnd);
-
-        const activityEnd = parseBangkokDateTime(
-          `${String(r.endDate || r.date).slice(0, 10)}T${String(r.endTime || r.time).slice(0, 8)}`,
-        );
-
-        return Boolean(
-          start &&
-          end &&
-          activityEnd &&
-          now >= start &&
-          now < end &&
-          now < activityEnd,
-        );
+        const activityEnd = parseBangkokDateTime(`${String(r.endDate || r.date).slice(0, 10)}T${String(r.endTime || r.time).slice(0, 8)}`);
+        return Boolean(start && end && activityEnd && now >= start && now < end && now < activityEnd);
       })(),
       skills: skillMap[r.activityId] || [],
-      participationStatus: r.participationStatus || null,
-      registrationQrToken: r.registrationQrToken || null,
-      qrPayload: r.registrationQrToken ? buildRegistrationQrPayload(r.activityId, r.registrationQrToken) : null,
+      participationStatus: isPublic ? null : r.participationStatus || null,
+      registrationQrToken: isPublic ? null : r.registrationQrToken || null,
+      qrPayload: isPublic ? null : (r.registrationQrToken ? buildRegistrationQrPayload(r.activityId, r.registrationQrToken) : null),
     })));
   } catch (error) {
     return jsonError(error);
