@@ -107,11 +107,11 @@ export default function ScanQrPage({
   Shell,
   activePath,
 }: {
-  Shell: React.ComponentType<{
+  Shell?: React.ComponentType<{
     activePath: string;
     children: React.ReactNode;
   }>;
-  activePath: string;
+  activePath?: string;
 }) {
   const [activityCode, setActivityCode] = useState("");
   const [activity, setActivity] = useState<Activity | null>(null);
@@ -317,7 +317,7 @@ export default function ScanQrPage({
       setCameraStarting(false);
       setCameraError(
         error instanceof Error
-          ? `${error.message} หากเปิดผ่าน HTTP ให้ใช้ปุ่มเลือกภาพ QR แทน หรือเปิดผ่าน HTTPS`
+          ? `${error.message} หาก打开通过 HTTP，请使用选择 QR 图片按钮，或通过 HTTPS 打开`
           : "ไม่สามารถเปิดกล้องได้",
       );
     }
@@ -380,8 +380,10 @@ export default function ScanQrPage({
     }
   };
 
+  const PageShell = Shell ?? (({ children }: { activePath: string; children: React.ReactNode }) => <>{children}</>);
+
   return (
-    <Shell activePath={activePath}>
+    <PageShell activePath={activePath || ""}>
       <section className="min-w-0 flex-1 p-4 sm:p-6 lg:p-8">
         <div className="mx-auto max-w-5xl">
           <div className="mb-6">
@@ -553,6 +555,6 @@ export default function ScanQrPage({
           </div>
         </div>
       </section>
-    </Shell>
+    </PageShell>
   );
 }
