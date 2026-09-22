@@ -2,6 +2,7 @@
 // components/auth/ChangePasswordPage.tsx
 "use client";
 
+import { apiPath } from "@/lib/api-path";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Lock, Shield, CheckCircle } from "lucide-react";
@@ -38,7 +39,7 @@ export default function ChangePasswordPage() {
     setError("");
 
     try {
-      const res = await fetch("/api/auth/change-password", {
+      const res = await fetch(apiPath("/api/auth/change-password"), {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

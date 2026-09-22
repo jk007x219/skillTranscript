@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import TeacherShell from "@/components/teacher/TeacherShell";
 import { useAuth } from "@/context/auth-context";
+import { apiPath } from "@/lib/api-path";
 
 type Template = {
   id: string;
@@ -63,8 +64,8 @@ export default function TeacherLibraryPage() {
       setLoading(true);
       // ส่ง userId เพื่อกรองเฉพาะแม่แบบที่ผู้ใช้คนนี้สร้าง
       const url = user?.id
-        ? `/api/staff/templates?userId=${encodeURIComponent(String(user.id))}`
-        : "/api/staff/templates";
+        ? apiPath(`/api/staff/templates?userId=${encodeURIComponent(String(user.id))}`)
+        : apiPath("/api/staff/templates");
       const res = await fetch(url);
       if (!res.ok) throw new Error("ไม่สามารถโหลดข้อมูลแม่แบบ");
       const data = await res.json();
@@ -129,7 +130,7 @@ const handleSubmit = async (e: React.FormEvent) => {
     formData.append("file", selectedFile);
     formData.append("uploadedBy", String(user.id)); // ✅ ส่ง userId
 
-    const res = await fetch("/api/staff/templates", {
+    const res = await fetch(apiPath("/api/staff/templates"), {
       method: "POST",
       body: formData,
     });
@@ -153,7 +154,7 @@ const handleSubmit = async (e: React.FormEvent) => {
   const handleDelete = async (id: string) => {
     if (!confirm("คุณต้องการลบแม่แบบนี้ใช่หรือไม่?")) return;
     try {
-      const res = await fetch(`/api/staff/templates?id=${id}`, {
+      const res = await fetch(apiPath(`/api/staff/templates?id=${id}`), {
         method: "DELETE",
       });
       if (!res.ok) {
@@ -186,7 +187,7 @@ const handleSubmit = async (e: React.FormEvent) => {
 
     setIsUpdating(true);
     try {
-      const res = await fetch(`/api/staff/templates?id=${selectedTemplate.id}`, {
+      const res = await fetch(apiPath(`/api/staff/templates?id=${selectedTemplate.id}`), {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(editForm),

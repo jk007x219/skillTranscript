@@ -1,5 +1,6 @@
 "use client";
 
+import { apiPath } from "@/lib/api-path";
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useAuth } from "@/context/auth-context"; // ✅ เพิ่ม import useAuth
@@ -71,7 +72,7 @@ export default function StudentEvaluatePage() {
         setLoading(true);
         setError("");
 
-        const response = await fetch(`/api/activities/${activityId}`, {
+        const response = await fetch(apiPath(`/api/activities/${activityId}`), {
           cache: "no-store",
         });
 
@@ -141,7 +142,7 @@ export default function StudentEvaluatePage() {
         selectedOption: answers[question.id],
       }));
 
-      const response = await fetch(`/api/activities/${activityId}/submit-evaluation`, {
+      const response = await fetch(apiPath(`/api/activities/${activityId}/submit-evaluation`), {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

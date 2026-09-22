@@ -1,5 +1,6 @@
 "use client";
 // ปรับให้ responsive สำหรับมือถือ + แก้บั๊กเล็กน้อย (แท็บไม่มีสถานะ active, ปุ่ม QR มีเครื่องหมายคำพูดเกิน)
+import { apiPath } from "@/lib/api-path";
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
@@ -251,7 +252,7 @@ export default function StudentActivitiesPage() {
     if (!user?.studentId) return;
     setLoading(true);
     try {
-      const r = await fetch("/api/activities/workflow", { cache: "no-store" });
+      const r = await fetch(apiPath("/api/activities/workflow"), { cache: "no-store" });
       const d = await r.json();
       if (!r.ok) throw new Error(d?.error || "โหลดกิจกรรมไม่สำเร็จ");
       setA(Array.isArray(d) ? d : []);
@@ -266,7 +267,7 @@ export default function StudentActivitiesPage() {
   }, [user?.studentId]);
   useEffect(() => {
     if (tab === "past" && user?.studentId)
-      fetch(`/api/students/${user.studentId}/participations`, {
+      fetch(apiPath(`/api/students/${user.studentId}/participations`), {
         cache: "no-store",
       })
         .then((r) => r.json())
@@ -296,7 +297,7 @@ export default function StudentActivitiesPage() {
   };
 
   const apply = async (x: A) => {
-    const r = await fetch(`/api/activities/${x.activityId}/register`, {
+    const r = await fetch(apiPath(`/api/activities/${x.activityId}/register`), {
       method: "POST",
     });
     const d = await r.json();

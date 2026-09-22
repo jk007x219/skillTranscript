@@ -1,6 +1,7 @@
 // components/staff/StaffEditUserPage.tsx
 "use client";
 
+import { apiPath } from "@/lib/api-path";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import StaffShell from "@/components/staff/StaffShell";
@@ -203,7 +204,7 @@ export default function StaffEditUserPage({
       try {
         setLoading(true);
 
-        const res = await fetch(`/api/users/${userId}`);
+        const res = await fetch(apiPath(`/api/users/${userId}`));
 
         if (!res.ok) {
           throw new Error("ไม่สามารถโหลดข้อมูลผู้ใช้");
@@ -290,7 +291,7 @@ export default function StaffEditUserPage({
       try {
         setLoadingTeachers(true);
 
-        const res = await fetch("/api/users/teachers");
+        const res = await fetch(apiPath("/api/users/teachers"));
 
         if (res.ok) {
           const data = await res.json();
@@ -631,7 +632,7 @@ export default function StaffEditUserPage({
 
     try {
       const res = await fetch(
-        `/api/users/${userId}`,
+        apiPath(`/api/users/${userId}`),
         {
           method: "PUT",
           headers: {

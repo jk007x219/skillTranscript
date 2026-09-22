@@ -1,5 +1,6 @@
 "use client";
 
+import { apiPath } from "@/lib/api-path";
 import { useEffect, useRef, useState } from "react";
 import {
   Camera,
@@ -158,7 +159,7 @@ export default function ScanQrPage({
     stopCamera();
 
     try {
-      const response = await fetch("/api/activities/workflow", { cache: "no-store" });
+      const response = await fetch(apiPath("/api/activities/workflow"), { cache: "no-store" });
       const data = await response.json();
 
       if (!response.ok) {
@@ -197,7 +198,7 @@ export default function ScanQrPage({
     setScanResult(null);
 
     try {
-      const response = await fetch(`/api/activities/${encodeURIComponent(activity.activityId)}/scan-qr`, {
+      const response = await fetch(apiPath(`/api/activities/${encodeURIComponent(activity.activityId)}/scan-qr`), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

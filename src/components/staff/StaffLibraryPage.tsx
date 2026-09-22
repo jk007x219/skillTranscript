@@ -1,6 +1,7 @@
 // components/staff/StaffLibraryPage.tsx
 "use client";
 
+import { apiPath } from "@/lib/api-path";
 import { useCallback, useEffect, useState } from "react";
 import {
   Plus,
@@ -76,7 +77,7 @@ export default function StaffLibraryPage() {
   const fetchTemplates = useCallback(async () => {
     try {
       setLoading(true);
-      const res = await fetch("/api/staff/templates");
+      const res = await fetch(apiPath("/api/staff/templates"));
       if (!res.ok) throw new Error("ไม่สามารถโหลดข้อมูลแม่แบบ");
       const data = await res.json();
       setTemplates(data.templates || []);
@@ -90,7 +91,7 @@ export default function StaffLibraryPage() {
 
   const fetchDeanSettings = useCallback(async () => {
     try {
-      const res = await fetch("/api/staff/certificate-settings");
+      const res = await fetch(apiPath("/api/staff/certificate-settings"));
       if (!res.ok) throw new Error("ไม่สามารถโหลดข้อมูลคณบดี");
       const data = await res.json();
       const settings = data.settings as DeanSettings;
@@ -139,7 +140,7 @@ export default function StaffLibraryPage() {
       if (deanSignature) formData.append("signature", deanSignature);
       if (removeDeanSignature) formData.append("removeSignature", "true");
 
-      const res = await fetch("/api/staff/certificate-settings", {
+      const res = await fetch(apiPath("/api/staff/certificate-settings"), {
         method: "PUT",
         body: formData,
       });
@@ -199,7 +200,7 @@ export default function StaffLibraryPage() {
         formData.append("uploadedBy", String(user.id));
       }
 
-      const res = await fetch("/api/staff/templates", {
+      const res = await fetch(apiPath("/api/staff/templates"), {
         method: "POST",
         body: formData,
       });
@@ -224,7 +225,7 @@ export default function StaffLibraryPage() {
     if (!confirm("คุณต้องการลบแม่แบบนี้ใช่หรือไม่?")) return;
 
     try {
-      const res = await fetch(`/api/staff/templates?id=${id}`, {
+      const res = await fetch(apiPath(`/api/staff/templates?id=${id}`), {
         method: "DELETE",
       });
       if (!res.ok) {
@@ -257,7 +258,7 @@ export default function StaffLibraryPage() {
 
     setIsUpdating(true);
     try {
-      const res = await fetch(`/api/staff/templates?id=${selectedTemplate.id}`, {
+      const res = await fetch(apiPath(`/api/staff/templates?id=${selectedTemplate.id}`), {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(editForm),

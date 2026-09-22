@@ -1,7 +1,8 @@
 // src/services/auth.ts
 import type { AuthResponse, RegisterPayload, StudentProfilePayload } from "@/types/auth";
+import { apiPath } from "@/lib/api-path";
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || "/api";
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || apiPath("/api");
 
 type ApiOptions = Omit<RequestInit, "body"> & {
   body?: unknown;

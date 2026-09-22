@@ -1,6 +1,7 @@
 // components/staff/StaffRequestsPage.tsx
 "use client";
 
+import { apiPath } from "@/lib/api-path";
 import { useCallback, useEffect, useState } from "react";
 import {
   ChevronRight,
@@ -100,7 +101,7 @@ export default function StaffRequestsPage() {
     const fetchSkills = async () => {
       try {
         setLoadingSkills(true);
-        const res = await fetch("/api/skills");
+        const res = await fetch(apiPath("/api/skills"));
         if (res.ok) {
           const data = await res.json();
           setSkillOptions(data);
@@ -117,7 +118,7 @@ export default function StaffRequestsPage() {
   const fetchRequests = useCallback(async () => {
     try {
       setLoading(true);
-      const res = await fetch("/api/activity-requests");
+      const res = await fetch(apiPath("/api/activity-requests"));
       if (!res.ok) throw new Error("ไม่สามารถโหลดคำขอได้");
       const data = await res.json();
       setRequests(data);
@@ -201,7 +202,7 @@ export default function StaffRequestsPage() {
 
     try {
       setSavingDecision(true);
-      const res = await fetch(`/api/activity-requests/${selectedRequest.id}`, {
+      const res = await fetch(apiPath(`/api/activity-requests/${selectedRequest.id}`), {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

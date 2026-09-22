@@ -2,6 +2,7 @@
 // components/student/SkillTranscriptPage.tsx
 "use client";
 
+import { apiPath } from "@/lib/api-path";
 import { useEffect, useMemo, useState } from "react";
 import {
   BarChart3,
@@ -419,7 +420,7 @@ export default function SkillTranscriptPage() {
     setError("");
 
     fetch(
-      `/api/students/${user.studentId}/skill-transcript`,
+      apiPath(`/api/students/${user.studentId}/skill-transcript`),
       {
         signal: controller.signal,
         cache: "no-store",

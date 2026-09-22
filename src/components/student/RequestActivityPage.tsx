@@ -1,6 +1,7 @@
 // components/student/RequestActivityPage.tsx
 "use client";
 
+import { apiPath } from "@/lib/api-path";
 import { useState } from "react";
 import { File as FileIcon, Plus, Upload, X } from "lucide-react";
 import { useRouter } from "next/navigation";
@@ -108,7 +109,7 @@ const newFiles: FileItem[] = selectedArray.map((file) => ({
         requestFormData.append("evidenceFiles", item.file);
       });
 
-      const res = await fetch("/api/activity-requests", {
+      const res = await fetch(apiPath("/api/activity-requests"), {
         method: "POST",
         body: requestFormData,
       });

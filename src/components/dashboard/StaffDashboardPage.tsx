@@ -1,5 +1,6 @@
 "use client";
 
+import { apiPath } from "@/lib/api-path";
 import { useEffect, useMemo, useState } from "react";
 import {
   Star,
@@ -122,7 +123,7 @@ export default function StaffDashboardPage() {
             )}`;
 
       const response = await fetch(
-        `/api/staff/dashboard${query}`,
+        apiPath(`/api/staff/dashboard${query}`),
         {
           signal,
           cache: "no-store",

@@ -1,5 +1,6 @@
 "use client";
 
+import { apiPath } from "@/lib/api-path";
 import { useState } from "react";
 import Link from "next/link";
 import { ArrowLeft, Mail, Send } from "lucide-react";
@@ -17,7 +18,7 @@ export default function ForgotPasswordPage() {
     setError("");
 
     try {
-      const res = await fetch("/api/auth/forgot-password", {
+      const res = await fetch(apiPath("/api/auth/forgot-password"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email }),

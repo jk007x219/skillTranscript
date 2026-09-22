@@ -1,5 +1,6 @@
 "use client";
 
+import { apiPath } from "@/lib/api-path";
 import { useEffect, useState } from "react";
 import {
   Star,
@@ -229,7 +230,7 @@ export default function ExecutiveDashboardPage() {
         params.set("major", major);
 
         const res = await fetch(
-          `/api/executive/dashboard?${params.toString()}`,
+          apiPath(`/api/executive/dashboard?${params.toString()}`),
           {
             signal: controller.signal,
             cache: "no-store",

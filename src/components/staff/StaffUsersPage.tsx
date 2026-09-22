@@ -2,6 +2,7 @@
 // ปรับให้ responsive: มือถือแสดงเป็นการ์ดรายคน, จอกว้างแสดงเป็นตารางเหมือนเดิม
 "use client";
 
+import { apiPath } from "@/lib/api-path";
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import {
@@ -118,7 +119,7 @@ export default function StaffUsersPage() {
   const fetchUsers = async () => {
     try {
       setLoading(true);
-      const res = await fetch("/api/users");
+      const res = await fetch(apiPath("/api/users"));
       if (!res.ok) throw new Error("ไม่สามารถโหลดข้อมูลผู้ใช้");
       const data = await res.json();
       setUsers(data.users || []);
@@ -152,7 +153,7 @@ export default function StaffUsersPage() {
   const handleDelete = async (id: string) => {
     if (!confirm("คุณต้องการลบผู้ใช้นี้ใช่หรือไม่?")) return;
     try {
-      const res = await fetch(`/api/users/${id}`, { method: "DELETE" });
+      const res = await fetch(apiPath(`/api/users/${id}`), { method: "DELETE" });
       if (!res.ok) throw new Error("ลบผู้ใช้ไม่สำเร็จ");
       await fetchUsers();
     } catch (err) {

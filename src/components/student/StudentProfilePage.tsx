@@ -1,6 +1,7 @@
 // components/student/StudentProfilePage.tsx
 "use client";
 
+import { apiPath } from "@/lib/api-path";
 import { useEffect, useMemo, useState } from "react";
 import { Camera, GraduationCap, Mail, Phone, Save, UserRound, UsersRound, BookOpen } from "lucide-react";
 import StudentShell from "@/components/student/StudentShell";
@@ -71,7 +72,7 @@ export default function StudentProfilePage() {
     if (!user?.studentId) return;
     try {
       setLoadingProfile(true);
-      const res = await fetch(`/api/students/${user.studentId}`);
+      const res = await fetch(apiPath(`/api/students/${user.studentId}`));
       if (!res.ok) throw new Error("ไม่สามารถโหลดข้อมูลโปรไฟล์ได้");
       const data = await res.json();
       const userData = data.user || data;

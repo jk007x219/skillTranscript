@@ -1,6 +1,7 @@
 // components/teacher/TeacherStudentSkillsPage.tsx
 "use client";
 
+import { apiPath } from "@/lib/api-path";
 import { useEffect, useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import {
@@ -533,7 +534,7 @@ export default function TeacherStudentSkillsPage() {
       try {
         setLoading(true);
         const studentRes = await fetch(
-          `/api/advisor/students?advisorUserId=${encodeURIComponent(user.id)}`
+          apiPath(`/api/advisor/students?advisorUserId=${encodeURIComponent(user.id)}`)
         );
         if (!studentRes.ok) {
           const data = await studentRes.json().catch(() => ({}));
@@ -549,7 +550,7 @@ export default function TeacherStudentSkillsPage() {
         setStudent(found);
 
         const skillRes = await fetch(
-          `/api/advisor/students/${studentId}/skills`
+          apiPath(`/api/advisor/students/${studentId}/skills`)
         );
         if (!skillRes.ok) {
           const data = await skillRes.json().catch(() => ({}));
@@ -600,7 +601,7 @@ export default function TeacherStudentSkillsPage() {
 
     try {
       const res = await fetch(
-        `/api/advisor/students/${studentId}/skills/${skill.skillId}/activities`
+        apiPath(`/api/advisor/students/${studentId}/skills/${skill.skillId}/activities`)
       );
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));

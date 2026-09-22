@@ -1,5 +1,6 @@
 // components/auth/RegisterPage.tsx
 "use client";
+import { apiPath } from "@/lib/api-path";
 import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
@@ -244,7 +245,7 @@ export default function RegisterPage() {
     const fetchTeachers = async () => {
       try {
         setLoadingTeachers(true);
-        const res = await fetch("/api/users/teachers");
+        const res = await fetch(apiPath("/api/users/teachers"));
         if (!res.ok) throw new Error("ไม่สามารถโหลดข้อมูลอาจารย์ได้");
         const data = await res.json();
         setTeachers(data.teachers || []);

@@ -1,5 +1,6 @@
 "use client";
 
+import { apiPath } from "@/lib/api-path";
 import { useEffect, useState } from "react";
 import {
   CheckCircle2,
@@ -204,9 +205,9 @@ export default function RequestStatusPage() {
         setLoading(true);
 
         const res = await fetch(
-          `/api/activity-requests?studentId=${encodeURIComponent(
+          apiPath(`/api/activity-requests?studentId=${encodeURIComponent(
             user.studentId,
-          )}`,
+          )}`),
           {
             cache: "no-store",
           },

@@ -1,5 +1,6 @@
 "use client";
 
+import { apiPath } from "@/lib/api-path";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import type { LucideIcon } from "lucide-react";
@@ -469,7 +470,7 @@ export default function StudentDashboard() {
     setIsLoadingDashboard(true);
     setError("");
 
-    fetch(`/api/students/${user.studentId}/dashboard`, { signal: controller.signal })
+    fetch(apiPath(`/api/students/${user.studentId}/dashboard`), { signal: controller.signal })
       .then(async (response) => {
         const data = await response.json().catch(() => ({}));
 

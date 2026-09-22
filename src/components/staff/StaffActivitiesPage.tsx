@@ -4,6 +4,7 @@
 
 "use client";
 
+import { apiPath } from "@/lib/api-path";
 import { type ChangeEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   CalendarDays,
@@ -1329,7 +1330,7 @@ export default function StaffActivitiesPage() {
 
   const fetchSkills = useCallback(async () => {
     try {
-      const res = await fetch("/api/skills");
+      const res = await fetch(apiPath("/api/skills"));
       if (!res.ok) throw new Error("ไม่สามารถโหลดรายการทักษะ");
       const data = await res.json();
       setSkillOptions(data);
@@ -1341,7 +1342,7 @@ export default function StaffActivitiesPage() {
 
   const fetchTemplates = useCallback(async () => {
     try {
-      const res = await fetch("/api/staff/templates");
+      const res = await fetch(apiPath("/api/staff/templates"));
       if (!res.ok) throw new Error("ไม่สามารถโหลดแม่แบบ");
       const data = await res.json();
       setTemplates(
@@ -1354,7 +1355,7 @@ export default function StaffActivitiesPage() {
 
   const fetchCurrentUser = useCallback(async () => {
     try {
-      const res = await fetch("/api/auth/session");
+      const res = await fetch(apiPath("/api/auth/session"));
       if (!res.ok) return;
       const session = await res.json();
       setCurrentUserId(session?.user?.id ? String(session.user.id) : null);
@@ -1367,7 +1368,7 @@ export default function StaffActivitiesPage() {
   const fetchActivities = useCallback(async () => {
     try {
       setLoading(true);
-      const res = await fetch("/api/activities");
+      const res = await fetch(apiPath("/api/activities"));
       if (!res.ok) throw new Error("ไม่สามารถโหลดกิจกรรม");
       const data = await res.json();
       setActivities(data);
@@ -1447,7 +1448,7 @@ export default function StaffActivitiesPage() {
           throw new Error("ต้องสร้างแบบประเมินก่อน จึงจะเปิดแบบประเมินกิจกรรมได้");
         }
 
-        const updateRes = await fetch("/api/activities/workflow", {
+        const updateRes = await fetch(apiPath("/api/activities/workflow"), {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -1460,7 +1461,7 @@ export default function StaffActivitiesPage() {
 
         await fetchActivities();
       } else {
-        const updateRes = await fetch("/api/activities/workflow", {
+        const updateRes = await fetch(apiPath("/api/activities/workflow"), {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -1488,7 +1489,7 @@ export default function StaffActivitiesPage() {
       const value = field === "applicationEnabled"
         ? !activity.applicationEnabled
         : !activity.registrationEnabled;
-      const res = await fetch("/api/activities/workflow", {
+      const res = await fetch(apiPath("/api/activities/workflow"), {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
@@ -1709,7 +1710,7 @@ export default function StaffActivitiesPage() {
     setScanError("");
     setScanMessage("");
     try {
-      const res = await fetch(`/api/activities/${scanActivity.id}/scan-qr`, {
+      const res = await fetch(apiPath(`/api/activities/${scanActivity.id}/scan-qr`), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -1785,7 +1786,7 @@ export default function StaffActivitiesPage() {
         capacity: Number(form.capacity),
       };
 
-      const res = await fetch("/api/activities", {
+      const res = await fetch(apiPath("/api/activities"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
@@ -1838,7 +1839,7 @@ export default function StaffActivitiesPage() {
     }
 
     try {
-      const res = await fetch(`/api/activities/${activityId}`, {
+      const res = await fetch(apiPath(`/api/activities/${activityId}`), {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -1920,7 +1921,7 @@ export default function StaffActivitiesPage() {
         capacity: Number(editForm.capacity),
       };
 
-      const res = await fetch(`/api/activities/${editingActivity.id}`, {
+      const res = await fetch(apiPath(`/api/activities/${editingActivity.id}`), {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
@@ -1980,7 +1981,7 @@ export default function StaffActivitiesPage() {
     )
       return;
     try {
-      const res = await fetch(`/api/activities/${activityId}`, {
+      const res = await fetch(apiPath(`/api/activities/${activityId}`), {
         method: "DELETE",
       });
       if (!res.ok) {
@@ -2000,7 +2001,7 @@ export default function StaffActivitiesPage() {
     setLoadingParticipants(true);
     setParticipants([]);
     try {
-      const res = await fetch(`/api/activities/${encodeURIComponent(activityId)}/participants`, {
+      const res = await fetch(apiPath(`/api/activities/${encodeURIComponent(activityId)}/participants`), {
         cache: "no-store",
       });
       if (!res.ok) {

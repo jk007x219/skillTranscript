@@ -1,6 +1,7 @@
 // components/student/StudentCertificatePage.tsx
 "use client";
 
+import { apiPath } from "@/lib/api-path";
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import {
@@ -165,7 +166,7 @@ const studentId = user.studentId;
 if (!studentId) return;
 
 const res = await fetch(
-  `/api/activities/${activityId}/certificate?studentId=${encodeURIComponent(studentId)}`
+  apiPath(`/api/activities/${activityId}/certificate?studentId=${encodeURIComponent(studentId)}`)
 );
 
         if (!res.ok) {

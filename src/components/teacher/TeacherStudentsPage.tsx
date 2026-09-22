@@ -1,6 +1,7 @@
 // components/teacher/TeacherStudentsPage.tsx
 "use client";
 
+import { apiPath } from "@/lib/api-path";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Search, Eye, Loader2, UserRound } from "lucide-react";
@@ -40,7 +41,7 @@ export default function TeacherStudentsPage() {
       try {
         setLoading(true);
         const res = await fetch(
-          `/api/advisor/students?advisorUserId=${encodeURIComponent(user.id)}`
+          apiPath(`/api/advisor/students?advisorUserId=${encodeURIComponent(user.id)}`)
         );
         if (!res.ok) {
           const data = await res.json().catch(() => ({}));

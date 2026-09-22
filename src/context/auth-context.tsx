@@ -4,6 +4,7 @@
 import { SessionProvider, getSession, signIn, signOut, useSession } from "next-auth/react";
 import { createContext, useContext, useEffect, useMemo } from "react";
 import { authAPI } from "@/services/auth";
+import { apiPath } from "@/lib/api-path";
 import type { AuthUser, RegisterPayload, StudentProfilePayload } from "@/types/auth";
 
 type AuthContextValue = {
@@ -132,7 +133,11 @@ const refreshUser = async () => {
 
 export function AuthProvider({ children }: AuthProviderProps) {
   return (
-    <SessionProvider refetchOnWindowFocus={false}>
+    // next-auth's client ignores next.config.ts's `basePath` and defaults its
+    // own fetches (csrf/providers/callback) to "/api/auth", so under the
+    // "/662021086" basePath it hits the wrong absolute path and falls back to
+    // "<origin>/api/auth/error". Point it at the prefixed path explicitly.
+    <SessionProvider refetchOnWindowFocus={false} basePath={apiPath("/api/auth")}>
       <AuthContextProvider>{children}</AuthContextProvider>
     </SessionProvider>
   );

@@ -1,6 +1,7 @@
 // components/staff/StaffAddUserPage.tsx
 "use client";
 
+import { apiPath } from "@/lib/api-path";
 import { useEffect, useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import {
@@ -165,7 +166,7 @@ export default function StaffAddUserPage() {
     const fetchTeachers = async () => {
       try {
         setLoadingTeachers(true);
-        const res = await fetch("/api/users/teachers");
+        const res = await fetch(apiPath("/api/users/teachers"));
         if (res.ok) {
           const data = await res.json();
           setTeachers(data.teachers || []);
@@ -326,7 +327,7 @@ export default function StaffAddUserPage() {
 
     setIsSubmitting(true);
     try {
-      const res = await fetch("/api/users", {
+      const res = await fetch(apiPath("/api/users"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),

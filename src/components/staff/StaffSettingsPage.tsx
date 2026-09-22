@@ -1,6 +1,7 @@
 // components/staff/StaffSettingsPage.tsx
 "use client";
 
+import { apiPath } from "@/lib/api-path";
 import { useEffect, useState } from "react";
 import { useSession } from "next-auth/react";
 import {
@@ -42,7 +43,7 @@ export default function StaffSettingsPage() {
   const fetchProfile = async () => {
     try {
       setLoading(true);
-      const res = await fetch("/api/staff/profile");
+      const res = await fetch(apiPath("/api/staff/profile"));
       if (!res.ok) throw new Error("ไม่สามารถโหลดข้อมูลโปรไฟล์");
       const data = await res.json();
       setProfile(data);
@@ -104,7 +105,7 @@ export default function StaffSettingsPage() {
     }
 
     try {
-      const res = await fetch("/api/staff/profile", {
+      const res = await fetch(apiPath("/api/staff/profile"), {
         method: "PUT",
         body: formDataToSend,
       });

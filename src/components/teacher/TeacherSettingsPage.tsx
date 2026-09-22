@@ -1,5 +1,6 @@
 "use client";
 
+import { apiPath } from "@/lib/api-path";
 import { useEffect, useState } from "react";
 import { useSession } from "next-auth/react";
 import {
@@ -46,7 +47,7 @@ export default function TeacherSettingsPage() {
   const fetchProfile = async () => {
     try {
       setLoading(true);
-      const res = await fetch("/api/teacher/profile");
+      const res = await fetch(apiPath("/api/teacher/profile"));
       if (!res.ok) throw new Error("ไม่สามารถโหลดข้อมูลโปรไฟล์");
       const data = await res.json();
       setProfile(data);
@@ -108,7 +109,7 @@ export default function TeacherSettingsPage() {
     }
 
     try {
-      const res = await fetch("/api/teacher/profile", {
+      const res = await fetch(apiPath("/api/teacher/profile"), {
         method: "PUT",
         body: formDataToSend,
       });
