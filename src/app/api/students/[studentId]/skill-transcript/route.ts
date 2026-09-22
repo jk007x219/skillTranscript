@@ -1,3 +1,110 @@
+    const groupedSkills = new Map<
+      string,
+      {
+        skillId: string;
+        levels: Record<string, {
+          activityCount: number;
+          earnedScore: number;
+          maxPossibleScore: number;
+        }>;
+      }
+    >();
+
+    for (const row of skillRows) {
+      const skillName = row.skillName || row.skillId;
+      const existing = groupedSkills.get(skillName) || {
+        skillId: row.skillId,
+        levels: {},
+      };
+      const level = normalizeLevel(row.level);
+
+      existing.levels[level] = {
+        activityCount: toNumber(row.activityCount),
+        earnedScore: toNumber(row.earnedScore),
+        maxPossibleScore: toNumber(row.maxPossibleScore),
+      };
+
+      groupedSkills.set(skillName, existing);
+    }
+
+    // คะแนนรวมของ Skill Transcript ใช้สูตรเดียวกับ Dashboard:
+    // คะแนนระดับ = คะแนนที่ได้ / คะแนนเต็ม × 100
+    // สัดส่วนกิจกรรม = จำนวนกิจกรรมระดับนั้น / กิจกรรมทั้งหมด × 100
+    // คะแนนทักษะรวม = ผลรวม(คะแนนระดับ × สัดส่วนกิจกรรม / 100)
+    const skills = Array.from(groupedSkills.entries()).map(
+      ([skillName, group]) => {
+        const basic = group.levels['พื้นฐาน'] || {
+          activityCount: 0,
+          earnedScore: 0,
+          maxPossibleScore: 0,
+        };
+        const intermediate = group.levels['กลาง'] || {
+          activityCount: 0,
+          earnedScore: 0,
+          maxPossibleScore: 0,
+        };
+        const advanced = group.levels['สูง'] || {
+          activityCount: 0,
+          earnedScore: 0,
+          maxPossibleScore: 0,
+        };
+
+        const totalActivities =
+          basic.activityCount +
+          intermediate.activityCount +
+          advanced.activityCount;
+
+        const levelPercent = (level: typeof basic) =>
+          level.maxPossibleScore > 0
+            ? Math.min(
+                100,
+                Math.max(
+                  0,
+                  (level.earnedScore / level.maxPossibleScore) * 100
+                )
+              )
+            : 0;
+
+        const basicPercent = levelPercent(basic);
+        const intermediatePercent = levelPercent(intermediate);
+        const advancedPercent = levelPercent(advanced);
+
+        const percent =
+          totalActivities > 0
+            ? Math.round(
+                (
+                  (basicPercent * basic.activityCount +
+                    intermediatePercent * intermediate.activityCount +
+                    advancedPercent * advanced.activityCount) /
+                  totalActivities
+                ) * 100
+              ) / 100
+            : 0;
+
+        const earnedScore =
+          basic.earnedScore +
+          intermediate.earnedScore +
+          advanced.earnedScore;
+        const maxPossibleScore =
+          basic.maxPossibleScore +
+          intermediate.maxPossibleScore +
+          advanced.maxPossibleScore;
+
+        return {
+          skillId: group.skillId,
+          name: normalizeSkillName(skillName),
+          level:
+            advanced.activityCount > 0
+              ? 'สูง'
+              : intermediate.activityCount > 0
+                ? 'กลาง'
+                : 'พื้นฐาน',
+          earnedScore,
+          maxPossibleScore,
+          percent: Math.min(100, Math.max(0, percent)),
+        };
+      }
+    );
 // app/api/students/[studentId]/skill-transcript/route.ts
 
 import { NextResponse } from "next/server";
@@ -37,6 +144,7 @@ type SkillScoreRow = RowDataPacket & {
   skillId: string;
   skillName: string | null;
   level: string | null;
+  activityCount: number | string | null;
   earnedScore: number | string | null;
   maxPossibleScore: number | string | null;
 };
@@ -249,35 +357,11 @@ export async function GET(
         SELECT
           s.skillId,
           s.skillname AS skillName,
-
-          COALESCE(
-            GROUP_CONCAT(
-              DISTINCT COALESCE(
-                acs.level,
-                'กลาง'
-              )
-              ORDER BY acs.level
-              SEPARATOR ','
-            ),
-            'กลาง'
-          ) AS level,
-
-          COALESCE(
-            SUM(
-              student_scores.earnedScore
-            ),
-            0
-          ) AS earnedScore,
-
-          COALESCE(
-            SUM(
-              student_scores.maxScore
-            ),
-            0
-          ) AS maxPossibleScore
-
+          acs.level AS level,
+          COUNT(DISTINCT student_scores.ParticipationId) AS activityCount,
+          COALESCE(SUM(student_scores.earnedScore), 0) AS earnedScore,
+          COALESCE(SUM(student_scores.maxScore), 0) AS maxPossibleScore
         FROM skill s
-
         LEFT JOIN (
           SELECT
             p.ParticipationId,
@@ -285,36 +369,53 @@ export async function GET(
             ps.skillName,
             ps.earnedScore,
             ps.maxScore
-
           FROM participation p
-
           INNER JOIN participation_skill ps
-            ON ps.participationId =
-               p.ParticipationId
-
+            ON ps.participationId = p.ParticipationId
           WHERE
             p.studentId = ?
             AND p.status = 'completed'
         ) AS student_scores
-          ON student_scores.skillName =
-             s.skillname
-
+          ON student_scores.skillName = s.skillname
         LEFT JOIN activityskill acs
-          ON acs.skillname =
-             s.skillname
-
-          AND acs.activityId =
-              student_scores.activityId
-
+          ON acs.skillname = s.skillname
+          AND acs.activityId = student_scores.activityId
         GROUP BY
           s.skillId,
-          s.skillname
-
+          s.skillname,
+          acs.level
         ORDER BY
-          s.skillId
+          s.skillId,
+          acs.level
         `,
         [studentId]
       );
+
+    function normalizeLevel(level: string | null) {
+      const value = String(level || '').trim().toLowerCase();
+
+      if (
+        value.includes('สูง') ||
+        value.includes('advanced') ||
+        value.includes('high') ||
+        value === '3'
+      ) {
+        return 'สูง';
+      }
+
+      if (
+        value.includes('กลาง') ||
+        value.includes('intermediate') ||
+        value.includes('medium') ||
+        value.includes('mid') ||
+        value === '2'
+      ) {
+        return 'กลาง';
+      }
+
+      return 'พื้นฐาน';
+    }
+
 
     // ========================================================
     // 4. สร้างข้อมูลทักษะ
