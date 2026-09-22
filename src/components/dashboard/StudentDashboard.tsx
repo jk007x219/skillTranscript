@@ -368,40 +368,49 @@ function DashboardPanel({
 }) {
   const [activeTab, setActiveTab] = useState<ProgressTab>("all");
 
+  // แยกตาม "ข้อมูลที่เกิดขึ้นจริง" จากกิจกรรม/การประเมิน
+  // ไม่ใช้ item.level เพราะ skill.level ในฐานข้อมูลเป็นค่าเริ่มต้น "กลาง"
   const grouped = useMemo(
     () => ({
-      basic: items.filter((item) => normalizeSkillLevel(item.level) === "basic"),
-      intermediate: items.filter(
-        (item) => normalizeSkillLevel(item.level) === "intermediate",
-      ),
-      advanced: items.filter((item) => normalizeSkillLevel(item.level) === "advanced"),
+      basic: items.filter((item) => (item.basicActivityCount ?? 0) > 0),
+      intermediate: items.filter((item) => (item.intermediateActivityCount ?? 0) > 0),
+      advanced: items.filter((item) => (item.advancedActivityCount ?? 0) > 0),
     }),
     [items],
   );
 
-  // โครงสร้างกราฟคงครบทุกทักษะเสมอ
-  // และใช้คะแนนของ "ระดับที่เลือก" โดยตรงจาก API
-  // ถ้าไม่มีข้อมูลในระดับนั้น ต้องเป็น 0
+  // โครงสร้าง Radar คงครบทุกทักษะเสมอ
+  // ถ้ายังไม่มีข้อมูลของระดับนั้น ให้แสดง 0
   const chartItems = items.map((item) => {
-    if (activeTab === "all") return item;
+    if (activeTab === "all") {
+      return {
+        ...item,
+        percent: item.activityCount > 0 ? item.percent : 0,
+      };
+    }
+
+    const activityCount =
+      activeTab === "basic"
+        ? item.basicActivityCount ?? 0
+        : activeTab === "intermediate"
+          ? item.intermediateActivityCount ?? 0
+          : item.advancedActivityCount ?? 0;
 
     const percent =
       activeTab === "basic"
-        ? (item.basicActivityCount ?? 0) > 0
-          ? item.basicPercent ?? 0
-          : 0
+        ? item.basicPercent ?? 0
         : activeTab === "intermediate"
-          ? (item.intermediateActivityCount ?? 0) > 0
-            ? item.intermediatePercent ?? 0
-            : 0
-          : (item.advancedActivityCount ?? 0) > 0
-            ? item.advancedPercent ?? 0
-            : 0;
+          ? item.intermediatePercent ?? 0
+          : item.advancedPercent ?? 0;
 
-    return { ...item, percent };
+    return { ...item, percent: activityCount > 0 ? percent : 0 };
   });
 
-  const visibleItems = activeTab === "all" ? items : grouped[activeTab];
+  // รายการด้านขวาแสดงเฉพาะทักษะที่มีข้อมูลจริง
+  const visibleItems = activeTab === "all"
+    ? items.filter((item) => item.activityCount > 0)
+    : grouped[activeTab];
+
 
   const tabs: Array<{ key: ProgressTab; count: number }> = [
     { key: "all", count: items.length },
