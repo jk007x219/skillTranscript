@@ -421,55 +421,46 @@ export async function GET(
     // 4. สร้างข้อมูลทักษะ
     // ========================================================
 
-    const skills =
-      skillRows.map((row) => {
-        const earnedScore =
-          toNumber(
-            row.earnedScore
-          );
+    const groupedSkills = new Map<string, {
+      skillId: string;
+      name: string;
+      levels: Record<string, { activityCount: number; earnedScore: number; maxPossibleScore: number }>;
+    }>();
 
-        const maxPossibleScore =
-          toNumber(
-            row.maxPossibleScore
-          );
+    for (const row of skillRows) {
+      const name = normalizeSkillName(row.skillName || row.skillId);
+      const level = normalizeLevel(row.level);
+      const current = groupedSkills.get(name) || { skillId: row.skillId, name, levels: {} };
+      current.levels[level] = {
+        activityCount: toNumber(row.activityCount),
+        earnedScore: toNumber(row.earnedScore),
+        maxPossibleScore: toNumber(row.maxPossibleScore),
+      };
+      groupedSkills.set(name, current);
+    }
 
-        const percent =
-          maxPossibleScore > 0
-            ? Math.round(
-                (earnedScore /
-                  maxPossibleScore) *
-                  10000
-              ) / 100
-            : 0;
+    // สูตรรวมใหม่: คะแนนระดับ × (จำนวนกิจกรรมระดับนั้น / จำนวนกิจกรรมทั้งหมด)
+    const skills = Array.from(groupedSkills.values()).map((skill) => {
+      const basic = skill.levels['พื้นฐาน'] || { activityCount: 0, earnedScore: 0, maxPossibleScore: 0 };
+      const intermediate = skill.levels['กลาง'] || { activityCount: 0, earnedScore: 0, maxPossibleScore: 0 };
+      const advanced = skill.levels['สูง'] || { activityCount: 0, earnedScore: 0, maxPossibleScore: 0 };
+      const totalActivities = basic.activityCount + intermediate.activityCount + advanced.activityCount;
+      const levelPercent = (v: typeof basic) => v.maxPossibleScore > 0
+        ? Math.min(100, Math.max(0, (v.earnedScore / v.maxPossibleScore) * 100))
+        : 0;
+      const percent = totalActivities > 0
+        ? Math.round(((levelPercent(basic) * basic.activityCount + levelPercent(intermediate) * intermediate.activityCount + levelPercent(advanced) * advanced.activityCount) / totalActivities) * 100) / 100
+        : 0;
 
-        return {
-          skillId:
-            row.skillId,
-
-          name:
-            normalizeSkillName(
-              row.skillName ||
-                row.skillId
-            ),
-
-          level:
-            row.level ||
-            "กลาง",
-
-          earnedScore,
-
-          maxPossibleScore,
-
-          percent:
-            Math.min(
-              100,
-              Math.max(
-                0,
-                percent
-              )
-            ),
-        };
-      });
+      return {
+        skillId: skill.skillId,
+        name: skill.name,
+        level: advanced.activityCount > 0 ? 'สูง' : intermediate.activityCount > 0 ? 'กลาง' : 'พื้นฐาน',
+        earnedScore: basic.earnedScore + intermediate.earnedScore + advanced.earnedScore,
+        maxPossibleScore: basic.maxPossibleScore + intermediate.maxPossibleScore + advanced.maxPossibleScore,
+        percent: Math.min(100, Math.max(0, percent)),
+      };
+    });
 
     // ========================================================
     // 5. ดึงกิจกรรมที่นิสิตเข้าร่วม
