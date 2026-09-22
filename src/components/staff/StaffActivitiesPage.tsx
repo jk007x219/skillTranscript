@@ -130,6 +130,7 @@ type StaffActivity = {
 };
 
 type ActivityForm = {
+  activityCode: string;
   title: string;
   description: string;
   startDate: string; // YYYY-MM-DD
@@ -154,6 +155,7 @@ type SkillOption = {
 
 const LEVELS = ["พื้นฐาน", "กลาง", "สูง"];
 const emptyForm: ActivityForm = {
+  activityCode: "",
   title: "",
   description: "",
   startDate: "",
@@ -561,6 +563,23 @@ function AddActivityModal({
         }}
       >
         <div className="space-y-4">
+          {!isEditing && (
+            <Field
+              label="รหัสกิจกรรม"
+              hint="กำหนดเองได้ เช่น AI01, CS01, OPENHOUSE69 (ไม่เกิน 20 ตัวอักษร และห้ามซ้ำ)"
+            >
+              <input
+                value={form.activityCode}
+                onChange={(e) => onChange("activityCode", e.target.value.toUpperCase())}
+                className="staff-activity-input"
+                maxLength={20}
+                pattern="[A-Z0-9_-]{1,20}"
+                placeholder="เช่น AI01"
+                required
+              />
+            </Field>
+          )}
+
           <Field label="ชื่อกิจกรรม/อบรม">
             <input
               value={form.title}
@@ -1772,6 +1791,7 @@ export default function StaffActivitiesPage() {
       }
 
       const payload = {
+        activityCode: form.activityCode,
         title: form.title,
         description: form.description,
         dateTime: startDateTime,
