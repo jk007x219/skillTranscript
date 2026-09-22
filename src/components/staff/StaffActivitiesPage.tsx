@@ -1431,7 +1431,9 @@ export default function StaffActivitiesPage() {
         return isExternalActivity(activity);
       }
 
-      return true;
+      // กิจกรรมทั้งหมด: แสดงเฉพาะกิจกรรมที่กำลังดำเนินอยู่
+      // ไม่รวมกิจกรรมที่ถูกสิ้นสุดแล้ว หรือหมดเวลาจัดกิจกรรม
+      return activity.status !== "past" && !isActivityPast(activity);
     },
     [currentUserId],
   );
