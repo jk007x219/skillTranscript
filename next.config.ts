@@ -11,6 +11,17 @@ const nextConfig: NextConfig = {
   env: {
     NEXT_PUBLIC_BASE_PATH: BASE_PATH,
   },
+  // The built-in image optimizer (/_next/image) resolves local images via an
+  // internal self-request that doesn't go through basePath-aware routing, so
+  // under a non-root basePath it 404s on every local <Image> and returns
+  // 400 "isn't a valid image". `unoptimized: true` isn't a fix either — it
+  // skips the loader entirely and renders the raw (unprefixed) src as-is.
+  // A custom loader (src/lib/image-loader.ts) serves the file directly at
+  // its basePath-prefixed path instead.
+  images: {
+    loader: "custom",
+    loaderFile: "./src/lib/image-loader.ts",
+  },
 };
 
 export default nextConfig;

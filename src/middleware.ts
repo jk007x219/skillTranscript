@@ -98,9 +98,15 @@ export async function middleware(request: NextRequest) {
   const needsAuth = isProtectedPage(pathname) || (isApiRequest(pathname) && !isPublicPath(pathname));
   if (!needsAuth) return NextResponse.next();
 
+  // getToken() defaults secureCookie to false, but Auth.js sets the session
+  // cookie as "__Secure-authjs.session-token" whenever the request is HTTPS
+  // (which production always is). Without this, getToken() looks up the
+  // unprefixed cookie name, never finds it, and every request looks
+  // unauthenticated even right after a successful login.
   const token = await getToken({
     req: request,
     secret: process.env.AUTH_SECRET || process.env.NEXTAUTH_SECRET,
+    secureCookie: request.nextUrl.protocol === "https:",
   });
 
   if (!token) return unauthorized(request);
