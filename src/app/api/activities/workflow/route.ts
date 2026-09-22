@@ -133,16 +133,22 @@ export async function PUT(request: NextRequest) {
     const body = await request.json();
     const activityId = String(body.activityId || "");
     const field = String(body.field || "");
-    const value = Boolean(body.value);
-    if (!activityId || !["applicationEnabled", "registrationEnabled", "confirmationEnabled"].includes(field)) throw httpError(400, "ข้อมูล workflow ไม่ถูกต้อง");
+    const value = body.value;
+    if (!activityId || !["applicationEnabled", "registrationEnabled", "confirmationEnabled", "status"].includes(field)) throw httpError(400, "ข้อมูล workflow ไม่ถูกต้อง");
     const [activities] = await pool.query<any[]>(`SELECT activityId, createdBy, status, applicationEnabled, registrationEnabled, confirmationEnabled, hasEvaluation FROM activity WHERE activityId = ? LIMIT 1`, [activityId]);
     const activity = activities[0];
     if (!activity) throw httpError(404, "ไม่พบกิจกรรม");
     if (session.user.role === "teacher" && !session.user.isExecutive && activity.createdBy !== session.user.id) throw httpError(403, "คุณจัดการได้เฉพาะกิจกรรมที่สร้างเอง");
-    if (field === "confirmationEnabled" && value && !activity.hasEvaluation) throw httpError(400, "ต้องสร้างแบบประเมินก่อน จึงจะเปิดแบบประเมินกิจกรรมได้");
-    await pool.query(`UPDATE activity SET ${field} = ? WHERE activityId = ?`, [value ? 1 : 0, activityId]);
-    const [updated] = await pool.query<any[]>(`SELECT activityId, applicationEnabled, registrationEnabled, confirmationEnabled FROM activity WHERE activityId = ? LIMIT 1`, [activityId]);
-    return NextResponse.json({ activityId, applicationEnabled: Boolean(updated[0].applicationEnabled), registrationEnabled: Boolean(updated[0].registrationEnabled), confirmationEnabled: Boolean(updated[0].confirmationEnabled) });
+    if (field === "confirmationEnabled" && Boolean(value) && !activity.hasEvaluation) throw httpError(400, "ต้องสร้างแบบประเมินก่อน จึงจะเปิดแบบประเมินกิจกรรมได้");
+    if (field === "status" && value !== "active" && value !== "past") throw httpError(400, "สถานะกิจกรรมไม่ถูกต้อง");
+    await pool.query(
+      field === "status"
+        ? `UPDATE activity SET status = ? WHERE activityId = ?`
+        : `UPDATE activity SET ${field} = ? WHERE activityId = ?`,
+      field === "status" ? [value, activityId] : [Boolean(value) ? 1 : 0, activityId],
+    );
+    const [updated] = await pool.query<any[]>(`SELECT activityId, status, applicationEnabled, registrationEnabled, confirmationEnabled FROM activity WHERE activityId = ? LIMIT 1`, [activityId]);
+    return NextResponse.json({ activityId, status: updated[0].status, applicationEnabled: Boolean(updated[0].applicationEnabled), registrationEnabled: Boolean(updated[0].registrationEnabled), confirmationEnabled: Boolean(updated[0].confirmationEnabled) });
   } catch (error) {
     return jsonError(error);
   }
