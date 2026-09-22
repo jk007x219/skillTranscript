@@ -373,6 +373,16 @@ function DashboardPanel({
     [items],
   );
 
+  // โครงสร้างกราฟคงครบทุกทักษะเสมอ แต่ค่าแต่ละจุดจะมาจากระดับที่เลือก
+  const chartItems = items.map((item) => {
+    if (activeTab === "all") return item;
+
+    // ถ้าทักษะไม่อยู่ในระดับที่เลือก ให้แสดงจุดเป็น 0 แต่ยังคงแฉกของทักษะไว้
+    return grouped[activeTab].some((filtered) => filtered.skillId === item.skillId)
+      ? item
+      : { ...item, percent: 0 };
+  });
+
   const visibleItems = activeTab === "all" ? items : grouped[activeTab];
 
   const tabs: Array<{ key: ProgressTab; count: number }> = [
@@ -428,8 +438,8 @@ function DashboardPanel({
           <div className="flex flex-col items-center gap-3 rounded-xl bg-slate-50/60 p-4">
             <RadarChart
               accent={accent}
-              values={visibleItems.length >= 3 ? visibleItems.map((item) => item.percent) : []}
-              labels={visibleItems.map((item) => getRadarLabel(item.title))}
+              values={chartItems.length >= 3 ? chartItems.map((item) => item.percent) : []}
+              labels={chartItems.map((item) => getRadarLabel(item.title))}
               id={`${chartId}-${activeTab}`}
             />
           </div>
