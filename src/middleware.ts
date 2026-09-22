@@ -60,18 +60,30 @@ function canAccessPath(pathname: string, token: Record<string, unknown>) {
   return true;
 }
 
+// `new URL("/login", request.url)` resolves as an absolute path and drops
+// the "/662021086" basePath entirely (standard URL resolution semantics,
+// same as how "/x" always resolves from the domain root). request.nextUrl
+// is a Next.js NextURL, which re-adds the basePath when read back via
+// clone()/redirect(), so build redirect targets from a clone instead.
+function redirectTo(request: NextRequest, pathname: string) {
+  const url = request.nextUrl.clone();
+  url.pathname = pathname;
+  url.search = "";
+  return url;
+}
+
 function forbidden(request: NextRequest) {
   if (isApiRequest(request.nextUrl.pathname)) {
     return NextResponse.json({ message: "ไม่มีสิทธิ์เข้าถึงข้อมูลนี้" }, { status: 403 });
   }
-  return NextResponse.redirect(new URL("/", request.url));
+  return NextResponse.redirect(redirectTo(request, "/"));
 }
 
 function unauthorized(request: NextRequest) {
   if (isApiRequest(request.nextUrl.pathname)) {
     return NextResponse.json({ message: "กรุณาเข้าสู่ระบบ" }, { status: 401 });
   }
-  const loginUrl = new URL("/login", request.url);
+  const loginUrl = redirectTo(request, "/login");
   loginUrl.searchParams.set("callbackUrl", request.nextUrl.pathname);
   return NextResponse.redirect(loginUrl);
 }
@@ -94,7 +106,7 @@ export async function middleware(request: NextRequest) {
   if (!token) return unauthorized(request);
 
   if (token.mustChangePassword && token.role) {
-    return NextResponse.redirect(new URL("/change-password", request.url));
+    return NextResponse.redirect(redirectTo(request, "/change-password"));
   }
 
   if (!canAccessPath(pathname, token)) return forbidden(request);

@@ -1,7 +1,7 @@
 // components/staff/StaffRequestsPage.tsx
 "use client";
 
-import { apiPath } from "@/lib/api-path";
+import { apiPath, withBasePath } from "@/lib/api-path";
 import { useCallback, useEffect, useState } from "react";
 import {
   ChevronRight,
@@ -457,14 +457,14 @@ export default function StaffRequestsPage() {
                             if (file.url && isImageFile(file)) {
                               setPreviewFile(file);
                             } else if (file.url) {
-                              window.open(file.url, "_blank", "noopener,noreferrer");
+                              window.open(withBasePath(file.url), "_blank", "noopener,noreferrer");
                             }
                           }}
                           className="min-w-0 rounded-lg border border-[#DCEBFA] bg-[#F8FCFF] p-2 text-left transition hover:border-[#8EC5F4] hover:bg-white"
                         >
                           {file.url && isImageFile(file) ? (
                             <img
-                              src={file.url}
+                              src={withBasePath(file.url)}
                               alt={file.name}
                               className="mb-2 h-20 w-full rounded-md object-cover"
                             />
@@ -687,7 +687,7 @@ export default function StaffRequestsPage() {
             </div>
             <div className="max-h-[calc(100vh-8rem)] overflow-auto bg-slate-50 p-4">
               <img
-                src={previewFile.url}
+                src={withBasePath(previewFile.url)}
                 alt={previewFile.name}
                 className="mx-auto max-h-[calc(100vh-10rem)] max-w-full rounded-lg object-contain"
               />

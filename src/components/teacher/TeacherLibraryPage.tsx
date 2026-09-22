@@ -17,7 +17,7 @@ import {
 } from "lucide-react";
 import TeacherShell from "@/components/teacher/TeacherShell";
 import { useAuth } from "@/context/auth-context";
-import { apiPath } from "@/lib/api-path";
+import { apiPath, withBasePath } from "@/lib/api-path";
 
 type Template = {
   id: string;
@@ -263,7 +263,7 @@ const handleSubmit = async (e: React.FormEvent) => {
                 >
                   <div className="relative aspect-[4/3] overflow-hidden rounded-t-xl bg-slate-100">
                     <img
-                      src={template.imageUrl}
+                      src={withBasePath(template.imageUrl)}
                       alt={template.name}
                       className="h-full w-full object-cover transition duration-300 group-hover:scale-105"
                     />

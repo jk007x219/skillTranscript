@@ -1,7 +1,7 @@
 // components/student/StudentProfilePage.tsx
 "use client";
 
-import { apiPath } from "@/lib/api-path";
+import { apiPath, withBasePath } from "@/lib/api-path";
 import { useEffect, useMemo, useState } from "react";
 import { Camera, GraduationCap, Mail, Phone, Save, UserRound, UsersRound, BookOpen } from "lucide-react";
 import StudentShell from "@/components/student/StudentShell";
@@ -239,7 +239,7 @@ export default function StudentProfilePage() {
                   <label className="group relative block h-36 w-36 cursor-pointer overflow-hidden rounded-full border-4 border-white bg-blue-100 shadow-md ring-1 ring-blue-100">
                     {imageSrc ? (
                       <img
-                        src={imageSrc}
+                        src={withBasePath(imageSrc)}
                         alt={displayName}
                         className="h-full w-full object-cover"
                       />

@@ -2,7 +2,7 @@
 // components/student/SkillTranscriptPage.tsx
 "use client";
 
-import { apiPath } from "@/lib/api-path";
+import { apiPath, withBasePath } from "@/lib/api-path";
 import { useEffect, useMemo, useState } from "react";
 import {
   BarChart3,
@@ -887,7 +887,7 @@ export default function SkillTranscriptPage() {
 
               <div className="w-[92px] flex items-center">
                 <img
-                  src="/tsu-logo.png"
+                  src={apiPath("/tsu-logo.png")}
                   alt="TSU"
                   className="w-[70px] h-auto object-contain"
                   onError={(e) => {
@@ -909,7 +909,7 @@ export default function SkillTranscriptPage() {
 
               <div className="w-[110px] flex items-center justify-end">
                 <img
-                  src="/faculty-logo.png"
+                  src={apiPath("/faculty-logo.png")}
                   alt="คณะวิทยาศาสตร์และนวัตกรรมดิจิทัล"
                   className="h-[32px] w-auto object-contain"
                   onError={(e) => {
@@ -939,10 +939,10 @@ export default function SkillTranscriptPage() {
 
                     {data.profile.profileImageUrl ? (
                       <img
-                        src={
+                        src={withBasePath(
                           data.profile
                             .profileImageUrl
-                        }
+                        )}
                         alt={
                           data.profile.name
                         }
@@ -1364,7 +1364,7 @@ export default function SkillTranscriptPage() {
                       <div className="flex justify-center mb-1">
 
                         <img
-                          src={deanSignatureUrl}
+                          src={withBasePath(deanSignatureUrl)}
                           alt="ลายเซ็นคณบดี"
                           className="h-12 w-auto object-contain"
                           onError={(e) => {

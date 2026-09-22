@@ -1,7 +1,7 @@
 // components/staff/StaffSettingsPage.tsx
 "use client";
 
-import { apiPath } from "@/lib/api-path";
+import { apiPath, withBasePath } from "@/lib/api-path";
 import { useEffect, useState } from "react";
 import { useSession } from "next-auth/react";
 import {
@@ -182,7 +182,7 @@ export default function StaffSettingsPage() {
                 <label className="group relative block h-36 w-36 cursor-pointer overflow-hidden rounded-full border-4 border-white bg-blue-100 shadow-md ring-1 ring-blue-100">
                   {previewUrl ? (
                     <img
-                      src={previewUrl}
+                      src={withBasePath(previewUrl)}
                       alt={displayName}
                       className="h-full w-full object-cover"
                     />

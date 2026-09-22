@@ -1,7 +1,7 @@
 // components/student/StudentCertificatePage.tsx
 "use client";
 
-import { apiPath } from "@/lib/api-path";
+import { apiPath, withBasePath } from "@/lib/api-path";
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import {
@@ -65,20 +65,20 @@ function CertificatePreview({ certificate }: { certificate: CertificateData }) {
     >
       {/* Template Background */}
       <img
-        src={certificate.templateImageUrl}
+        src={withBasePath(certificate.templateImageUrl)}
         alt={certificate.templateName}
         className="absolute inset-0 h-full w-full object-cover"
         onError={(e) => {
           const target = e.currentTarget;
           if (!target.src.endsWith("/certificate-placeholder.png")) {
-            target.src = "/certificate-placeholder.png";
+            target.src = apiPath("/certificate-placeholder.png");
           }
         }}
       />
 
       <div className="absolute left-1/2 top-[6%] -translate-x-1/2">
         <img
-          src="/tsu-logo.png"
+          src={apiPath("/tsu-logo.png")}
           alt="TSU Logo"
           className="h-14 w-auto object-contain"
         />
@@ -119,7 +119,7 @@ function CertificatePreview({ certificate }: { certificate: CertificateData }) {
       <div className="absolute bottom-[7%] left-1/2 w-[34%] -translate-x-1/2 text-center">
         {certificate.deanSignatureUrl && (
           <img
-            src={certificate.deanSignatureUrl}
+            src={withBasePath(certificate.deanSignatureUrl)}
             alt="ลายเซ็นคณบดี"
             className="mx-auto mb-[-2px] h-10 max-w-full object-contain"
           />

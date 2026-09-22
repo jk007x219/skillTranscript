@@ -4,6 +4,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useState } from "react";
+import { withBasePath } from "@/lib/api-path";
 import { useRouter } from "next/navigation";
 import type { ReactNode } from "react";
 import type { LucideIcon } from "lucide-react";
@@ -151,7 +152,7 @@ export default function StudentShell({
                 <div className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-full bg-slate-200 text-slate-600 shadow-sm">
                   {user?.profileImageUrl ? (
                     <img
-                      src={user.profileImageUrl}
+                      src={withBasePath(user.profileImageUrl)}
                       alt={displayName}
                       className="h-full w-full rounded-full object-cover"
                     />
@@ -242,7 +243,7 @@ export default function StudentShell({
           <div className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-full bg-white/20">
             {user?.profileImageUrl ? (
               <img
-                src={user.profileImageUrl}
+                src={withBasePath(user.profileImageUrl)}
                 alt={displayName}
                 className="h-full w-full rounded-full object-cover"
               />

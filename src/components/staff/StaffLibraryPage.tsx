@@ -1,7 +1,7 @@
 // components/staff/StaffLibraryPage.tsx
 "use client";
 
-import { apiPath } from "@/lib/api-path";
+import { apiPath, withBasePath } from "@/lib/api-path";
 import { useCallback, useEffect, useState } from "react";
 import {
   Plus,
@@ -415,7 +415,7 @@ export default function StaffLibraryPage() {
                 >
                   <div className="relative aspect-[4/3] overflow-hidden rounded-t-xl bg-slate-100">
                     <img
-                      src={template.imageUrl}
+                      src={withBasePath(template.imageUrl)}
                       alt={template.name}
                       className="h-full w-full object-cover transition duration-300 group-hover:scale-105"
                     />
