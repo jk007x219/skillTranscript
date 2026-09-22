@@ -1,8 +1,8 @@
 import Image from "next/image";
 import Link from "next/link";
-import { LogIn, Menu, UserPlus } from "lucide-react";
+import { LogIn, Menu, QrCode, UserPlus } from "lucide-react";
 
-// Navbar หลักของระบบ แสดงตรามหาวิทยาลัย เมนูนำทาง และปุ่มเข้าสู่ระบบ/สมัครสมาชิก
+// Navbar หลักของระบบ แสดงตรามหาวิทยาลัย เมนูนำทาง และปุ่มเข้าสู่ระบบ/สมัครสมาชิก/สแกน QR
 export default function Navbar() {
   return (
     <header className="sticky top-0 z-50 border-b border-slate-200 bg-white/95 shadow-sm backdrop-blur">
@@ -25,6 +25,13 @@ export default function Navbar() {
         </Link>
 
         <div className="hidden items-center gap-3 md:flex">
+          <Link
+            href="/scan-qr"
+            className="inline-flex items-center gap-2 rounded-xl border border-[#1565C0] px-4 py-2 text-sm font-medium text-[#1565C0] transition hover:bg-blue-50"
+          >
+            <QrCode className="h-4 w-4" aria-hidden="true" />
+            สแกน QR
+          </Link>
           <Link
             href="/login"
             className="inline-flex items-center gap-2 rounded-xl border border-[#1565C0] px-4 py-2 text-sm font-medium text-[#1565C0] transition hover:bg-blue-50"
