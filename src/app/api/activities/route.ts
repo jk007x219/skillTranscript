@@ -431,11 +431,19 @@ export async function GET(request: NextRequest) {
         a.applicationEnabled,
         a.capacity,
 
-        COUNT(p.ParticipationId) AS attendeeCount,
+        SUM(
+          CASE
+            WHEN p.registrationQrToken IS NOT NULL
+             AND TRIM(p.registrationQrToken) <> ''
+            THEN 1
+            ELSE 0
+          END
+        ) AS attendeeCount,
 
         SUM(
           CASE
-            WHEN p.status IN ('confirmed', 'completed')
+            WHEN p.registrationQrToken IS NOT NULL
+             AND TRIM(p.registrationQrToken) <> ''
             THEN 1
             ELSE 0
           END
