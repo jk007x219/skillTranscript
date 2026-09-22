@@ -1,3 +1,11 @@
+# เข้าถึงผ่าน shared reverse proxy ที่ https://miscis.scidi.tsu.ac.th/662021086
+# (ดู ../nginx-conf/default.conf) — ก่อนหน้านี้เข้าตรงพอร์ต 3086 (เลิกใช้แล้ว)
+#
+# *** ต้อง build image ใหม่ก่อนถึงจะใช้งานได้ถูกต้อง ***
+# image arraya086/skilltranscript:v23 ยังไม่รู้จัก path prefix (Next.js ไม่มี
+# basePath ตั้งไว้) เสิร์ฟ asset/API เป็น absolute path จาก root (/_next/..., /api/...)
+# ต้องเพิ่ม `basePath: "/662021086"` ใน next.config ของโปรเจกต์ skilltranscript
+# แล้ว build+push image tag ใหม่ (เช่น v23) มาแทนที่ tag ด้านล่างก่อน deploy จริง
 services:
   mysql:
     image: mysql:8.0
@@ -12,58 +20,37 @@ services:
       - "3386:3306"
     volumes:
       - mysql-data:/var/lib/mysql
-    healthcheck:
-      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -uroot -prootpass --silent"]
-      interval: 10s
-      timeout: 5s
-      retries: 10
-      start_period: 20s
 
   app_skilltranscript086:
-    image: arraya086/skilltranscript:v02
+    image: arraya086/skilltranscript:v28   # TODO: เปลี่ยนเป็น tag ที่ build ด้วย basePath /662021086 แล้ว
     container_name: skilltranscript-app-086
-    working_dir: /app
-
-    depends_on:
-      mysql:
-        condition: service_healthy
-
     env_file:
       - .env
-
     environment:
       NODE_ENV: production
       PORT: 3000
-      NEXTAUTH_URL: https://miscis.scidi.tsu.ac.th:3086
-      AUTH_URL: https://miscis.scidi.tsu.ac.th:3086
+      NEXTAUTH_URL: https://miscis.scidi.tsu.ac.th/662021086
+      AUTH_URL: https://miscis.scidi.tsu.ac.th/662021086
       AUTH_TRUST_HOST: "true"
-
       DB_HOST: mysql
       DB_PORT: 3306
       DB_USER: skilltranscript
       DB_PASSWORD: skilltranscript
       DB_NAME: skilltranscript
-      WATCHPACK_POLLING: "true"
-    expose:
-      - "3000"
-    restart: unless-stopped
-
-  caddy:
-    image: caddy:2-alpine
-    container_name: skilltranscript-caddy
-    restart: unless-stopped
-    depends_on:
-      - app_skilltranscript086
     ports:
-      - "80:80"
-      - "443:443"
-      - "3086:3086"
-    volumes:
-      - ./Caddyfile:/etc/caddy/Caddyfile:ro
-      - caddy-data:/data
-      - caddy-config:/config
+      # เก็บไว้ทดสอบตรง ๆ ระหว่างเปลี่ยนผ่านเท่านั้น — ใช้งานจริงเข้าทาง reverse proxy ด้านบน
+      - "3086:3000"
+    depends_on:
+      - mysql
+    restart: unless-stopped
+    networks:
+      - default
+      - miscis-proxy
 
 volumes:
   mysql-data:
-  caddy-data:
-  caddy-config:
+
+networks:
+  miscis-proxy:
+    name: miscis-proxy
+    external: true
