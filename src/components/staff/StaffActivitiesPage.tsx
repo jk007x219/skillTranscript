@@ -2310,7 +2310,7 @@ export default function StaffActivitiesPage() {
                 </div>
               ) : (
                 filteredActivities.map((activity) => {
-                  const past = isActivityPast(activity);
+                  const past = activity.status === "past" || isActivityPast(activity);
                   const external = isExternalActivity(activity);
                   return (
                     <article
