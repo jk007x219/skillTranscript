@@ -24,6 +24,8 @@ type TranscriptSkill = {
   level: string | null;
   earnedScore: number;
   maxPossibleScore: number;
+  assessmentCorrectCount: number;
+  assessmentTotalCount: number;
   percent: number;
 };
 
@@ -540,10 +542,10 @@ export default function SkillTranscriptPage() {
           (skill) => ({
             name: skill.name,
             score: `${formatScore(
-              skill.earnedScore
+              skill.assessmentCorrectCount
             )}/${formatScore(
-              skill.maxPossibleScore
-            )}`,
+              skill.assessmentTotalCount
+            )} ข้อ`,
           })
         ),
     };
