@@ -31,78 +31,155 @@ export async function GET(_request: Request, context: RouteContext) {
     );
 
     // =========================================================
-    // 2. รวมคะแนนของแต่ละทักษะจากทุกกิจกรรม
+    // 2. คำนวณคะแนนทักษะแบบใหม่
     //
-    // สูตรที่ถูกต้อง:
+    // แต่ละระดับมีน้ำหนักเท่ากันต่อกิจกรรม:
+    // พื้นฐาน = 1, กลาง = 1, สูง = 1
     //
-    //     SUM(earnedScore)
-    //     ---------------- × 100
-    //      SUM(maxScore)
+    // คะแนนของแต่ละระดับ
+    //   = SUM(คะแนนที่ได้) / SUM(คะแนนเต็ม) * 100
     //
-    // ห้ามใช้ AVG(normalizedScore)
-    // เพราะจะกลายเป็นการเฉลี่ยเปอร์เซ็นต์ของแต่ละกิจกรรม
+    // สัดส่วนกิจกรรมของแต่ละระดับ
+    //   = จำนวนกิจกรรมระดับนั้น / จำนวนกิจกรรมทั้งหมดของทักษะ * 100
+    //
+    // คะแนนทักษะรวม
+    //   = SUM(คะแนนระดับนั้น * สัดส่วนกิจกรรมระดับนั้น / 100)
+    //
+    // เช่น 100% * 1/9 + 52.94% * 3/9 + 58.62% * 5/9
+    //      = 61.32%
     // =========================================================
     const [skillScores] = await pool.query<RowDataPacket[]>(
       `SELECT
-         ps.skillName,
+         s.skillId,
+         s.skillname AS skillName,
+         COALESCE(acs.level, 'พื้นฐาน') AS skillLevel,
+         COUNT(DISTINCT p.activityId) AS activityCount,
          SUM(COALESCE(ps.earnedScore, 0)) AS totalEarned,
          SUM(COALESCE(ps.maxScore, 0)) AS totalMax
-       FROM participation_skill ps
-       INNER JOIN participation p
-         ON p.ParticipationId = ps.participationId
-       WHERE p.studentId = ?
-         AND p.status = 'completed'
-       GROUP BY ps.skillName`,
+       FROM skill s
+       LEFT JOIN activityskill acs
+         ON acs.skillId = s.skillId
+       LEFT JOIN participation p
+         ON p.activityId = acs.activityId
+        AND p.studentId = ?
+        AND p.status = 'completed'
+       LEFT JOIN participation_skill ps
+         ON ps.participationId = p.ParticipationId
+        AND ps.skillName = acs.skillname
+       GROUP BY s.skillId, s.skillname, acs.level`,
       [studentId]
     );
 
-    // =========================================================
-    // 3. สร้าง Map สำหรับคะแนนแต่ละทักษะ
-    // =========================================================
-    const scoreMap: Record<
-      string,
-      {
-        earned: number;
-        max: number;
-      }
-    > = {};
+    type LevelScore = {
+      activityCount: number;
+      earned: number;
+      max: number;
+    };
 
-    (skillScores as RowDataPacket[]).forEach((row) => {
-      const earned = Number(row.totalEarned) || 0;
-      const max = Number(row.totalMax) || 0;
+    const scoreMap: Record<string, Record<string, LevelScore>> = {};
 
-      scoreMap[String(row.skillName)] = {
-        earned,
-        max,
+    for (const row of skillScores) {
+      const skillName = String(row.skillName);
+      const level = String(row.skillLevel || 'พื้นฐาน');
+
+      if (!scoreMap[skillName]) scoreMap[skillName] = {};
+
+      scoreMap[skillName][level] = {
+        activityCount: Number(row.activityCount) || 0,
+        earned: Number(row.totalEarned) || 0,
+        max: Number(row.totalMax) || 0,
       };
-    });
+    }
 
-    // =========================================================
-    // 4. สร้างข้อมูลทักษะสำหรับ Dashboard
-    // =========================================================
+    function normalizeLevel(level: string) {
+      const value = level.trim().toLowerCase();
+
+      if (value.includes('สูง') || value.includes('advanced') || value.includes('high') || value === '3') {
+        return 'สูง';
+      }
+
+      if (value.includes('กลาง') || value.includes('intermediate') || value.includes('medium') || value.includes('mid') || value === '2') {
+        return 'กลาง';
+      }
+
+      return 'พื้นฐาน';
+    }
+
+    // รวมข้อมูลกรณีฐานข้อมูลใช้ชื่อระดับหลายรูปแบบ
+    const normalizedScoreMap: Record<string, Record<string, LevelScore>> = {};
+
+    for (const [skillName, levels] of Object.entries(scoreMap)) {
+      normalizedScoreMap[skillName] = {};
+
+      for (const [rawLevel, value] of Object.entries(levels)) {
+        const level = normalizeLevel(rawLevel);
+        const current = normalizedScoreMap[skillName][level] || {
+          activityCount: 0,
+          earned: 0,
+          max: 0,
+        };
+
+        current.activityCount += value.activityCount;
+        current.earned += value.earned;
+        current.max += value.max;
+        normalizedScoreMap[skillName][level] = current;
+      }
+    }
+
     const skills = allSkills.map((skill) => {
       const skillName = String(skill.skillname);
+      const levels = normalizedScoreMap[skillName] || {};
 
-      const score = scoreMap[skillName] || {
-        earned: 0,
-        max: 0,
-      };
+      const basic = levels['พื้นฐาน'] || { activityCount: 0, earned: 0, max: 0 };
+      const intermediate = levels['กลาง'] || { activityCount: 0, earned: 0, max: 0 };
+      const advanced = levels['สูง'] || { activityCount: 0, earned: 0, max: 0 };
 
-      // สูตรสะสมที่ถูกต้อง
+      const totalActivities =
+        basic.activityCount +
+        intermediate.activityCount +
+        advanced.activityCount;
+
+      const levelPercent = (item: LevelScore) =>
+        item.max > 0
+          ? Math.min(100, Math.max(0, Math.round((item.earned / item.max) * 10000) / 100))
+          : 0;
+
+      const basicPercent = levelPercent(basic);
+      const intermediatePercent = levelPercent(intermediate);
+      const advancedPercent = levelPercent(advanced);
+
       const percent =
-        score.max > 0
-          ? Math.round((score.earned / score.max) * 10000) / 100
+        totalActivities > 0
+          ? Math.round(
+              (
+                (basicPercent * basic.activityCount +
+                  intermediatePercent * intermediate.activityCount +
+                  advancedPercent * advanced.activityCount) /
+                totalActivities
+              ) * 100
+            ) / 100
           : 0;
 
       return {
         skillId: skill.skillId,
         title: skillName,
-        level: "กลาง",
+        level:
+          advanced.activityCount > 0
+            ? 'สูง'
+            : intermediate.activityCount > 0
+              ? 'กลาง'
+              : 'พื้นฐาน',
         hours: 0,
-        activityCount: 0,
+        activityCount: totalActivities,
         percent,
-        earnedScore: score.earned,
-        maxScore: score.max,
+        basicPercent,
+        intermediatePercent,
+        advancedPercent,
+        basicActivityCount: basic.activityCount,
+        intermediateActivityCount: intermediate.activityCount,
+        advancedActivityCount: advanced.activityCount,
+        earnedScore: basic.earned + intermediate.earned + advanced.earned,
+        maxScore: basic.max + intermediate.max + advanced.max,
       };
     });
 
