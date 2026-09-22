@@ -34,6 +34,12 @@ type DashboardSkill = {
   hours: number;
   activityCount: number;
   percent: number;
+  basicPercent?: number;
+  intermediatePercent?: number;
+  advancedPercent?: number;
+  basicActivityCount?: number;
+  intermediateActivityCount?: number;
+  advancedActivityCount?: number;
 };
 
 type StudentDashboardData = {
@@ -373,14 +379,26 @@ function DashboardPanel({
     [items],
   );
 
-  // โครงสร้างกราฟคงครบทุกทักษะเสมอ แต่ค่าแต่ละจุดจะมาจากระดับที่เลือก
+  // โครงสร้างกราฟคงครบทุกทักษะเสมอ
+  // และใช้คะแนนของ "ระดับที่เลือก" โดยตรงจาก API
+  // ถ้าไม่มีข้อมูลในระดับนั้น ต้องเป็น 0
   const chartItems = items.map((item) => {
     if (activeTab === "all") return item;
 
-    // ถ้าทักษะไม่อยู่ในระดับที่เลือก ให้แสดงจุดเป็น 0 แต่ยังคงแฉกของทักษะไว้
-    return grouped[activeTab].some((filtered) => filtered.skillId === item.skillId)
-      ? item
-      : { ...item, percent: 0 };
+    const percent =
+      activeTab === "basic"
+        ? (item.basicActivityCount ?? 0) > 0
+          ? item.basicPercent ?? 0
+          : 0
+        : activeTab === "intermediate"
+          ? (item.intermediateActivityCount ?? 0) > 0
+            ? item.intermediatePercent ?? 0
+            : 0
+          : (item.advancedActivityCount ?? 0) > 0
+            ? item.advancedPercent ?? 0
+            : 0;
+
+    return { ...item, percent };
   });
 
   const visibleItems = activeTab === "all" ? items : grouped[activeTab];
