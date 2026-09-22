@@ -630,6 +630,8 @@ export default function SkillTranscriptPage() {
 
         body {
           font-family: "Sarabun", Arial, sans-serif;
+          font-size: 16px;
+          line-height: 1.5;
         }
 
         .download-bar {
@@ -656,7 +658,7 @@ export default function SkillTranscriptPage() {
         }
 
         .transcript-header {
-          min-height: 18mm;
+          min-height: 25mm;
         }
 
         .transcript-card {
@@ -689,9 +691,9 @@ export default function SkillTranscriptPage() {
           border-bottom: 1px solid #e3e6eb;
           padding-bottom: 5px;
           color: #173b69;
-          font-size: 10px;
+          font-size: 16px;
           font-weight: 700;
-          line-height: 1.2;
+          line-height: 1.4;
         }
 
         .top-grid {
@@ -891,7 +893,7 @@ export default function SkillTranscriptPage() {
                 <img
                   src={apiPath("/tsu-logo.png")}
                   alt="TSU"
-                  className="w-[70px] h-auto object-contain"
+                  className="w-[90px] h-auto object-contain"
                   onError={(e) => {
                     e.currentTarget.style.display =
                       "none";
@@ -900,11 +902,11 @@ export default function SkillTranscriptPage() {
               </div>
 
               <div className="absolute left-1/2 -translate-x-1/2 top-[0px] text-center">
-                <h1 className="text-[#203c63] text-[25px] font-bold leading-[30px] tracking-wide">
+                <h1 className="text-[#203c63] text-[30px] font-bold leading-[36px] tracking-wide">
                   SKILLS TRANSCRIPT
                 </h1>
 
-                <p className="text-[8px] font-medium text-[#587596]">
+                <p className="text-[16px] font-medium text-[#587596] leading-[22px]">
                   Faculty of Science and Digital Innovation
                 </p>
               </div>
@@ -913,7 +915,7 @@ export default function SkillTranscriptPage() {
                 <img
                   src={apiPath("/faculty-logo.png")}
                   alt="คณะวิทยาศาสตร์และนวัตกรรมดิจิทัล"
-                  className="h-[32px] w-auto object-contain"
+                  className="h-[42px] w-auto object-contain"
                   onError={(e) => {
                     e.currentTarget.style.display =
                       "none";
