@@ -36,7 +36,8 @@ type StudentRow = RowDataPacket & {
 type SkillScoreRow = RowDataPacket & {
   skillId: string;
   skillName: string | null;
-  level: string | null;
+  skillLevel: string | null;
+  activityCount: number | string | null;
   earnedScore: number | string | null;
   maxPossibleScore: number | string | null;
 };
@@ -249,66 +250,29 @@ export async function GET(
         SELECT
           s.skillId,
           s.skillname AS skillName,
-
-          COALESCE(
-            GROUP_CONCAT(
-              DISTINCT COALESCE(
-                acs.level,
-                'กลาง'
-              )
-              ORDER BY acs.level
-              SEPARATOR ','
-            ),
-            'กลาง'
-          ) AS level,
-
-          COALESCE(
-            SUM(
-              student_scores.earnedScore
-            ),
-            0
-          ) AS earnedScore,
-
-          COALESCE(
-            SUM(
-              student_scores.maxScore
-            ),
-            0
-          ) AS maxPossibleScore
+          COALESCE(acs.level, 'พื้นฐาน') AS skillLevel,
+          COUNT(DISTINCT p.activityId) AS activityCount,
+          COALESCE(SUM(ps.earnedScore), 0) AS earnedScore,
+          COALESCE(SUM(ps.maxScore), 0) AS maxPossibleScore
 
         FROM skill s
 
-        LEFT JOIN (
-          SELECT
-            p.ParticipationId,
-            p.activityId,
-            ps.skillName,
-            ps.earnedScore,
-            ps.maxScore
-
-          FROM participation p
-
-          INNER JOIN participation_skill ps
-            ON ps.participationId =
-               p.ParticipationId
-
-          WHERE
-            p.studentId = ?
-            AND p.status = 'completed'
-        ) AS student_scores
-          ON student_scores.skillName =
-             s.skillname
-
         LEFT JOIN activityskill acs
-          ON acs.skillname =
-             s.skillname
+          ON acs.skillId = s.skillId
 
-          AND acs.activityId =
-              student_scores.activityId
+        LEFT JOIN participation p
+          ON p.activityId = acs.activityId
+          AND p.studentId = ?
+          AND p.status = 'completed'
+
+        LEFT JOIN participation_skill ps
+          ON ps.participationId = p.ParticipationId
+          AND ps.skillName = acs.skillname
 
         GROUP BY
           s.skillId,
-          s.skillname
+          s.skillname,
+          acs.level
 
         ORDER BY
           s.skillId
@@ -320,55 +284,145 @@ export async function GET(
     // 4. สร้างข้อมูลทักษะ
     // ========================================================
 
-    const skills =
-      skillRows.map((row) => {
-        const earnedScore =
-          toNumber(
-            row.earnedScore
-          );
+    function normalizeSkillLevel(level: string | null) {
+      const value = String(level || '').trim().toLowerCase();
 
-        const maxPossibleScore =
-          toNumber(
-            row.maxPossibleScore
-          );
+      if (
+        value.includes('สูง') ||
+        value.includes('advanced') ||
+        value.includes('high') ||
+        value === '3'
+      ) {
+        return 'advanced';
+      }
 
-        const percent =
-          maxPossibleScore > 0
-            ? Math.round(
-                (earnedScore /
-                  maxPossibleScore) *
-                  10000
-              ) / 100
-            : 0;
+      if (
+        value.includes('กลาง') ||
+        value.includes('intermediate') ||
+        value.includes('medium') ||
+        value.includes('mid') ||
+        value === '2'
+      ) {
+        return 'intermediate';
+      }
 
-        return {
-          skillId:
-            row.skillId,
+      return 'basic';
+    }
 
-          name:
-            normalizeSkillName(
-              row.skillName ||
-                row.skillId
-            ),
+    type LevelData = {
+      activityCount: number;
+      earned: number;
+      max: number;
+    };
 
-          level:
-            row.level ||
-            "กลาง",
+    const skillsById = new Map<
+      string,
+      {
+        skillId: string;
+        name: string;
+        levels: Record<string, LevelData>;
+      }
+    >();
 
-          earnedScore,
+    for (const row of skillRows) {
+      const skillId = String(row.skillId);
+      const existing = skillsById.get(skillId) || {
+        skillId,
+        name: normalizeSkillName(row.skillName || skillId),
+        levels: {},
+      };
 
-          maxPossibleScore,
+      const level = normalizeSkillLevel(row.skillLevel);
+      const current = existing.levels[level] || {
+        activityCount: 0,
+        earned: 0,
+        max: 0,
+      };
 
-          percent:
-            Math.min(
+      current.activityCount += toNumber(row.activityCount);
+      current.earned += toNumber(row.earnedScore);
+      current.max += toNumber(row.maxPossibleScore);
+
+      existing.levels[level] = current;
+      skillsById.set(skillId, existing);
+    }
+
+    const skills = Array.from(skillsById.values()).map((skill) => {
+      const basic = skill.levels.basic || {
+        activityCount: 0,
+        earned: 0,
+        max: 0,
+      };
+
+      const intermediate = skill.levels.intermediate || {
+        activityCount: 0,
+        earned: 0,
+        max: 0,
+      };
+
+      const advanced = skill.levels.advanced || {
+        activityCount: 0,
+        earned: 0,
+        max: 0,
+      };
+
+      const totalActivities =
+        basic.activityCount +
+        intermediate.activityCount +
+        advanced.activityCount;
+
+      const levelPercent = (level: LevelData) =>
+        level.max > 0
+          ? Math.min(
               100,
               Math.max(
                 0,
-                percent
+                Math.round(
+                  (level.earned / level.max) * 10000
+                ) / 100
               )
-            ),
-        };
-      });
+            )
+          : 0;
+
+      const basicPercent = levelPercent(basic);
+      const intermediatePercent = levelPercent(intermediate);
+      const advancedPercent = levelPercent(advanced);
+
+      // คะแนน "รวม" ใช้สูตรเดียวกับ Student Dashboard:
+      // คะแนนของแต่ละระดับ × สัดส่วนจำนวนกิจกรรมของระดับนั้น
+      const percent =
+        totalActivities > 0
+          ? Math.round(
+              (
+                basicPercent * basic.activityCount +
+                intermediatePercent * intermediate.activityCount +
+                advancedPercent * advanced.activityCount
+              ) /
+                totalActivities *
+                100
+            ) / 100
+          : 0;
+
+      return {
+        skillId: skill.skillId,
+        name: skill.name,
+        level:
+          advanced.activityCount > 0
+            ? 'สูง'
+            : intermediate.activityCount > 0
+              ? 'กลาง'
+              : 'พื้นฐาน',
+        earnedScore:
+          basic.earned +
+          intermediate.earned +
+          advanced.earned,
+        maxPossibleScore:
+          basic.max +
+          intermediate.max +
+          advanced.max,
+        percent,
+      };
+    });
 
     // ========================================================
     // 5. ดึงกิจกรรมที่นิสิตเข้าร่วม
