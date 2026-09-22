@@ -373,6 +373,8 @@ function DashboardPanel({
     [items],
   );
 
+  // กราฟต้องแสดงทุกทักษะของหมวดนี้ตลอดเวลา ไม่เปลี่ยนตามแท็บระดับ
+  const chartItems = items;
   const visibleItems = activeTab === "all" ? items : grouped[activeTab];
 
   const tabs: Array<{ key: ProgressTab; count: number }> = [
@@ -428,16 +430,10 @@ function DashboardPanel({
           <div className="flex flex-col items-center gap-3 rounded-xl bg-slate-50/60 p-4">
             <RadarChart
               accent={accent}
-              values={visibleItems.length >= 3 ? visibleItems.map((item) => item.percent) : []}
-              labels={visibleItems.map((item) => getRadarLabel(item.title))}
+              values={chartItems.length >= 3 ? chartItems.map((item) => item.percent) : []}
+              labels={chartItems.map((item) => getRadarLabel(item.title))}
               id={`${chartId}-${activeTab}`}
             />
-            <div className="text-center">
-              <p className="text-2xl font-semibold tabular-nums text-slate-900">
-                {averagePercent(visibleItems)}%
-              </p>
-              <p className="text-xs text-slate-500">คะแนนเฉลี่ยของหมวดนี้</p>
-            </div>
           </div>
 
           <ProgressList items={visibleItems} accent={accent} />
