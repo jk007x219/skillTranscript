@@ -176,19 +176,18 @@ export async function PUT(
       approvedActivityId = nanoid(20);
 
       /**
-       * คะแนนรวมของกิจกรรม
+       * คะแนนของกิจกรรมภายนอก
        *
-       * ตัวอย่าง:
-       * พื้นฐาน 1
-       * ปานกลาง 2
-       * สูง 3
+       * กิจกรรมภายนอกไม่มีแบบประเมินของระบบ
+       * ดังนั้นเมื่อเจ้าหน้าที่อนุมัติทักษะแล้ว
+       * ให้ถือว่านิสิตผ่านกิจกรรมนั้นเต็ม 100%
        *
-       * รวม = 6
+       * หมายเหตุ:
+       * น้ำหนัก พื้นฐาน=1, กลาง=2, สูง=3
+       * ใช้เฉพาะเป็นน้ำหนักของ maxScore/earnedScore
+       * ของแต่ละทักษะ ไม่ใช่คะแนนรวมของกิจกรรม
        */
-      const totalScore = cleanedSkills.reduce(
-        (sum, item) => sum + getLevelScore(item.level),
-        0,
-      );
+      const activityScore = 1;
 
       /**
        * =======================================================
@@ -287,10 +286,8 @@ export async function PUT(
        * 4. สร้าง Participation
        * =======================================================
        *
-       * score = คะแนนรวมของทุกทักษะ
-       *
-       * ตัวอย่าง:
-       * 1 + 2 + 3 = 6
+       * score = คะแนนมาตรฐานของกิจกรรม
+       * 1 = ผ่านเต็ม 100% (ไม่มีแบบประเมิน)
        */
       const participationId = nanoid(20);
 
@@ -311,7 +308,7 @@ export async function PUT(
           activityRequest.studentId,
           approvedActivityId,
           activityRequest.activityDate,
-          totalScore,
+          activityScore,
         ],
       );
 
@@ -333,7 +330,8 @@ export async function PUT(
             participationId,
             skillName,
             earnedScore,
-            maxScore
+            maxScore,
+            normalizedScore
           )
          VALUES ?`,
         [
@@ -345,6 +343,7 @@ export async function PUT(
               item.skill,
               score,
               score,
+              1,
             ];
           }),
         ],
