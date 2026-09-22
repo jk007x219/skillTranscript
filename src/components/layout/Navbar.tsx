@@ -26,7 +26,7 @@ export default function Navbar() {
 
         <div className="hidden items-center gap-3 md:flex">
           <Link
-            href="/scan-qr"
+            href="/staff/scan-qr"
             className="inline-flex items-center gap-2 rounded-xl border border-[#1565C0] px-4 py-2 text-sm font-medium text-[#1565C0] transition hover:bg-blue-50"
           >
             <QrCode className="h-4 w-4" aria-hidden="true" />
