@@ -662,7 +662,7 @@ export default function StudentActivitiesPage() {
             </div>
             {qrActivity.qrPayload && (
               <textarea
-                value={qrActivity.qrPayload}
+                value={user?.studentId || ""}
                 readOnly
                 className="mt-4 h-20 w-full resize-none rounded-xl border border-slate-200 bg-white p-3 text-xs text-slate-500"
               />
