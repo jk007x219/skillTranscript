@@ -2344,12 +2344,15 @@ export default function StaffActivitiesPage() {
 
                         <div className="flex items-center gap-2">
                           {!past && (
-                            <ActionButton
-                              icon={CheckCircle2}
-                              label="สิ้นสุดกิจกรรม"
-                              onClick={() => handleEndActivity(activity.id)}
-                              title="ย้ายกิจกรรมไปยังกิจกรรมที่สิ้นสุดแล้ว"
-                            />
+                            <div className="inline-flex items-center rounded-lg border border-slate-100 bg-white px-2">
+                              <span className="mr-2 text-xs font-medium text-slate-600">
+                                สิ้นสุดกิจกรรม
+                              </span>
+                              <ToggleSwitch
+                                enabled={false}
+                                onClick={() => handleEndActivity(activity.id)}
+                              />
+                            </div>
                           )}
                           <ActionButton
                             icon={Edit}
