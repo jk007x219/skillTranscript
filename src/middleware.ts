@@ -9,6 +9,7 @@ const publicPaths = [
   "/api/users/teachers",
   "/api/certificate-settings/signature",
   "/api/activity-requests/evidence",
+  "/staff/scan-qr",
   "/login",
   "/register",
   "/forgot-password",
@@ -60,11 +61,6 @@ function canAccessPath(pathname: string, token: Record<string, unknown>) {
   return true;
 }
 
-// `new URL("/login", request.url)` resolves as an absolute path and drops
-// the "/662021086" basePath entirely (standard URL resolution semantics,
-// same as how "/x" always resolves from the domain root). request.nextUrl
-// is a Next.js NextURL, which re-adds the basePath when read back via
-// clone()/redirect(), so build redirect targets from a clone instead.
 function redirectTo(request: NextRequest, pathname: string) {
   const url = request.nextUrl.clone();
   url.pathname = pathname;
@@ -98,11 +94,6 @@ export async function middleware(request: NextRequest) {
   const needsAuth = isProtectedPage(pathname) || (isApiRequest(pathname) && !isPublicPath(pathname));
   if (!needsAuth) return NextResponse.next();
 
-  // getToken() defaults secureCookie to false, but Auth.js sets the session
-  // cookie as "__Secure-authjs.session-token" whenever the request is HTTPS
-  // (which production always is). Without this, getToken() looks up the
-  // unprefixed cookie name, never finds it, and every request looks
-  // unauthenticated even right after a successful login.
   const token = await getToken({
     req: request,
     secret: process.env.AUTH_SECRET || process.env.NEXTAUTH_SECRET,
@@ -117,9 +108,6 @@ export async function middleware(request: NextRequest) {
 
   if (!canAccessPath(pathname, token)) return forbidden(request);
 
-  // The student activities page uses /api/activities with studentId.
-  // Send that request to the workflow endpoint so registered/confirmed
-  // states are kept visible while completed activities stay in history.
   if (pathname === "/api/activities" && token.role === "student") {
     const studentId = request.nextUrl.searchParams.get("studentId");
     const visible = request.nextUrl.searchParams.get("visible");
