@@ -413,7 +413,7 @@ function DashboardPanel({
 
 
   const tabs: Array<{ key: ProgressTab; count: number }> = [
-    { key: "all", count: items.length },
+    { key: "all", count: items.filter((item) => item.activityCount > 0).length },
     { key: "basic", count: grouped.basic.length },
     { key: "intermediate", count: grouped.intermediate.length },
     { key: "advanced", count: grouped.advanced.length },
