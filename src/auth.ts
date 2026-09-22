@@ -4,7 +4,7 @@ import NextAuth from "next-auth";
 import Credentials from "next-auth/providers/credentials";
 import type { RowDataPacket } from "mysql2";
 import { pool } from "@/lib/db";
-import { apiPath } from "@/lib/api-path";
+import { apiPath, withBasePath } from "@/lib/api-path";
 
 type LoginUserRow = RowDataPacket & {
   userId: string;
@@ -163,6 +163,18 @@ export const {
   ],
 
   callbacks: {
+    // Auth.js's default redirect callback resolves a relative callbackUrl
+    // as `${baseUrl}${url}`, where baseUrl is just the request origin (no
+    // basePath — Next.js strips "/662021086" before this code ever runs).
+    // signOut() defaults to redirect:true (unlike our signIn() calls, which
+    // always pass redirect:false and navigate manually), so without this it
+    // sends the browser to "https://.../" instead of "https://.../662021086/".
+    async redirect({ url, baseUrl }) {
+      if (url.startsWith("/")) return `${baseUrl}${withBasePath(url)}`;
+      if (new URL(url).origin === baseUrl) return url;
+      return baseUrl;
+    },
+
     async jwt({ token, user, trigger, session }) {
       if (user) {
         token.id = user.id;
