@@ -181,8 +181,10 @@ function Card({
           </button>
         ) : s === "applied" ? (
           <button
+            type="button"
             disabled
-            className="h-11 flex-1 rounded-xl border border-blue-100 bg-blue-50 text-sm font-semibold text-[#2455A4]"
+            className="h-11 flex-1 cursor-not-allowed rounded-xl bg-slate-300 text-sm font-semibold text-slate-600"
+            aria-disabled="true"
           >
             <span className="inline-flex items-center justify-center gap-2">
               <CheckCircle2 className="h-4 w-4" />
