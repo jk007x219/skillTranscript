@@ -489,13 +489,16 @@ export async function GET(request: NextRequest) {
         (skill) => skill.participantCount > 0
       );
 
+    // กราฟต้องแสดงครบทุกทักษะ
+    // ทักษะที่ไม่มีนิสิตเข้าร่วมจะแสดงเป็น 0%
+    // แต่ participantCount จะยังเป็น 0 เพื่อไม่ให้นำไปคิดค่าเฉลี่ยหมวด
     const facultySkills =
-      assessedSkillAverages.filter((skill) =>
+      allSkillAverages.filter((skill) =>
         isFacultySkill(skill.skillName)
       );
 
     const essentialSkills =
-      assessedSkillAverages.filter(
+      allSkillAverages.filter(
         (skill) =>
           !isFacultySkill(skill.skillName)
       );
