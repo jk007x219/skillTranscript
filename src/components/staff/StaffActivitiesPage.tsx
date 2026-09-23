@@ -280,6 +280,19 @@ function getActivityStartDateTime(activity: StaffActivity): Date | null {
   return new Date(`${date}T${time}`);
 }
 
+function formatRegistrationDateTime(value?: string | null): string {
+  if (!value) return "ไม่ระบุ";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "ไม่ระบุ";
+  return date.toLocaleString("th-TH", {
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  }) + " น.";
+}
+
 function isExternalActivity(activity: StaffActivity) {
   return activity.location === "กิจกรรมภายนอก";
 }
@@ -2581,6 +2594,20 @@ export default function StaffActivitiesPage() {
                               )} น.`
                             : ""}
                           {activity.hours ? ` · ${formatActivityHours(activity.hours)}` : ""}
+                        </span>
+                        <span className="inline-flex items-center gap-1.5">
+                          <CalendarDays className="h-4 w-4 text-slate-400" />
+                          <span>
+                            เปิดรับสมัคร:{" "}
+                            <span className="font-medium text-slate-600">
+                              {formatRegistrationDateTime(activity.registrationStart)}
+                            </span>
+                            {" · "}
+                            สิ้นสุดลงทะเบียน:{" "}
+                            <span className="font-medium text-slate-600">
+                              {formatRegistrationDateTime(activity.registrationEnd)}
+                            </span>
+                          </span>
                         </span>
                         {activity.location && (
                           <span className="inline-flex items-center gap-1.5">
