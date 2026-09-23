@@ -294,7 +294,20 @@ function formatThaiDate(value?: string | null, short = false): string {
 
 function formatThaiTime(value?: string | null): string {
   if (!value) return "ไม่ระบุ";
-  const text = String(value).slice(0, 5);
+
+  const raw = String(value).trim();
+  let text = "";
+
+  // รองรับทั้งเวลา HH:mm / HH:mm:ss และวันที่เวลา ISO เช่น 2026-09-23T11:25:00.000Z
+  if (/^\\d{2}:\\d{2}/.test(raw)) {
+    text = raw.slice(0, 5);
+  } else {
+    const timeMatch = raw.match(/[T ](\\d{2}:\\d{2})/);
+    text = timeMatch?.[1] || "";
+  }
+
+  if (!text) return "ไม่ระบุ";
+
   const date = new Date(`2000-01-01T${text}`);
   if (Number.isNaN(date.getTime())) return "ไม่ระบุ";
 
@@ -817,7 +830,7 @@ function AddActivityModal({
                 type="date"
                 value={form.startDate}
                 onChange={(e) => onChange("startDate", e.target.value)}
-                min={today}
+                min={isEditing ? undefined : today}
                 className="staff-activity-input"
                 required
               />
@@ -838,7 +851,7 @@ function AddActivityModal({
                   if (form.startDate && val && val < form.startDate) return;
                   onChange("endDate", val);
                 }}
-                min={form.startDate || today}
+                min={form.startDate || (isEditing ? undefined : today)}
                 className="staff-activity-input"
                 required
               />
@@ -925,7 +938,7 @@ function AddActivityModal({
             <Field label="เริ่มลงทะเบียน">
               <DateTimeField
                 value={form.registrationStart}
-                minDate={today}
+                minDate={isEditing ? undefined : today}
                 maxDate={form.endDate || undefined}
                 onChange={(value) => {
                   if (
@@ -953,7 +966,9 @@ function AddActivityModal({
                 minDate={
                   form.registrationStart
                     ? form.registrationStart.slice(0, 10)
-                    : today
+                    : isEditing
+                      ? undefined
+                      : today
                 }
                 maxDate={form.endDate || undefined}
                 onChange={(value) => {
