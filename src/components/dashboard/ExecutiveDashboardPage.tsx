@@ -1278,7 +1278,7 @@ export default function ExecutiveDashboardPage() {
 
                 <p className="text-xs text-slate-400">
                   {termSummary.length > 0
-                    ? `${termSummary[0].studentCount.toLocaleString()} คน`
+                    ? `${(termSummary[0]?.studentCount ?? 0).toLocaleString()} คน`
                     : "ยังไม่มีข้อมูล"}
                 </p>
               </div>
