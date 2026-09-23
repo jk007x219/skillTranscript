@@ -51,6 +51,7 @@ import { useAuth } from "@/context/auth-context";
 type SkillAverage = {
   skillName: string;
   average: number;
+  participantCount?: number;
 };
 
 type RadarItem = {
