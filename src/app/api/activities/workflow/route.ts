@@ -54,8 +54,9 @@ export async function GET() {
                 (
                   a.applicationEnabled = 1
                   AND TIMESTAMP(a.endDate, a.endTime) > NOW()
+                  AND p.ParticipationId IS NULL
                 )
-                OR p.status IN ('applied', 'registered', 'confirmed')
+                OR p.status IN ('applied', 'registered')
               )`
            : ""}
        ${isStudent
