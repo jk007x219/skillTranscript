@@ -280,17 +280,66 @@ function getActivityStartDateTime(activity: StaffActivity): Date | null {
   return new Date(`${date}T${time}`);
 }
 
-function formatRegistrationDateTime(value?: string | null): string {
+function formatThaiDate(value?: string | null, short = false): string {
   if (!value) return "ไม่ระบุ";
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return "ไม่ระบุ";
-  return date.toLocaleString("th-TH", {
+
+  return date.toLocaleDateString("th-TH", {
     year: "numeric",
-    month: "long",
+    month: short ? "short" : "long",
     day: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  }) + " น.";
+  });
+}
+
+function formatThaiTime(value?: string | null): string {
+  if (!value) return "ไม่ระบุ";
+  const text = String(value).slice(0, 5);
+  const date = new Date(`2000-01-01T${text}`);
+  if (Number.isNaN(date.getTime())) return "ไม่ระบุ";
+
+  return (
+    date.toLocaleTimeString("th-TH", {
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false,
+    }) + " น."
+  );
+}
+
+function formatActivityDateRange(activity: StaffActivity): string {
+  const startDate = formatThaiDate(activity.date);
+  const endDate = activity.endDate ? formatThaiDate(activity.endDate) : startDate;
+
+  if (startDate === "ไม่ระบุ") return "ไม่ระบุวันที่";
+  if (endDate === startDate) return startDate;
+
+  return `${startDate} - ${endDate}`;
+}
+
+function formatActivityTimeRange(activity: StaffActivity): string {
+  const startTime = formatThaiTime(activity.time);
+  const endTime = activity.endTime ? formatThaiTime(activity.endTime) : "";
+
+  if (startTime === "ไม่ระบุ") return "ไม่ระบุเวลา";
+  return endTime ? `${startTime} – ${endTime}` : startTime;
+}
+
+function formatRegistrationRange(activity: StaffActivity): string {
+  const start = activity.registrationStart;
+  const end = activity.registrationEnd;
+
+  if (!start && !end) return "ไม่ระบุ";
+
+  const startText = start
+    ? `${formatThaiDate(start, true)} · ${formatThaiTime(start)}`
+    : "ไม่ระบุ";
+
+  const endText = end
+    ? `${formatThaiDate(end, true)} · ${formatThaiTime(end)}`
+    : "ไม่ระบุ";
+
+  return `${startText} - ${endText}`;
 }
 
 function isExternalActivity(activity: StaffActivity) {
@@ -2568,52 +2617,47 @@ export default function StaffActivitiesPage() {
                         {activity.title}
                       </h2>
 
-                      <div className="mt-2.5 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-sm text-slate-500">
-                        <span className="inline-flex items-center gap-1.5">
-                          <CalendarDays className="h-4 w-4 text-slate-400" />
-                          {activity.date
-                            ? new Date(activity.date).toLocaleDateString("th-TH", {
-                                year: "numeric",
-                                month: "long",
-                                day: "numeric",
-                              })
-                            : "ไม่ระบุวันที่"}
-                        </span>
-                        <span className="inline-flex items-center gap-1.5">
-                          <Clock className="h-4 w-4 text-slate-400" />
-                          {activity.time
-                            ? new Date(`2000-01-01T${activity.time}`).toLocaleTimeString(
-                                "th-TH",
-                                { hour: "2-digit", minute: "2-digit" },
-                              ) + " น."
-                            : "ไม่ระบุเวลา"}
-                          {activity.endTime
-                            ? ` - ${new Date(`2000-01-01T${activity.endTime}`).toLocaleTimeString(
-                                "th-TH",
-                                { hour: "2-digit", minute: "2-digit" },
-                              )} น.`
-                            : ""}
-                          {activity.hours ? ` · ${formatActivityHours(activity.hours)}` : ""}
-                        </span>
-                        <span className="inline-flex items-center gap-1.5">
-                          <CalendarDays className="h-4 w-4 text-slate-400" />
-                          <span>
-                            เปิดรับสมัคร:{" "}
-                            <span className="font-medium text-slate-600">
-                              {formatRegistrationDateTime(activity.registrationStart)}
-                            </span>
-                            {" · "}
-                            สิ้นสุดลงทะเบียน:{" "}
-                            <span className="font-medium text-slate-600">
-                              {formatRegistrationDateTime(activity.registrationEnd)}
-                            </span>
-                          </span>
-                        </span>
+                      <div className="mt-3 grid gap-2.5 text-sm sm:grid-cols-2">
+                        <div className="rounded-xl border border-slate-100 bg-slate-50/70 px-3.5 py-3">
+                          <p className="text-xs font-semibold text-slate-500">วันจัดกิจกรรม</p>
+                          <div className="mt-1.5 flex items-center gap-2 text-slate-700">
+                            <CalendarDays className="h-4 w-4 shrink-0 text-slate-400" />
+                            <span className="font-medium">{formatActivityDateRange(activity)}</span>
+                          </div>
+                        </div>
+
+                        <div className="rounded-xl border border-blue-100 bg-blue-50/60 px-3.5 py-3">
+                          <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
+                            <div>
+                              <p className="text-xs font-semibold text-slate-500">เวลา</p>
+                              <div className="mt-1 flex items-center gap-2 text-blue-700">
+                                <Clock className="h-4 w-4 shrink-0" />
+                                <span className="font-medium">{formatActivityTimeRange(activity)}</span>
+                              </div>
+                            </div>
+                            {activity.hours ? (
+                              <div>
+                                <p className="text-xs font-semibold text-slate-500">ระยะเวลา</p>
+                                <p className="mt-1 font-medium text-slate-600">
+                                  {formatActivityHours(activity.hours)}
+                                </p>
+                              </div>
+                            ) : null}
+                          </div>
+                        </div>
+
+                        <div className="rounded-xl border border-emerald-100 bg-emerald-50/60 px-3.5 py-3 sm:col-span-2">
+                          <p className="text-xs font-semibold text-emerald-700">เวลาลงทะเบียน</p>
+                          <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-emerald-800">
+                            <span className="font-medium">{formatRegistrationRange(activity)}</span>
+                          </div>
+                        </div>
+
                         {activity.location && (
-                          <span className="inline-flex items-center gap-1.5">
+                          <div className="inline-flex items-center gap-1.5 text-slate-500 sm:col-span-2">
                             <MapPin className="h-4 w-4 text-slate-400" />
                             {activity.location}
-                          </span>
+                          </div>
                         )}
                       </div>
 
