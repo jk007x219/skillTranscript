@@ -69,6 +69,7 @@ declare global {
 }
 
 type ActivityStatus = "active" | "past";
+type ActivityDisplayStatus = "not_open" | "open" | "running" | "registration_closed" | "past";
 type ActivityCategory = "all" | "mine" | "past" | "external";
 type MineStatusFilter = "all" | "active" | "past";
 
@@ -128,6 +129,10 @@ type StaffActivity = {
   templateId?: string | null;
   registrationStart?: string | null;
   registrationEnd?: string | null;
+  registrationOpen?: boolean;
+  normalRegistrationOpen?: boolean;
+  emergencyRegistrationOpen?: boolean;
+  activityStarted?: boolean;
   createdBy?: string | null;
 };
 
@@ -284,6 +289,72 @@ function isActivityPast(activity: StaffActivity, now: Date = new Date()) {
   const time = String(activity.endTime || activity.time || "00:00").slice(0, 5);
   const activityEnd = new Date(`${date}T${time}`);
   return !Number.isNaN(activityEnd.getTime()) && activityEnd < now;
+}
+function getActivityDisplayStatus(activity: StaffActivity, now: Date = new Date()) {
+  const past = activity.status === "past" || isActivityPast(activity, now);
+
+  if (past) return {
+    key: "past" as ActivityDisplayStatus,
+    label: "สิ้นสุดแล้ว",
+    description: "กิจกรรมสิ้นสุดแล้ว",
+    badgeClass: "bg-slate-100 text-slate-500",
+    dotClass: "bg-slate-400",
+  };
+
+  const start = getActivityStartDateTime(activity);
+  const started = Boolean(start && now.getTime() >= start.getTime());
+
+  if (started) {
+    if (activity.registrationOpen) return {
+      key: "open" as ActivityDisplayStatus,
+      label: "เปิดลงทะเบียน",
+      description: "ขณะนี้ยังเปิดให้ลงทะเบียนเข้าร่วมกิจกรรม",
+      badgeClass: "bg-blue-50 text-blue-600",
+      dotClass: "bg-blue-500",
+    };
+    return {
+      key: "running" as ActivityDisplayStatus,
+      label: "กำลังดำเนินอยู่",
+      description: "กิจกรรมกำลังอยู่ในช่วงดำเนินการ",
+      badgeClass: "bg-emerald-50 text-emerald-600",
+      dotClass: "bg-emerald-500",
+    };
+  }
+
+  if (activity.registrationOpen) return {
+    key: "open" as ActivityDisplayStatus,
+    label: activity.applicationEnabled ? "เปิดรับสมัคร" : "เปิดลงทะเบียน",
+    description: activity.applicationEnabled ? "ขณะนี้เปิดรับสมัครนิสิต" : "ขณะนี้เปิดให้ลงทะเบียนเข้าร่วมกิจกรรม",
+    badgeClass: "bg-blue-50 text-blue-600",
+    dotClass: "bg-blue-500",
+  };
+
+  const registrationStart = parseLocalDateTime(String(activity.registrationStart || ""));
+  const registrationEnd = parseLocalDateTime(String(activity.registrationEnd || ""));
+
+  if (registrationStart && now.getTime() < registrationStart.getTime()) return {
+    key: "not_open" as ActivityDisplayStatus,
+    label: "ยังไม่เปิดรับสมัคร",
+    description: "ยังไม่ถึงวันและเวลาที่กำหนดให้เปิดรับสมัคร",
+    badgeClass: "bg-amber-50 text-amber-700",
+    dotClass: "bg-amber-500",
+  };
+
+  if (registrationEnd && now.getTime() >= registrationEnd.getTime()) return {
+    key: "registration_closed" as ActivityDisplayStatus,
+    label: "ปิดรับสมัครแล้ว",
+    description: "หมดช่วงเวลารับสมัครแล้ว แต่กิจกรรมยังไม่สิ้นสุด",
+    badgeClass: "bg-orange-50 text-orange-700",
+    dotClass: "bg-orange-500",
+  };
+
+  return {
+    key: "not_open" as ActivityDisplayStatus,
+    label: "ยังไม่เปิดรับสมัคร",
+    description: "เจ้าหน้าที่ยังไม่ได้เปิดรับสมัครหรือการลงทะเบียน",
+    badgeClass: "bg-amber-50 text-amber-700",
+    dotClass: "bg-amber-500",
+  };
 }
 
 // ---------- shared presentational building blocks ----------
@@ -2361,7 +2432,8 @@ export default function StaffActivitiesPage() {
                 </div>
               ) : (
                 filteredActivities.map((activity) => {
-                  const past = activity.status === "past" || isActivityPast(activity);
+                  const displayStatus = getActivityDisplayStatus(activity);
+                  const past = displayStatus.key === "past";
                   const external = isExternalActivity(activity);
                   return (
                     <article
@@ -2372,16 +2444,13 @@ export default function StaffActivitiesPage() {
                       <div className="flex flex-wrap items-start justify-between gap-3">
                         <div className="flex flex-wrap items-center gap-2">
                           <span
-                            className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium ${
-                              past
-                                ? "bg-slate-100 text-slate-500"
-                                : "bg-emerald-50 text-emerald-600"
-                            }`}
+                            title={displayStatus.description}
+                            className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium ${displayStatus.badgeClass}`}
                           >
                             <span
-                              className={`h-1.5 w-1.5 rounded-full ${past ? "bg-slate-400" : "bg-emerald-500"}`}
+                              className={`h-1.5 w-1.5 rounded-full ${displayStatus.dotClass}`}
                             />
-                            {past ? "สิ้นสุดแล้ว" : "กำลังดำเนินอยู่"}
+                            {displayStatus.label}
                           </span>
                           {external && (
                             <span className="inline-flex items-center rounded-full bg-amber-50 px-2.5 py-1 text-xs font-medium text-amber-700">
