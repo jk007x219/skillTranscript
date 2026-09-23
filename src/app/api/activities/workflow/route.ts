@@ -50,10 +50,16 @@ export async function GET() {
        ${isPublic
          ? "WHERE a.status = 'active'"
          : isStudent
-           ? "WHERE (a.status = 'active' OR p.status IN ('applied', 'registered', 'confirmed'))"
+           ? `WHERE (
+                (
+                  a.applicationEnabled = 1
+                  AND TIMESTAMP(a.endDate, a.endTime) > NOW()
+                )
+                OR p.status IN ('applied', 'registered', 'confirmed')
+              )`
            : ""}
        ${isStudent
-         ? "AND (a.applicationEnabled = 1 OR p.status IN ('applied', 'registered', 'confirmed'))"
+         ? ""
          : ""}
        ORDER BY a.date DESC, a.time DESC, a.activityId ASC`,
       [session?.user?.studentId || ""],
