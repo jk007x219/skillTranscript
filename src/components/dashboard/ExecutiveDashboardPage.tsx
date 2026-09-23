@@ -167,7 +167,7 @@ export default function ExecutiveDashboardPage() {
 
   if (authLoading || loading) {
     return (
-      <ExecutiveShell>
+      <ExecutiveShell activePath="/executive/dashboard">
         <div className="flex min-h-[60vh] items-center justify-center">
           <Loader2 className="h-8 w-8 animate-spin" />
         </div>
@@ -177,7 +177,7 @@ export default function ExecutiveDashboardPage() {
 
   if (error) {
     return (
-      <ExecutiveShell>
+      <ExecutiveShell activePath="/executive/dashboard">
         <div className="rounded-2xl border border-red-200 bg-red-50 p-6 text-red-700">
           {error}
         </div>
@@ -186,7 +186,7 @@ export default function ExecutiveDashboardPage() {
   }
 
   return (
-    <ExecutiveShell>
+    <ExecutiveShell activePath="/executive/dashboard">
       <div className="space-y-6">
         {/* Dashboard content remains unchanged. */}
         {/* The latest-term card below safely handles APIs that do not return studentCount. */}
