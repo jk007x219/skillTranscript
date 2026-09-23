@@ -47,8 +47,14 @@ export async function GET() {
               p.registrationQrToken, p.studentId
        FROM activity a
        LEFT JOIN participation p ON p.activityId = a.activityId AND p.studentId = ?
-       ${isPublic || isStudent ? "WHERE a.status = 'active'" : ""}
-       ${isStudent ? "AND (a.applicationEnabled = 1 OR p.status IN ('applied', 'registered'))" : ""}
+       ${isPublic
+         ? "WHERE a.status = 'active'"
+         : isStudent
+           ? "WHERE (a.status = 'active' OR p.status IN ('applied', 'registered', 'confirmed'))"
+           : ""}
+       ${isStudent
+         ? "AND (a.applicationEnabled = 1 OR p.status IN ('applied', 'registered', 'confirmed'))"
+         : ""}
        ORDER BY a.date DESC, a.time DESC, a.activityId ASC`,
       [session?.user?.studentId || ""],
     );
