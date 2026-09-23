@@ -317,7 +317,7 @@ export default function ScanQrPage({
       setCameraStarting(false);
       setCameraError(
         error instanceof Error
-          ? `${error.message} หาก打开通过 HTTP，请使用选择 QR 图片按钮，或通过 HTTPS 打开`
+          ? `${error.message} หากเปิดผ่าน HTTP กรุณาใช้ปุ่ม “เลือกภาพ QR” หรือเปิดผ่าน HTTPS`
           : "ไม่สามารถเปิดกล้องได้",
       );
     }
