@@ -238,134 +238,175 @@ export async function GET(request: Request) {
     );
 
     // =========================================================
-    // 4. ดึงคะแนนแต่ละทักษะของแต่ละนิสิต
+    // 4-7. คำนวณคะแนนให้ตรงกับ Student Dashboard
     //
-    // ใช้สูตรเดียวกับ Student Dashboard:
-    //
-    // SUM(earnedScore)
-    // ---------------- × 100
-    // SUM(maxScore)
-    //
-    // สำคัญ:
-    // ต้องรวม earnedScore และ maxScore ก่อน
-    // แล้วจึงคำนวณเปอร์เซ็นต์
+    // คำนวณรายนิสิต -> รายทักษะ -> รายระดับ ก่อน
+    // แล้วจึงเฉลี่ยคะแนนของนิสิตในปีการศึกษาที่เลือก
     // =========================================================
-    const [skillScoreRows] = await pool.query<SkillScoreRow[]>(
+    type LevelScore = {
+      activityCount: number;
+      earned: number;
+      max: number;
+    };
+
+    type StudentSkillLevels = Record<string, Record<string, LevelScore>>;
+    const studentSkillLevelMap: Record<string, StudentSkillLevels> = {};
+
+    studentIds.forEach((studentId) => {
+      studentSkillLevelMap[studentId] = {};
+    });
+
+    const [skillScoreRows] = await pool.query<
+      (RowDataPacket & {
+        studentId: string;
+        skillName: string;
+        skillLevel: string;
+        activityCount: number | string;
+        totalEarned: number | string;
+        totalMax: number | string;
+      })[]
+    >(
       `
       SELECT
-        ps.skillName,
         p.studentId,
+        ps.skillName,
+        COALESCE(acs.level, 'พื้นฐาน') AS skillLevel,
+        COUNT(DISTINCT p.activityId) AS activityCount,
         SUM(COALESCE(ps.earnedScore, 0)) AS totalEarned,
         SUM(COALESCE(ps.maxScore, 0)) AS totalMax
-      FROM participation_skill ps
-      INNER JOIN participation p
-        ON p.ParticipationId = ps.participationId
+      FROM participation p
+      INNER JOIN participation_skill ps
+        ON ps.participationId = p.ParticipationId
+      LEFT JOIN activityskill acs
+        ON acs.activityId = p.activityId
+       AND acs.skillname = ps.skillName
       WHERE p.status = 'completed'
         AND p.studentId IN (${placeholders})
       GROUP BY
         p.studentId,
-        ps.skillName
+        ps.skillName,
+        COALESCE(acs.level, 'พื้นฐาน')
       `,
       studentIds
     );
 
-    // =========================================================
-    // 5. Map คะแนน
-    //
-    // studentSkillPercentMap[studentId][skillName] = percent
-    // =========================================================
-    const studentSkillPercentMap: Record<
-      string,
-      Record<string, number>
-    > = {};
+    function normalizeLevel(level: string) {
+      const value = level.trim().toLowerCase();
 
-    // เตรียมข้อมูลนิสิตทุกคน
-    studentIds.forEach((studentId) => {
-      studentSkillPercentMap[studentId] = {};
-    });
+      if (
+        value.includes('สูง') ||
+        value.includes('advanced') ||
+        value.includes('high') ||
+        value === '3'
+      ) return 'สูง';
+
+      if (
+        value.includes('กลาง') ||
+        value.includes('intermediate') ||
+        value.includes('medium') ||
+        value.includes('mid') ||
+        value === '2'
+      ) return 'กลาง';
+
+      return 'พื้นฐาน';
+    }
 
     skillScoreRows.forEach((row) => {
       const studentId = String(row.studentId);
       const skillName = String(row.skillName);
+      const level = normalizeLevel(String(row.skillLevel || 'พื้นฐาน'));
 
-      const earned = Number(row.totalEarned) || 0;
-      const max = Number(row.totalMax) || 0;
-
-      const percent =
-        max > 0
-          ? round2((earned / max) * 100)
-          : 0;
-
-      if (!studentSkillPercentMap[studentId]) {
-        studentSkillPercentMap[studentId] = {};
+      if (!studentSkillLevelMap[studentId]) {
+        studentSkillLevelMap[studentId] = {};
+      }
+      if (!studentSkillLevelMap[studentId][skillName]) {
+        studentSkillLevelMap[studentId][skillName] = {};
       }
 
-      studentSkillPercentMap[studentId][skillName] = percent;
+      const current =
+        studentSkillLevelMap[studentId][skillName][level] || {
+          activityCount: 0,
+          earned: 0,
+          max: 0,
+        };
+
+      current.activityCount += Number(row.activityCount) || 0;
+      current.earned += Number(row.totalEarned) || 0;
+      current.max += Number(row.totalMax) || 0;
+      studentSkillLevelMap[studentId][skillName][level] = current;
     });
 
-    // =========================================================
-    // 6. ค่าเฉลี่ยของแต่ละทักษะ
-    //
-    // สำคัญ:
-    // ต้องเฉลี่ย "นิสิตทั้งหมดในกลุ่ม"
-    //
-    // ถ้านิสิตไม่มีคะแนนทักษะนั้น -> 0
-    //
-    // เช่น:
-    // นิสิต A = 100%
-    // นิสิต B = 50%
-    // นิสิต C = ไม่มีคะแนน = 0%
-    //
-    // ค่าเฉลี่ย = (100 + 50 + 0) / 3 = 50%
-    // =========================================================
-    const allSkillAverages = ALL_SKILLS.map((skillName) => {
-      let totalPercent = 0;
+    // คะแนนทักษะของนิสิตแต่ละคน ใช้สูตรเดียวกับ Student Dashboard
+    const studentSkillPercentMap: Record<string, Record<string, number>> = {};
 
-      studentIds.forEach((studentId) => {
+    studentIds.forEach((studentId) => {
+      studentSkillPercentMap[studentId] = {};
+
+      ALL_SKILLS.forEach((skillName) => {
+        const levels = studentSkillLevelMap[studentId]?.[skillName] || {};
+        const basic = levels['พื้นฐาน'] || { activityCount: 0, earned: 0, max: 0 };
+        const intermediate = levels['กลาง'] || { activityCount: 0, earned: 0, max: 0 };
+        const advanced = levels['สูง'] || { activityCount: 0, earned: 0, max: 0 };
+
+        const totalActivities =
+          basic.activityCount +
+          intermediate.activityCount +
+          advanced.activityCount;
+
+        const levelPercent = (item: LevelScore) =>
+          item.max > 0
+            ? Math.min(100, Math.max(0, round2((item.earned / item.max) * 100)))
+            : 0;
+
+        const basicPercent = levelPercent(basic);
+        const intermediatePercent = levelPercent(intermediate);
+        const advancedPercent = levelPercent(advanced);
+
         const percent =
-          studentSkillPercentMap[studentId]?.[skillName] ?? 0;
+          totalActivities > 0
+            ? round2(
+                (basicPercent * basic.activityCount +
+                  intermediatePercent * intermediate.activityCount +
+                  advancedPercent * advanced.activityCount) /
+                  totalActivities
+              )
+            : 0;
 
-        totalPercent += percent;
+        studentSkillPercentMap[studentId][skillName] = percent;
       });
+    });
 
-      const average =
-        studentIds.length > 0
-          ? round2(totalPercent / studentIds.length)
-          : 0;
+    // ค่าเฉลี่ยแต่ละทักษะ = ค่าเฉลี่ยคะแนนของนิสิตทุกคนในปีที่เลือก
+    const allSkillAverages = ALL_SKILLS.map((skillName) => {
+      const totalPercent = studentIds.reduce(
+        (sum, studentId) =>
+          sum + (studentSkillPercentMap[studentId]?.[skillName] ?? 0),
+        0
+      );
 
       return {
         skillName,
-        average,
+        average:
+          studentIds.length > 0
+            ? round2(totalPercent / studentIds.length)
+            : 0,
       };
     });
 
-    // =========================================================
-    // 7. ค่าเฉลี่ย Overall ของนิสิต
-    //
-    // Student Dashboard:
-    //
-    // overallPercent =
-    // average ของ percent ทั้ง 11 ทักษะ
-    //
-    // สำหรับ Staff:
-    // คำนวณ Overall ของนิสิตแต่ละคนก่อน
-    // แล้วนำ Overall ของนิสิตทั้งหมดมาเฉลี่ย
-    //
-    // เพื่อให้นิสิตทุกคนมีน้ำหนักเท่ากัน
-    // =========================================================
+    // Overall = ค่าเฉลี่ย 11 ทักษะของนิสิตแต่ละคน
+    // แล้วจึงเฉลี่ย Overall ของนิสิตในกลุ่มที่เลือก
     let overallScoreSum = 0;
 
     studentIds.forEach((studentId) => {
-      let studentSkillTotal = 0;
-
-      ALL_SKILLS.forEach((skillName) => {
-        studentSkillTotal +=
-          studentSkillPercentMap[studentId]?.[skillName] ?? 0;
-      });
-
       const studentOverall =
         ALL_SKILLS.length > 0
-          ? studentSkillTotal / ALL_SKILLS.length
+          ? round2(
+              ALL_SKILLS.reduce(
+                (sum, skillName) =>
+                  sum + (studentSkillPercentMap[studentId]?.[skillName] ?? 0),
+                0
+              ) / ALL_SKILLS.length
+            )
           : 0;
 
       overallScoreSum += studentOverall;
