@@ -573,25 +573,212 @@ export async function GET(request: NextRequest) {
 
     // ======================================================
     // 9. สรุปตามภาคการศึกษา
+    // ใช้สูตรเดียวกับคะแนนหลักของ Staff/Executive
+    // โดยคำนวณแยกนิสิต + ทักษะ + ระดับ ภายในแต่ละภาค
     // ======================================================
-    const termSummary = terms.map(
-      (termName) => {
-        const termActivityCount =
-          activityRows.filter(
-            (row) =>
-              row.term === termName
-          ).length;
+    type TermScoreRow = RowDataPacket & {
+      studentId: string;
+      term: string;
+      skillName: string;
+      skillLevel: string;
+      activityCount: number | string;
+      totalEarned: number | string;
+      totalMax: number | string;
+    };
+
+    const [termScoreRows] =
+      await pool.query<TermScoreRow[]>(
+        `
+        SELECT
+          p.studentId,
+          a.term,
+          ps.skillName,
+          COALESCE(acs.level, 'พื้นฐาน') AS skillLevel,
+          COUNT(DISTINCT p.activityId) AS activityCount,
+          SUM(COALESCE(ps.earnedScore, 0)) AS totalEarned,
+          SUM(COALESCE(ps.maxScore, 0)) AS totalMax
+        FROM participation p
+        INNER JOIN activity a
+          ON a.activityId = p.activityId
+        INNER JOIN participation_skill ps
+          ON ps.participationId = p.ParticipationId
+        LEFT JOIN activityskill acs
+          ON acs.activityId = p.activityId
+         AND acs.skillname = ps.skillName
+        WHERE p.status = 'completed'
+          AND p.studentId IN (${placeholders})
+          AND a.term IS NOT NULL
+          AND TRIM(a.term) <> ''
+        GROUP BY
+          p.studentId,
+          a.term,
+          ps.skillName,
+          COALESCE(acs.level, 'พื้นฐาน')
+        `,
+        studentIds
+      );
+
+    const termLevelMap = new Map<
+      string,
+      Map<string, Map<string, LevelScore>>
+    >();
+
+    for (const row of termScoreRows) {
+      const termName = String(row.term);
+      const studentId = String(row.studentId);
+      const skillName = String(row.skillName);
+      const level = normalizeLevel(
+        String(row.skillLevel || 'พื้นฐาน')
+      );
+
+      if (!termLevelMap.has(termName)) {
+        termLevelMap.set(termName, new Map());
+      }
+
+      const studentMap = termLevelMap.get(termName)!;
+
+      if (!studentMap.has(studentId)) {
+        studentMap.set(studentId, new Map());
+      }
+
+      const skillMap = studentMap.get(studentId)!;
+
+      if (!skillMap.has(skillName)) {
+        skillMap.set(skillName, new Map());
+      }
+
+      const levelMap = skillMap.get(skillName)!;
+
+      const current = levelMap.get(level) || {
+        activityCount: 0,
+        earned: 0,
+        max: 0,
+      };
+
+      current.activityCount += Number(row.activityCount) || 0;
+      current.earned += Number(row.totalEarned) || 0;
+      current.max += Number(row.totalMax) || 0;
+
+      levelMap.set(level, current);
+    }
+
+    const calculateTermStudentOverall = (
+      studentMap: Map<string, Map<string, LevelScore>>
+    ) => {
+      const skillScores: number[] = [];
+
+      for (const skillName of ALL_SKILL_NAMES) {
+        const levelMap = studentMap.get(skillName);
+
+        if (!levelMap) continue;
+
+        const basic = levelMap.get('พื้นฐาน') || {
+          activityCount: 0,
+          earned: 0,
+          max: 0,
+        };
+
+        const intermediate = levelMap.get('กลาง') || {
+          activityCount: 0,
+          earned: 0,
+          max: 0,
+        };
+
+        const advanced = levelMap.get('สูง') || {
+          activityCount: 0,
+          earned: 0,
+          max: 0,
+        };
+
+        const totalActivities =
+          basic.activityCount +
+          intermediate.activityCount +
+          advanced.activityCount;
+
+        if (totalActivities <= 0) continue;
+
+        const levelPercent = (item: LevelScore) =>
+          item.max > 0
+            ? Math.min(
+                100,
+                Math.max(
+                  0,
+                  round2((item.earned / item.max) * 100)
+                )
+              )
+            : 0;
+
+        const basicPercent = levelPercent(basic);
+        const intermediatePercent = levelPercent(intermediate);
+        const advancedPercent = levelPercent(advanced);
+
+        skillScores.push(
+          round2(
+            (
+              basicPercent * basic.activityCount +
+              intermediatePercent * intermediate.activityCount +
+              advancedPercent * advanced.activityCount
+            ) / totalActivities
+          )
+        );
+      }
+
+      if (skillScores.length === 0) return null;
+
+      return round2(
+        skillScores.reduce((sum, score) => sum + score, 0) /
+          skillScores.length
+      );
+    };
+
+    const termSummary = terms
+      .map((termName) => {
+        const termStudents =
+          termLevelMap.get(termName) ||
+          new Map<string, Map<string, Map<string, LevelScore>>>();
+
+        const studentScores: number[] = [];
+
+        for (const studentMap of termStudents.values()) {
+          const score = calculateTermStudentOverall(studentMap);
+
+          if (score !== null) {
+            studentScores.push(score);
+          }
+        }
+
+        const termActivities = activityRows.filter(
+          (row) => row.term === termName
+        ).length;
+
+        const avgScore =
+          studentScores.length > 0
+            ? round2(
+                studentScores.reduce((sum, score) => sum + score, 0) /
+                  studentScores.length
+              )
+            : 0;
+
+        const level =
+          studentScores.length === 0
+            ? 'ยังไม่มีข้อมูล'
+            : avgScore >= 80
+              ? 'ดีมาก'
+              : avgScore >= 50
+                ? 'ปานกลาง'
+                : 'ต้องปรับปรุง';
 
         return {
           term: termName,
-          avgScore: 0,
-          studentCount: 0,
-          activityCount:
-            termActivityCount,
-          level: "ยังไม่มีข้อมูล",
+          avgScore,
+          studentCount: studentScores.length,
+          activityCount: termActivities,
+          level,
         };
-      }
-    );
+      })
+      .filter(
+        (item) => item.activityCount > 0 || item.studentCount > 0
+      );
 
     return NextResponse.json({
       academicYear,
