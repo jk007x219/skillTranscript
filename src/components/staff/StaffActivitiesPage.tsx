@@ -301,62 +301,89 @@ function getActivityDisplayStatus(activity: StaffActivity, now: Date = new Date(
     dotClass: "bg-slate-600",
   };
 
-  const start = getActivityStartDateTime(activity);
-  const started = Boolean(start && now.getTime() >= start.getTime());
+  // สถานะต้องยึดตามสวิตช์จริงของกิจกรรม
+  // - เปิดรับสมัคร = applicationEnabled
+  // - เปิดลงทะเบียน = registrationEnabled
+  // - ปิดทั้งสองสวิตช์ = ปิดรับสมัครแล้ว
+  const applicationEnabled = Boolean(activity.applicationEnabled);
+  const registrationEnabled = Boolean(activity.registrationEnabled);
 
-  if (started) {
-    if (activity.registrationOpen) return {
-      key: "open" as ActivityDisplayStatus,
-      label: "เปิดลงทะเบียน",
-      description: "ขณะนี้ยังเปิดให้ลงทะเบียนเข้าร่วมกิจกรรม",
-      badgeClass: "border border-blue-200 bg-blue-100 text-blue-700",
-      dotClass: "bg-blue-600",
-    };
-    return {
-      key: "running" as ActivityDisplayStatus,
-      label: "กำลังดำเนินอยู่",
-      description: "กิจกรรมกำลังอยู่ในช่วงดำเนินการ",
-      badgeClass: "border border-emerald-200 bg-emerald-100 text-emerald-700",
-      dotClass: "bg-emerald-600",
-    };
-  }
-
-  if (activity.registrationOpen) return {
-    key: "open" as ActivityDisplayStatus,
-    label: activity.applicationEnabled ? "เปิดรับสมัคร" : "เปิดลงทะเบียน",
-    description: activity.applicationEnabled ? "ขณะนี้เปิดรับสมัครนิสิต" : "ขณะนี้เปิดให้ลงทะเบียนเข้าร่วมกิจกรรม",
-    badgeClass: "bg-blue-50 text-blue-600",
-    dotClass: "bg-blue-500",
+  if (!applicationEnabled && !registrationEnabled) return {
+    key: "registration_closed" as ActivityDisplayStatus,
+    label: "ปิดรับสมัครแล้ว",
+    description: "ปิดสวิตช์รับสมัครและลงทะเบียนแล้ว",
+    badgeClass: "border border-red-200 bg-red-100 text-red-700",
+    dotClass: "bg-red-600",
   };
 
   const registrationStart = parseLocalDateTime(String(activity.registrationStart || ""));
   const registrationEnd = parseLocalDateTime(String(activity.registrationEnd || ""));
+  const registrationStarted = !registrationStart || now.getTime() >= registrationStart.getTime();
+  const registrationNotEnded = !registrationEnd || now.getTime() < registrationEnd.getTime();
 
-  if (registrationStart && now.getTime() < registrationStart.getTime()) return {
+  // ถ้ามีสวิตช์เปิด แต่ยังไม่ถึงเวลาที่กำหนด ให้แสดงว่ายังไม่เปิดรับสมัคร
+  if (!registrationStarted && registrationNotEnded) return {
     key: "not_open" as ActivityDisplayStatus,
     label: "ยังไม่เปิดรับสมัคร",
-    description: "ยังไม่ถึงวันและเวลาที่กำหนดให้เปิดรับสมัคร",
+    description: "เปิดสวิตช์ไว้แล้ว แต่ยังไม่ถึงวันและเวลาที่กำหนดให้เปิดรับสมัคร",
     badgeClass: "border border-amber-200 bg-amber-100 text-amber-800",
     dotClass: "bg-amber-600",
   };
 
-  if (registrationEnd && now.getTime() >= registrationEnd.getTime()) return {
+  // ถ้าพ้นช่วงเวลารับสมัครแล้ว แต่สวิตช์ยังเปิดอยู่
+  if (!registrationNotEnded) return {
     key: "registration_closed" as ActivityDisplayStatus,
     label: "ปิดรับสมัครแล้ว",
-    description: "หมดช่วงเวลารับสมัครแล้ว แต่กิจกรรมยังไม่สิ้นสุด",
+    description: "หมดช่วงเวลารับสมัครแล้ว",
     badgeClass: "border border-orange-200 bg-orange-100 text-orange-800",
     dotClass: "bg-orange-600",
   };
 
+  const start = getActivityStartDateTime(activity);
+  const started = Boolean(start && now.getTime() >= start.getTime());
+
+  if (started) {
+    if (registrationEnabled) return {
+      key: "open" as ActivityDisplayStatus,
+      label: "เปิดลงทะเบียน",
+      description: "เปิดสวิตช์ลงทะเบียนอยู่ และขณะนี้เปิดให้ลงทะเบียนเข้าร่วมกิจกรรม",
+      badgeClass: "border border-blue-200 bg-blue-100 text-blue-700",
+      dotClass: "bg-blue-600",
+    };
+
+    if (applicationEnabled) return {
+      key: "open" as ActivityDisplayStatus,
+      label: "เปิดรับสมัคร",
+      description: "เปิดสวิตช์รับสมัครอยู่",
+      badgeClass: "border border-blue-200 bg-blue-100 text-blue-700",
+      dotClass: "bg-blue-600",
+    };
+  }
+
+  if (registrationEnabled) return {
+    key: "open" as ActivityDisplayStatus,
+    label: "เปิดลงทะเบียน",
+    description: "เปิดสวิตช์ลงทะเบียนอยู่",
+    badgeClass: "border border-blue-200 bg-blue-100 text-blue-700",
+    dotClass: "bg-blue-600",
+  };
+
+  if (applicationEnabled) return {
+    key: "open" as ActivityDisplayStatus,
+    label: "เปิดรับสมัคร",
+    description: "เปิดสวิตช์รับสมัครอยู่",
+    badgeClass: "border border-blue-200 bg-blue-100 text-blue-700",
+    dotClass: "bg-blue-600",
+  };
+
   return {
-    key: "not_open" as ActivityDisplayStatus,
-    label: "ยังไม่เปิดรับสมัคร",
-    description: "เจ้าหน้าที่ยังไม่ได้เปิดรับสมัครหรือการลงทะเบียน",
-    badgeClass: "bg-amber-50 text-amber-700",
-    dotClass: "bg-amber-500",
+    key: "registration_closed" as ActivityDisplayStatus,
+    label: "ปิดรับสมัครแล้ว",
+    description: "ปิดสวิตช์รับสมัครและลงทะเบียนแล้ว",
+    badgeClass: "border border-red-200 bg-red-100 text-red-700",
+    dotClass: "bg-red-600",
   };
 }
-
 // ---------- shared presentational building blocks ----------
 
 // เชลล์กลางของโมดัลทั้งหมด ให้หน้าตาสม่ำเสมอ ลดโค้ดซ้ำ
