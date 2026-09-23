@@ -745,9 +745,10 @@ export async function GET(request: NextRequest) {
 
     const termSummary = terms
       .map((termName) => {
-        const termStudents =
-          termLevelMap.get(termName) ||
-          new Map<string, Map<string, Map<string, Map<string, LevelScore>>>>();
+        const termStudents: Map<
+          string,
+          Map<string, Map<string, LevelScore>>
+        > = termLevelMap.get(termName) || new Map();
 
         const studentScores: number[] = [];
 
