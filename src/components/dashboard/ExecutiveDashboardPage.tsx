@@ -356,28 +356,36 @@ export default function ExecutiveDashboardPage() {
   // คะแนนเฉลี่ยแต่ละหมวด
   // ====================================================
 
+  // ค่าเฉลี่ยหมวด: นับเฉพาะทักษะที่มีนิสิตเข้าร่วมจริง
+  // แต่ข้อมูล facultySkills / essentialSkills ยังคงครบทุกทักษะสำหรับกราฟ
+  const assessedFacultySkills = facultySkills.filter(
+    (item) => (item.participantCount ?? 0) > 0
+  );
+
+  const assessedEssentialSkills = essentialSkills.filter(
+    (item) => (item.participantCount ?? 0) > 0
+  );
+
   const facultyAverage =
-    facultySkills.length > 0
+    assessedFacultySkills.length > 0
       ? Math.round(
-          (facultySkills.reduce(
-            (sum, item) =>
-              sum + item.average,
+          (assessedFacultySkills.reduce(
+            (sum, item) => sum + item.average,
             0
           ) /
-            facultySkills.length) *
+            assessedFacultySkills.length) *
             100
         ) / 100
       : 0;
 
   const essentialAverage =
-    essentialSkills.length > 0
+    assessedEssentialSkills.length > 0
       ? Math.round(
-          (essentialSkills.reduce(
-            (sum, item) =>
-              sum + item.average,
+          (assessedEssentialSkills.reduce(
+            (sum, item) => sum + item.average,
             0
           ) /
-            essentialSkills.length) *
+            assessedEssentialSkills.length) *
             100
         ) / 100
       : 0;
