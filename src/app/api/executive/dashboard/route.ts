@@ -474,19 +474,20 @@ export async function GET(request: NextRequest) {
     // ======================================================
     // 6. Radar + แยกกลุ่มทักษะ
     // ======================================================
-    // แสดงและนำมาหาค่าเฉลี่ยเฉพาะทักษะที่มีนิสิต
-    // เข้าร่วมกิจกรรมและมีผลประเมินทักษะนั้นจริง
-    const assessedSkillAverages =
-      allSkillAverages.filter(
-        (skill) => skill.participantCount > 0
-      );
-
-    const radarData = assessedSkillAverages.map(
+    // Radar แสดงครบทุกทักษะตลอดเวลา
+    const radarData = allSkillAverages.map(
       (skill) => ({
         skill: skill.skillName,
         score: skill.average,
       })
     );
+
+    // ค่าเฉลี่ยของกลุ่มทักษะคิดเฉพาะทักษะที่มีนิสิต
+    // เข้าร่วมกิจกรรมและมีผลประเมินจริงเท่านั้น
+    const assessedSkillAverages =
+      allSkillAverages.filter(
+        (skill) => skill.participantCount > 0
+      );
 
     const facultySkills =
       assessedSkillAverages.filter((skill) =>
