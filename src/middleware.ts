@@ -29,7 +29,7 @@ function isPublicPath(pathname: string) {
   return publicPaths.some((p) => pathname === p || pathname.startsWith(`${p}/`));
 }
 
-// QR scanner ต้องค้นหากิจกรรมและยืนยันการเข้าร่วมได้โดยไม่ต้องล็อกอิน
+// QR scanner สามารถค้นหากิจกรรมได้โดยไม่ต้องล็อกอิน
 // แต่เปิดเฉพาะ endpoint ที่จำเป็น ไม่เปิด /api/activities ทั้งหมดเป็น public
 function isPublicQrApiRequest(request: NextRequest) {
   const pathname = request.nextUrl.pathname;
@@ -38,7 +38,7 @@ function isPublicQrApiRequest(request: NextRequest) {
     return request.method === "GET";
   }
 
-  return /^\\/api\\/activities\\/[^/]+\\/scan-qr$/.test(pathname) && request.method === "POST";
+  return /^\/api\/activities\/[^/]+\/scan-qr$/.test(pathname) && request.method === "POST";
 }
 
 function canAccessPath(pathname: string, token: Record<string, unknown>) {
