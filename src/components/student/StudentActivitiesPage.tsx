@@ -183,7 +183,7 @@ function Card({
           <button
             type="button"
             disabled
-            className="h-11 flex-1 cursor-not-allowed rounded-xl bg-slate-300 text-sm font-semibold text-slate-600"
+            className="h-11 flex-1 cursor-not-allowed rounded-xl bg-slate-400 text-sm font-bold text-white"
             aria-disabled="true"
           >
             <span className="inline-flex items-center justify-center gap-2">
@@ -209,6 +209,18 @@ function Card({
             {a.confirmationEnabled
               ? "ทำแบบประเมิน"
               : "รอเจ้าหน้าที่เปิดแบบประเมิน"}
+          </button>
+        ) : s ? (
+          <button
+            type="button"
+            disabled
+            className="h-11 flex-1 cursor-not-allowed rounded-xl bg-slate-400 text-sm font-bold text-white"
+            aria-disabled="true"
+          >
+            <span className="inline-flex items-center justify-center gap-2">
+              <CheckCircle2 className="h-4 w-4" />
+              สมัครแล้ว
+            </span>
           </button>
         ) : (
           <button
@@ -313,7 +325,10 @@ export default function StudentActivitiesPage() {
       a
         .filter((x) =>
           tab === "open"
-            ? x.applicationEnabled || Boolean(x.participationStatus)
+            ? x.applicationEnabled ||
+              ["applied", "registered", "confirmed"].includes(
+                x.participationStatus || "",
+              )
             : ["applied", "registered", "confirmed"].includes(
                 x.participationStatus || "",
               ),
