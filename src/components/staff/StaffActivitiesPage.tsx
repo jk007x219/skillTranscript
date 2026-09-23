@@ -297,8 +297,8 @@ function getActivityDisplayStatus(activity: StaffActivity, now: Date = new Date(
     key: "past" as ActivityDisplayStatus,
     label: "สิ้นสุดกิจกรรม",
     description: "กิจกรรมสิ้นสุดแล้ว",
-    badgeClass: "border border-slate-300 bg-slate-200 text-slate-700",
-    dotClass: "bg-slate-600",
+    badgeClass: "border border-slate-300 bg-slate-100 text-slate-600",
+    dotClass: "bg-slate-500",
   };
 
   // สวิตช์ของเจ้าหน้าที่เป็นตัวกำหนดสถานะหลัก
@@ -310,8 +310,8 @@ function getActivityDisplayStatus(activity: StaffActivity, now: Date = new Date(
     key: "open" as ActivityDisplayStatus,
     label: "เปิดรับสมัครอยู่",
     description: "เจ้าหน้าที่เปิดสวิตช์รับสมัครอยู่",
-    badgeClass: "border border-blue-200 bg-blue-100 text-blue-700",
-    dotClass: "bg-blue-600",
+    badgeClass: "border border-sky-200 bg-sky-50 text-sky-700",
+    dotClass: "bg-sky-500",
   };
 
   if (activity.registrationEnabled) return {
@@ -326,8 +326,8 @@ function getActivityDisplayStatus(activity: StaffActivity, now: Date = new Date(
     key: "registration_closed" as ActivityDisplayStatus,
     label: "ปิดรับสมัครแล้ว",
     description: "เจ้าหน้าที่ปิดสวิตช์รับสมัครและลงทะเบียนแล้ว",
-    badgeClass: "border border-orange-200 bg-orange-100 text-orange-800",
-    dotClass: "bg-orange-600",
+    badgeClass: "border border-amber-200 bg-amber-50 text-amber-700",
+    dotClass: "bg-amber-500",
   };
 }
 // ---------- shared presentational building blocks ----------
