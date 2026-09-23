@@ -327,18 +327,29 @@ export default function StudentActivitiesPage() {
   const list = useMemo(
     () =>
       a
+        .filter((x) => {
+          const participationStatus = x.participationStatus || "";
+          const appliedByStudent = ["applied", "registered"].includes(
+            participationStatus,
+          );
+
+          if (tab === "open") {
+            // เปิดรับ = กำลังเปิดรับและยังไม่สมัคร
+            // หรือ = นิสิตสมัครไว้แล้ว (ปุ่มต้องเป็นสีเทาและกดไม่ได้)
+            return (
+              (!participationStatus && x.applicationEnabled) ||
+              appliedByStudent
+            );
+          }
+
+          // แท็บกิจกรรมที่สมัคร แสดงทุกสถานะก่อนถึงการยืนยันเสร็จสิ้น
+          return ["applied", "registered", "confirmed"].includes(
+            participationStatus,
+          );
+        })
         .filter((x) =>
-          tab === "open"
-            ? (!x.participationStatus &&
-                x.applicationEnabled) ||
-              ["applied", "registered"].includes(
-                x.participationStatus || "",
-              )
-            : ["applied", "registered", "confirmed"].includes(
-                x.participationStatus || "",
-              ),
-        )
-        .filter((x) => x.title.toLowerCase().includes(q.toLowerCase())),
+          x.title.toLowerCase().includes(q.toLowerCase()),
+        ),
     [a, tab, q],
   );
   const past = p.filter((x) =>
