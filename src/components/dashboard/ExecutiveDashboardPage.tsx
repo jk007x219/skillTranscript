@@ -1876,40 +1876,32 @@ export default function ExecutiveDashboardPage() {
                   <tbody>
                     {termSummary.map(
                       (item, index) => {
-                        let trend:
+                        const previous =
+                          index <
+                          termSummary.length - 1
+                            ? termSummary[index + 1]
+                            : undefined;
+
+                        const trendDiff = previous
+                          ? Math.round(
+                              (item.avgScore -
+                                previous.avgScore) *
+                                100
+                            ) / 100
+                          : null;
+
+                        const trend:
                           | "up"
                           | "down"
                           | "same"
                           | null =
-                          null;
-
-                        if (
-                          index <
-                          termSummary.length - 1
-                        ) {
-                          const previous =
-                            termSummary[
-                              index + 1
-                            ];
-
-                          if (previous) {
-                            const diff =
-                              item.avgScore -
-                              previous.avgScore;
-
-                            if (diff > 0) {
-                              trend = "up";
-                            } else if (
-                              diff < 0
-                            ) {
-                              trend =
-                                "down";
-                            } else {
-                              trend =
-                                "same";
-                            }
-                          }
-                        }
+                          trendDiff === null
+                            ? null
+                            : trendDiff > 0
+                            ? "up"
+                            : trendDiff < 0
+                            ? "down"
+                            : "same";
 
                         const levelColor =
                           item.level ===
@@ -1958,7 +1950,7 @@ export default function ExecutiveDashboardPage() {
                                   <TrendingUp className="h-4 w-4" />
 
                                   <span className="text-xs">
-                                    ดีขึ้น
+                                    ดีขึ้น +{trendDiff?.toFixed(2)} คะแนน
                                   </span>
                                 </span>
                               )}
@@ -1969,7 +1961,7 @@ export default function ExecutiveDashboardPage() {
                                   <TrendingDown className="h-4 w-4" />
 
                                   <span className="text-xs">
-                                    ลดลง
+                                    ลดลง {trendDiff?.toFixed(2)} คะแนน
                                   </span>
                                 </span>
                               )}
@@ -1977,14 +1969,14 @@ export default function ExecutiveDashboardPage() {
                               {trend ===
                                 "same" && (
                                 <span className="text-xs text-slate-400">
-                                  คงที่
+                                  คงที่ 0.00 คะแนน
                                 </span>
                               )}
 
                               {trend ===
                                 null && (
                                 <span className="text-xs text-slate-400">
-                                  -
+                                  ไม่มีภาคก่อนหน้า
                                 </span>
                               )}
                             </td>
