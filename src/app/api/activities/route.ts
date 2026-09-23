@@ -212,6 +212,65 @@ function normalizeDatePart(value: unknown): string | null {
  * - string
  * - Date object
  */
+function formatClientDateTime(value: unknown): string | null {
+  if (!value) return null;
+
+  if (value instanceof Date) {
+    if (Number.isNaN(value.getTime())) return null;
+
+    const parts = new Intl.DateTimeFormat("en-GB", {
+      timeZone: "Asia/Bangkok",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+      hour12: false,
+    }).formatToParts(value);
+
+    const map = Object.fromEntries(
+      parts
+        .filter((part) => part.type !== "literal")
+        .map((part) => [part.type, part.value]),
+    );
+
+    return `${map.year}-${map.month}-${map.day}T${map.hour}:${map.minute}:${map.second}`;
+  }
+
+  const raw = String(value).trim();
+  if (!raw) return null;
+
+  const mysqlMatch = raw.match(
+    /^(\d{4}-\d{2}-\d{2})[ T](\d{2}:\d{2}(?::\d{2})?)/,
+  );
+  if (mysqlMatch) {
+    return `${mysqlMatch[1]}T${mysqlMatch[2]}`;
+  }
+
+  const parsed = new Date(raw);
+  if (Number.isNaN(parsed.getTime())) return null;
+
+  const parts = new Intl.DateTimeFormat("en-GB", {
+    timeZone: "Asia/Bangkok",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: false,
+  }).formatToParts(parsed);
+
+  const map = Object.fromEntries(
+    parts
+      .filter((part) => part.type !== "literal")
+      .map((part) => [part.type, part.value]),
+  );
+
+  return `${map.year}-${map.month}-${map.day}T${map.hour}:${map.minute}:${map.second}`;
+}
+
 function normalizeTimePart(value: unknown): string {
   if (!value) {
     return "00:00:00";
@@ -680,17 +739,20 @@ export async function GET(request: NextRequest) {
           description:
             act.description,
 
+          // ส่งวันที่และเวลาเป็น string แบบเวลาไทยโดยตรง
+          // ป้องกัน mysql2/JSON แปลง TIME/DATETIME เป็น Date
+          // แล้วทำให้หน้าเว็บอ่านเวลาไม่ออก
           date:
-            act.date,
+            normalizeDatePart(act.date),
 
           time:
-            act.time,
+            normalizeTimePart(act.time),
 
           endDate:
-            act.endDate,
+            normalizeDatePart(act.endDate),
 
           endTime:
-            act.endTime,
+            normalizeTimePart(act.endTime),
 
           hours:
             act.hours === null
@@ -758,10 +820,10 @@ export async function GET(request: NextRequest) {
            * Normal Registration
            */
           registrationStart:
-            act.registrationStart,
+            formatClientDateTime(act.registrationStart),
 
           registrationEnd:
-            act.registrationEnd,
+            formatClientDateTime(act.registrationEnd),
 
           /**
            * สถานะการลงทะเบียนจริง
