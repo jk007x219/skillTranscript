@@ -312,8 +312,8 @@ function getActivityDisplayStatus(activity: StaffActivity, now: Date = new Date(
     key: "registration_closed" as ActivityDisplayStatus,
     label: "ปิดรับสมัครแล้ว",
     description: "ปิดสวิตช์รับสมัครและลงทะเบียนแล้ว",
-    badgeClass: "border border-red-200 bg-red-100 text-red-700",
-    dotClass: "bg-red-600",
+    badgeClass: "border border-orange-200 bg-orange-100 text-orange-800",
+    dotClass: "bg-orange-600",
   };
 
   const registrationStart = parseLocalDateTime(String(activity.registrationStart || ""));
