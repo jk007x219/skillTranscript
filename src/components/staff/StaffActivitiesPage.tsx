@@ -560,6 +560,108 @@ function requestCameraStream(constraints: MediaStreamConstraints) {
   });
 }
 
+
+function TimeField({
+  value,
+  onChange,
+  required = false,
+}: {
+  value: string;
+  onChange: (value: string) => void;
+  required?: boolean;
+}) {
+  const [hour = "", minute = ""] = value ? value.split(":") : [];
+
+  const updatePart = (part: "hour" | "minute", nextValue: string) => {
+    const nextHour = part === "hour" ? nextValue : hour;
+    const nextMinute = part === "minute" ? nextValue : minute;
+
+    if (!nextHour && !nextMinute) {
+      onChange("");
+      return;
+    }
+
+    onChange(`${nextHour || "00"}:${nextMinute || "00"}`);
+  };
+
+  return (
+    <div className="grid grid-cols-2 gap-2">
+      <select
+        value={hour}
+        onChange={(e) => updatePart("hour", e.target.value)}
+        className="staff-activity-input appearance-none bg-white pr-8"
+        required={required}
+        aria-label="ชั่วโมง"
+      >
+        <option value="">ชั่วโมง</option>
+        {Array.from({ length: 24 }, (_, index) => {
+          const item = String(index).padStart(2, "0");
+          return (
+            <option key={item} value={item}>
+              {item} นาฬิกา
+            </option>
+          );
+        })}
+      </select>
+
+      <select
+        value={minute}
+        onChange={(e) => updatePart("minute", e.target.value)}
+        className="staff-activity-input appearance-none bg-white pr-8"
+        required={required}
+        aria-label="นาที"
+      >
+        <option value="">นาที</option>
+        {Array.from({ length: 60 }, (_, index) => {
+          const item = String(index).padStart(2, "0");
+          return (
+            <option key={item} value={item}>
+              {item} นาที
+            </option>
+          );
+        })}
+      </select>
+    </div>
+  );
+}
+
+function DateTimeField({
+  value,
+  onChange,
+  minDate,
+  maxDate,
+}: {
+  value: string;
+  onChange: (value: string) => void;
+  minDate?: string;
+  maxDate?: string;
+}) {
+  const date = value ? value.slice(0, 10) : "";
+  const time = value && value.length >= 16 ? value.slice(11, 16) : "";
+
+  return (
+    <div className="grid gap-2 sm:grid-cols-[1.15fr_1fr]">
+      <input
+        type="date"
+        value={date}
+        min={minDate}
+        max={maxDate}
+        onChange={(e) => {
+          const nextDate = e.target.value;
+          onChange(nextDate ? `${nextDate}T${time || "00:00"}` : "");
+        }}
+        className="staff-activity-input"
+      />
+      <TimeField
+        value={time}
+        onChange={(nextTime) => {
+          onChange(date && nextTime ? `${date}T${nextTime}` : "");
+        }}
+      />
+    </div>
+  );
+}
+
 // ---------- AddActivityModal ----------
 function AddActivityModal({
   form,
@@ -658,13 +760,10 @@ function AddActivityModal({
                 required
               />
             </Field>
-            <Field label="เวลาเริ่มต้น">
-              <input
-                type="time"
+            <Field label="เวลาเริ่มต้น" hint="เลือกชั่วโมงและนาที">
+              <TimeField
                 value={form.startTime}
-                onChange={(e) => onChange("startTime", e.target.value)}
-                step="60"
-                className="staff-activity-input"
+                onChange={(value) => onChange("startTime", value)}
                 required
               />
             </Field>
@@ -682,29 +781,25 @@ function AddActivityModal({
                 required
               />
             </Field>
-            <Field label="เวลาสิ้นสุด">
-              <input
-                type="time"
+            <Field label="เวลาสิ้นสุด" hint="เลือกชั่วโมงและนาที">
+              <TimeField
                 value={form.endTime}
-                onChange={(e) => {
-                  const val = e.target.value;
+                onChange={(value) => {
                   if (
                     form.startDate &&
                     form.startTime &&
-                    val &&
+                    value &&
                     !isValidEndDateTime(
                       form.startDate,
                       form.startTime,
                       form.endDate,
-                      val,
+                      value,
                     )
                   ) {
                     return;
                   }
-                  onChange("endTime", val);
+                  onChange("endTime", value);
                 }}
-                step="60"
-                className="staff-activity-input"
                 required
               />
             </Field>
@@ -766,11 +861,11 @@ function AddActivityModal({
           </p>
           <div className="mt-3 grid gap-3 sm:grid-cols-2">
             <Field label="เริ่มลงทะเบียน">
-              <input
-                type="datetime-local"
+              <DateTimeField
                 value={form.registrationStart}
-                onChange={(e) => {
-                  const value = e.target.value;
+                minDate={today}
+                maxDate={form.endDate || undefined}
+                onChange={(value) => {
                   if (
                     form.registrationEnd &&
                     value &&
@@ -788,21 +883,18 @@ function AddActivityModal({
                   }
                   onChange("registrationStart", value);
                 }}
-                min={`${today}T00:00`}
-                max={
-                  form.endDate && form.endTime
-                    ? `${form.endDate}T${form.endTime}`
-                    : undefined
-                }
-                className="staff-activity-input"
               />
             </Field>
             <Field label="สิ้นสุดลงทะเบียน">
-              <input
-                type="datetime-local"
+              <DateTimeField
                 value={form.registrationEnd}
-                onChange={(e) => {
-                  const value = e.target.value;
+                minDate={
+                  form.registrationStart
+                    ? form.registrationStart.slice(0, 10)
+                    : today
+                }
+                maxDate={form.endDate || undefined}
+                onChange={(value) => {
                   if (
                     form.registrationStart &&
                     value &&
@@ -820,13 +912,6 @@ function AddActivityModal({
                   }
                   onChange("registrationEnd", value);
                 }}
-                min={form.registrationStart || `${today}T00:00`}
-                max={
-                  form.endDate && form.endTime
-                    ? `${form.endDate}T${form.endTime}`
-                    : undefined
-                }
-                className="staff-activity-input"
               />
             </Field>
           </div>
