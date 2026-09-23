@@ -179,7 +179,36 @@ function Card({
             <FileBadge className="h-4 w-4" />
             ดูใบรับรอง
           </button>
-        ) : tab === "open" ? (
+        ) : s === "applied" ? (
+          <button
+            disabled
+            className="h-11 flex-1 rounded-xl border border-blue-100 bg-blue-50 text-sm font-semibold text-[#2455A4]"
+          >
+            <span className="inline-flex items-center justify-center gap-2">
+              <CheckCircle2 className="h-4 w-4" />
+              สมัครแล้ว
+            </span>
+          </button>
+        ) : s === "registered" ? (
+          <button
+            onClick={onShowQr}
+            className="inline-flex h-11 flex-1 items-center justify-center gap-2 rounded-xl border border-[#2455A4] text-sm font-semibold text-[#2455A4] transition hover:bg-blue-50"
+          >
+            <QrCode className="h-4 w-4" />
+            แสดง QR ลงทะเบียน
+          </button>
+        ) : s === "confirmed" ? (
+          <button
+            onClick={onEvaluate}
+            disabled={!a.confirmationEnabled}
+            className="inline-flex h-11 flex-1 items-center justify-center gap-2 rounded-xl border border-[#2455A4] text-sm font-semibold text-[#2455A4] transition hover:bg-blue-50 disabled:border-slate-200 disabled:bg-slate-100 disabled:text-slate-400"
+          >
+            <QrCode className="h-4 w-4" />
+            {a.confirmationEnabled
+              ? "ทำแบบประเมิน"
+              : "รอเจ้าหน้าที่เปิดแบบประเมิน"}
+          </button>
+        ) : (
           <button
             onClick={onApply}
             disabled={Boolean(a.isFull)}
@@ -191,34 +220,6 @@ function Card({
           >
             <CheckCircle2 className="h-4 w-4" />
             {a.isFull ? "เต็มแล้ว" : "สมัครกิจกรรม"}
-          </button>
-        ) : s === "applied" ? (
-          <button
-            onClick={onShowQr}
-            className="inline-flex h-11 flex-1 items-center justify-center gap-2 rounded-xl border border-[#2455A4] text-sm font-semibold text-[#2455A4] transition hover:bg-blue-50"
-          >
-            <QrCode className="h-4 w-4" />
-            แสดง QR ลงทะเบียน
-          </button>
-        ) : s === "registered" || s === "confirmed" ? (
-          <button
-            onClick={s === "confirmed" ? onEvaluate : onShowQr}
-            disabled={s === "confirmed" && !a.confirmationEnabled}
-            className="inline-flex h-11 flex-1 items-center justify-center gap-2 rounded-xl border border-[#2455A4] text-sm font-semibold text-[#2455A4] transition hover:bg-blue-50 disabled:border-slate-200 disabled:bg-slate-100 disabled:text-slate-400"
-          >
-            <QrCode className="h-4 w-4" />
-            {s === "confirmed"
-              ? a.confirmationEnabled
-                ? "ทำแบบประเมิน"
-                : "รอเจ้าหน้าที่เปิดแบบประเมิน"
-              : "แสดง QR ลงทะเบียน"}
-          </button>
-        ) : (
-          <button
-            disabled
-            className="h-11 flex-1 rounded-xl bg-slate-100 text-sm font-semibold text-slate-500"
-          >
-            ยืนยันแล้ว • รอทำแบบประเมิน
           </button>
         )}
         <button
@@ -310,7 +311,7 @@ export default function StudentActivitiesPage() {
       a
         .filter((x) =>
           tab === "open"
-            ? !x.participationStatus && x.applicationEnabled
+            ? x.applicationEnabled || Boolean(x.participationStatus)
             : ["applied", "registered", "confirmed"].includes(
                 x.participationStatus || "",
               ),
