@@ -51,12 +51,8 @@ export async function GET() {
          ? "WHERE a.status = 'active'"
          : isStudent
            ? `WHERE (
-                (
-                  a.applicationEnabled = 1
-                  AND TIMESTAMP(a.endDate, a.endTime) > NOW()
-                  AND p.ParticipationId IS NULL
-                )
-                OR p.status IN ('applied', 'registered')
+                a.status = 'active'
+                OR p.status IN ('pending', 'applied', 'registered', 'confirmed')
               )`
            : ""}
        ${isStudent
@@ -127,7 +123,11 @@ export async function GET() {
         return Boolean(start && end && activityEnd && now >= start && now < end && now < activityEnd);
       })(),
       skills: skillMap[r.activityId] || [],
-      participationStatus: isPublic ? null : r.participationStatus || null,
+      participationStatus: isPublic
+        ? null
+        : r.participationStatus === "pending"
+          ? "applied"
+          : r.participationStatus || null,
       registrationQrToken: isPublic ? null : r.registrationQrToken || null,
       qrPayload: isPublic
         ? null
