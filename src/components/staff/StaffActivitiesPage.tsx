@@ -1109,10 +1109,7 @@ function EvaluationModal({
         ],
   );
 
-  const skillOptions = activity.skills.map((s) => ({
-    name: s.name,
-    level: s.level || "ไม่ระบุระดับ",
-  }));
+  const skillOptions = activity.skills.map((s) => s.name);
 
   const addQuestion = () => {
     setQuestions((prev) => [
@@ -1350,28 +1347,31 @@ function EvaluationModal({
               </label>
               <div className="mt-1 flex flex-wrap gap-3">
                 {skillOptions.length > 0 ? (
-                  skillOptions.map((skill) => (
-                    <label
-                      key={skill.name}
-                      className={"flex items-center gap-2 rounded-lg border px-3 py-2 transition cursor-pointer " +
-                        ((q.skillNames || []).includes(skill.name)
-                          ? "border-[#2455A4] bg-blue-50"
-                          : "border-slate-200 bg-white hover:border-slate-300")}
-                    >
-                      <input
-                        type="checkbox"
-                        checked={(q.skillNames || []).includes(skill.name)}
-                        onChange={() => toggleSkill(q.id, skill.name)}
-                        className="h-4 w-4 rounded border-slate-300 text-[#2455A4] focus:ring-[#2455A4]"
-                      />
-                      <span className="flex items-center gap-2 text-sm">
-                        <span className="font-medium text-slate-700">{skill.name}</span>
-                        <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-500">
-                          {skill.level}
+                  skillOptions.map((skill) => {
+                    const activitySkill = activity.skills.find((s) => s.name === skill);
+                    return (
+                      <label
+                        key={skill}
+                        className={"flex items-center gap-2 rounded-lg border px-3 py-2 transition cursor-pointer " +
+                          ((q.skillNames || []).includes(skill)
+                            ? "border-[#2455A4] bg-blue-50"
+                            : "border-slate-200 bg-white hover:border-slate-300")}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={(q.skillNames || []).includes(skill)}
+                          onChange={() => toggleSkill(q.id, skill)}
+                          className="h-4 w-4 rounded border-slate-300 text-[#2455A4] focus:ring-[#2455A4]"
+                        />
+                        <span className="flex items-center gap-2 text-sm">
+                          <span className="font-medium text-slate-700">{skill}</span>
+                          <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-500">
+                            {activitySkill?.level || "ไม่ระบุระดับ"}
+                          </span>
                         </span>
-                      </span>
-                    </label>
-                  ))
+                      </label>
+                    );
+                  })
                 ) : (
                   <span className="text-sm text-slate-400">
                     ไม่มีทักษะในกิจกรรมนี้ กรุณาเพิ่มทักษะก่อน
