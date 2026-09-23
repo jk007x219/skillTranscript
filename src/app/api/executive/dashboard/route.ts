@@ -632,7 +632,7 @@ export async function GET(request: NextRequest) {
 
     const termLevelMap = new Map<
       string,
-      Map<string, Map<string, LevelScore>>
+      Map<string, Map<string, Map<string, LevelScore>>>
     >();
 
     for (const row of termScoreRows) {
@@ -747,7 +747,7 @@ export async function GET(request: NextRequest) {
       .map((termName) => {
         const termStudents =
           termLevelMap.get(termName) ||
-          new Map<string, Map<string, Map<string, LevelScore>>>();
+          new Map<string, Map<string, Map<string, Map<string, LevelScore>>>>();
 
         const studentScores: number[] = [];
 
