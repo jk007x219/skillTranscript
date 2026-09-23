@@ -297,8 +297,8 @@ function getActivityDisplayStatus(activity: StaffActivity, now: Date = new Date(
     key: "past" as ActivityDisplayStatus,
     label: "สิ้นสุดแล้ว",
     description: "กิจกรรมสิ้นสุดแล้ว",
-    badgeClass: "bg-slate-100 text-slate-500",
-    dotClass: "bg-slate-400",
+    badgeClass: "border border-slate-300 bg-slate-200 text-slate-700",
+    dotClass: "bg-slate-600",
   };
 
   const start = getActivityStartDateTime(activity);
@@ -309,15 +309,15 @@ function getActivityDisplayStatus(activity: StaffActivity, now: Date = new Date(
       key: "open" as ActivityDisplayStatus,
       label: "เปิดลงทะเบียน",
       description: "ขณะนี้ยังเปิดให้ลงทะเบียนเข้าร่วมกิจกรรม",
-      badgeClass: "bg-blue-50 text-blue-600",
-      dotClass: "bg-blue-500",
+      badgeClass: "border border-blue-200 bg-blue-100 text-blue-700",
+      dotClass: "bg-blue-600",
     };
     return {
       key: "running" as ActivityDisplayStatus,
       label: "กำลังดำเนินอยู่",
       description: "กิจกรรมกำลังอยู่ในช่วงดำเนินการ",
-      badgeClass: "bg-emerald-50 text-emerald-600",
-      dotClass: "bg-emerald-500",
+      badgeClass: "border border-emerald-200 bg-emerald-100 text-emerald-700",
+      dotClass: "bg-emerald-600",
     };
   }
 
@@ -336,16 +336,16 @@ function getActivityDisplayStatus(activity: StaffActivity, now: Date = new Date(
     key: "not_open" as ActivityDisplayStatus,
     label: "ยังไม่เปิดรับสมัคร",
     description: "ยังไม่ถึงวันและเวลาที่กำหนดให้เปิดรับสมัคร",
-    badgeClass: "bg-amber-50 text-amber-700",
-    dotClass: "bg-amber-500",
+    badgeClass: "border border-amber-200 bg-amber-100 text-amber-800",
+    dotClass: "bg-amber-600",
   };
 
   if (registrationEnd && now.getTime() >= registrationEnd.getTime()) return {
     key: "registration_closed" as ActivityDisplayStatus,
     label: "ปิดรับสมัครแล้ว",
     description: "หมดช่วงเวลารับสมัครแล้ว แต่กิจกรรมยังไม่สิ้นสุด",
-    badgeClass: "bg-orange-50 text-orange-700",
-    dotClass: "bg-orange-500",
+    badgeClass: "border border-orange-200 bg-orange-100 text-orange-800",
+    dotClass: "bg-orange-600",
   };
 
   return {
