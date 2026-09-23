@@ -295,83 +295,29 @@ function getActivityDisplayStatus(activity: StaffActivity, now: Date = new Date(
 
   if (past) return {
     key: "past" as ActivityDisplayStatus,
-    label: "สิ้นสุดแล้ว",
+    label: "สิ้นสุดกิจกรรม",
     description: "กิจกรรมสิ้นสุดแล้ว",
     badgeClass: "border border-slate-300 bg-slate-200 text-slate-700",
     dotClass: "bg-slate-600",
   };
 
-  // สถานะต้องยึดตามสวิตช์จริงของกิจกรรม
-  // - เปิดรับสมัคร = applicationEnabled
-  // - เปิดลงทะเบียน = registrationEnabled
-  // - ปิดทั้งสองสวิตช์ = ปิดรับสมัครแล้ว
-  const applicationEnabled = Boolean(activity.applicationEnabled);
-  const registrationEnabled = Boolean(activity.registrationEnabled);
-
-  if (!applicationEnabled && !registrationEnabled) return {
-    key: "registration_closed" as ActivityDisplayStatus,
-    label: "ปิดรับสมัครแล้ว",
-    description: "ปิดสวิตช์รับสมัครและลงทะเบียนแล้ว",
-    badgeClass: "border border-orange-200 bg-orange-100 text-orange-800",
-    dotClass: "bg-orange-600",
-  };
-
-  const registrationStart = parseLocalDateTime(String(activity.registrationStart || ""));
-  const registrationEnd = parseLocalDateTime(String(activity.registrationEnd || ""));
-  const registrationStarted = !registrationStart || now.getTime() >= registrationStart.getTime();
-  const registrationNotEnded = !registrationEnd || now.getTime() < registrationEnd.getTime();
-
-  // ถ้ามีสวิตช์เปิด แต่ยังไม่ถึงเวลาที่กำหนด ให้แสดงว่ายังไม่เปิดรับสมัคร
-  if (!registrationStarted && registrationNotEnded) return {
-    key: "not_open" as ActivityDisplayStatus,
-    label: "ยังไม่เปิดรับสมัคร",
-    description: "เปิดสวิตช์ไว้แล้ว แต่ยังไม่ถึงวันและเวลาที่กำหนดให้เปิดรับสมัคร",
-    badgeClass: "border border-amber-200 bg-amber-100 text-amber-800",
-    dotClass: "bg-amber-600",
-  };
-
-  // ถ้าพ้นช่วงเวลารับสมัครแล้ว แต่สวิตช์ยังเปิดอยู่
-  if (!registrationNotEnded) return {
-    key: "registration_closed" as ActivityDisplayStatus,
-    label: "ปิดรับสมัครแล้ว",
-    description: "หมดช่วงเวลารับสมัครแล้ว",
-    badgeClass: "border border-orange-200 bg-orange-100 text-orange-800",
-    dotClass: "bg-orange-600",
-  };
-
-  const start = getActivityStartDateTime(activity);
-  const started = Boolean(start && now.getTime() >= start.getTime());
-
-  if (started) {
-    if (registrationEnabled) return {
-      key: "open" as ActivityDisplayStatus,
-      label: "เปิดลงทะเบียน",
-      description: "เปิดสวิตช์ลงทะเบียนอยู่ และขณะนี้เปิดให้ลงทะเบียนเข้าร่วมกิจกรรม",
-      badgeClass: "border border-blue-200 bg-blue-100 text-blue-700",
-      dotClass: "bg-blue-600",
-    };
-
-    if (applicationEnabled) return {
-      key: "open" as ActivityDisplayStatus,
-      label: "เปิดรับสมัคร",
-      description: "เปิดสวิตช์รับสมัครอยู่",
-      badgeClass: "border border-blue-200 bg-blue-100 text-blue-700",
-      dotClass: "bg-blue-600",
-    };
-  }
-
-  if (registrationEnabled) return {
+  // สวิตช์ของเจ้าหน้าที่เป็นตัวกำหนดสถานะหลัก
+  // เปิดรับสมัคร = แสดง "เปิดรับสมัครอยู่"
+  // ปิดรับสมัคร + เปิดลงทะเบียน = แสดง "เปิดลงทะเบียนอยู่"
+  // ปิดทั้งสอง = แสดง "ปิดรับสมัครแล้ว"
+  // วันที่มีไว้กำหนดสถานะ "สิ้นสุดกิจกรรม" เท่านั้น
+  if (activity.applicationEnabled) return {
     key: "open" as ActivityDisplayStatus,
-    label: "เปิดลงทะเบียน",
-    description: "เปิดสวิตช์ลงทะเบียนอยู่",
+    label: "เปิดรับสมัครอยู่",
+    description: "เจ้าหน้าที่เปิดสวิตช์รับสมัครอยู่",
     badgeClass: "border border-blue-200 bg-blue-100 text-blue-700",
     dotClass: "bg-blue-600",
   };
 
-  if (applicationEnabled) return {
+  if (activity.registrationEnabled) return {
     key: "open" as ActivityDisplayStatus,
-    label: "เปิดรับสมัคร",
-    description: "เปิดสวิตช์รับสมัครอยู่",
+    label: "เปิดลงทะเบียนอยู่",
+    description: "เจ้าหน้าที่เปิดสวิตช์ลงทะเบียนอยู่",
     badgeClass: "border border-blue-200 bg-blue-100 text-blue-700",
     dotClass: "bg-blue-600",
   };
@@ -379,9 +325,9 @@ function getActivityDisplayStatus(activity: StaffActivity, now: Date = new Date(
   return {
     key: "registration_closed" as ActivityDisplayStatus,
     label: "ปิดรับสมัครแล้ว",
-    description: "ปิดสวิตช์รับสมัครและลงทะเบียนแล้ว",
-    badgeClass: "border border-red-200 bg-red-100 text-red-700",
-    dotClass: "bg-red-600",
+    description: "เจ้าหน้าที่ปิดสวิตช์รับสมัครและลงทะเบียนแล้ว",
+    badgeClass: "border border-orange-200 bg-orange-100 text-orange-800",
+    dotClass: "bg-orange-600",
   };
 }
 // ---------- shared presentational building blocks ----------
