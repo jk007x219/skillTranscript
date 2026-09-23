@@ -336,11 +336,7 @@ export default function StudentEvaluatePage() {
                   <div className="font-semibold text-gray-900">
                     {index + 1}. {question.question}
                   </div>
-                  {question.skillNames?.length > 0 && (
-                    <div className="mt-2 text-sm text-gray-500">
-                      ทักษะ: {question.skillNames.join(", ")}
-                    </div>
-                  )}
+
                 </div>
 
                 <div className="space-y-3">
