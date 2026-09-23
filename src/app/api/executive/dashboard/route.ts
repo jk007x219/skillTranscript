@@ -778,7 +778,39 @@ export async function GET(request: NextRequest) {
       })
       .filter(
         (item) => item.activityCount > 0 || item.studentCount > 0
-      );
+      )
+      .sort((a, b) => {
+        const parseTerm = (value: string) => {
+          const match = value.trim().match(/^(\d+)\s*[\/-]\s*(\d{4})$/);
+
+          if (!match) {
+            return {
+              termNumber: -1,
+              academicYear: -1,
+              raw: value,
+            };
+          }
+
+          return {
+            termNumber: Number(match[1]),
+            academicYear: Number(match[2]),
+            raw: value,
+          };
+        };
+
+        const aParsed = parseTerm(a.term);
+        const bParsed = parseTerm(b.term);
+
+        if (aParsed.academicYear !== bParsed.academicYear) {
+          return bParsed.academicYear - aParsed.academicYear;
+        }
+
+        if (aParsed.termNumber !== bParsed.termNumber) {
+          return bParsed.termNumber - aParsed.termNumber;
+        }
+
+        return bParsed.raw.localeCompare(aParsed.raw, "th");
+      });
 
     return NextResponse.json({
       academicYear,
