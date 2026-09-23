@@ -421,6 +421,7 @@ export async function GET(request: NextRequest) {
         return {
           skillName,
           average,
+          participantCount: participatingStudents.length,
         };
       }
     );
@@ -473,7 +474,14 @@ export async function GET(request: NextRequest) {
     // ======================================================
     // 6. Radar + แยกกลุ่มทักษะ
     // ======================================================
-    const radarData = allSkillAverages.map(
+    // แสดงและนำมาหาค่าเฉลี่ยเฉพาะทักษะที่มีนิสิต
+    // เข้าร่วมกิจกรรมและมีผลประเมินทักษะนั้นจริง
+    const assessedSkillAverages =
+      allSkillAverages.filter(
+        (skill) => skill.participantCount > 0
+      );
+
+    const radarData = assessedSkillAverages.map(
       (skill) => ({
         skill: skill.skillName,
         score: skill.average,
@@ -481,12 +489,12 @@ export async function GET(request: NextRequest) {
     );
 
     const facultySkills =
-      allSkillAverages.filter((skill) =>
+      assessedSkillAverages.filter((skill) =>
         isFacultySkill(skill.skillName)
       );
 
     const essentialSkills =
-      allSkillAverages.filter(
+      assessedSkillAverages.filter(
         (skill) =>
           !isFacultySkill(skill.skillName)
       );
