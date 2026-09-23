@@ -171,7 +171,8 @@ export async function GET(request: NextRequest) {
 
     // ======================================================
     // 2. คะแนนจากกิจกรรมที่นิสิต "เข้าร่วม + ประเมินแล้ว" เท่านั้น
-    //    ใช้ completed เหมือน Staff Dashboard
+    //    ใช้สูตรเดียวกับ Staff Dashboard
+    //    เพิ่มตัวกรองภาคเรียนของ Executive ได้โดยไม่เปลี่ยนสูตร
     // ======================================================
     const activityConditions = [
       `p.status = 'completed'`,
@@ -184,130 +185,315 @@ export async function GET(request: NextRequest) {
       activityParams.push(term);
     }
 
-    const [scoreRows] = await pool.query<ScoreRow[]>(
+    type ScoreLevelRow = RowDataPacket & {
+      studentId: string;
+      skillName: string;
+      skillLevel: string;
+      activityCount: number | string;
+      totalEarned: number | string;
+      totalMax: number | string;
+    };
+
+    const [scoreRows] = await pool.query<ScoreLevelRow[]>(
       `
       SELECT
         p.studentId,
         ps.skillName,
-        SUM(COALESCE(ps.earnedScore, 0)) AS earned,
-        SUM(COALESCE(ps.maxScore, 0)) AS maxScore,
-        COUNT(DISTINCT p.activityId) AS activityCount
+        COALESCE(acs.level, 'พื้นฐาน') AS skillLevel,
+        COUNT(DISTINCT p.activityId) AS activityCount,
+        SUM(COALESCE(ps.earnedScore, 0)) AS totalEarned,
+        SUM(COALESCE(ps.maxScore, 0)) AS totalMax
       FROM participation p
       INNER JOIN activity a ON a.activityId = p.activityId
       INNER JOIN participation_skill ps
         ON ps.participationId = p.ParticipationId
+      LEFT JOIN activityskill acs
+        ON acs.activityId = p.activityId
+       AND acs.skillname = ps.skillName
       WHERE ${activityConditions.join(" AND ")}
-      GROUP BY p.studentId, ps.skillName
+      GROUP BY
+        p.studentId,
+        ps.skillName,
+        COALESCE(acs.level, 'พื้นฐาน')
       `,
       activityParams
     );
 
-    // ======================================================
-    // 3. Map คะแนนรายนิสิต/รายทักษะ
-    // ======================================================
-    const scoreMap = new Map<string, Map<string, ScoreRow>>();
-    for (const studentId of studentIds) {
-      scoreMap.set(studentId, new Map());
-    }
+    type LevelScore = {
+      activityCount: number;
+      earned: number;
+      max: number;
+    };
 
-    for (const row of scoreRows) {
-      const studentMap = scoreMap.get(String(row.studentId));
-      if (!studentMap) continue;
-      studentMap.set(normalizeSkillName(String(row.skillName)), row);
-    }
+    type StudentSkillLevels = Record<
+      string,
+      Record<string, LevelScore>
+    >;
 
-    // ======================================================
-    // 4. ค่าเฉลี่ยทักษะ
-    // สำคัญ: นิสิตที่ยังไม่เข้าร่วม/ไม่มีผลประเมิน
-    // จะไม่ถูกนับเป็น 0 และไม่ถูกนำมาหาร
-    // ======================================================
-    const allSkillAverages = ALL_SKILL_NAMES.map((skillName) => {
-      const normalizedName = normalizeSkillName(skillName);
-      const assessedScores: number[] = [];
+    function normalizeLevel(level: string) {
+      const value = level.trim().toLowerCase();
 
-      for (const studentId of studentIds) {
-        const row = scoreMap.get(studentId)?.get(normalizedName);
-        if (!row || Number(row.maxScore || 0) <= 0) continue;
-
-        assessedScores.push(
-          calculateSkillPercent(
-            Number(row.earned || 0),
-            Number(row.maxScore || 0)
-          )
-        );
+      if (
+        value.includes("สูง") ||
+        value.includes("advanced") ||
+        value.includes("high") ||
+        value === "3"
+      ) {
+        return "สูง";
       }
 
-      return {
-        skillName,
-        average:
-          assessedScores.length > 0
-            ? round2(
-                assessedScores.reduce((sum, score) => sum + score, 0) /
-                  assessedScores.length
+      if (
+        value.includes("กลาง") ||
+        value.includes("intermediate") ||
+        value.includes("medium") ||
+        value.includes("mid") ||
+        value === "2"
+      ) {
+        return "กลาง";
+      }
+
+      return "พื้นฐาน";
+    }
+
+    const studentSkillLevelMap: Record<
+      string,
+      StudentSkillLevels
+    > = {};
+
+    studentIds.forEach((studentId) => {
+      studentSkillLevelMap[studentId] = {};
+    });
+
+    for (const row of scoreRows) {
+      const studentId = String(row.studentId);
+      const skillName = String(row.skillName);
+      const level = normalizeLevel(
+        String(row.skillLevel || "พื้นฐาน")
+      );
+
+      if (!studentSkillLevelMap[studentId]) {
+        studentSkillLevelMap[studentId] = {};
+      }
+
+      if (!studentSkillLevelMap[studentId][skillName]) {
+        studentSkillLevelMap[studentId][skillName] = {};
+      }
+
+      const current =
+        studentSkillLevelMap[studentId][skillName][level] || {
+          activityCount: 0,
+          earned: 0,
+          max: 0,
+        };
+
+      current.activityCount +=
+        Number(row.activityCount) || 0;
+      current.earned +=
+        Number(row.totalEarned) || 0;
+      current.max +=
+        Number(row.totalMax) || 0;
+
+      studentSkillLevelMap[studentId][skillName][level] =
+        current;
+    }
+
+    // ======================================================
+    // 3. คะแนนทักษะรายนิสิต
+    // สูตรเดียวกับ Staff Dashboard:
+    // แต่ละระดับคำนวณเปอร์เซ็นต์ก่อน
+    // แล้วถ่วงน้ำหนักด้วยจำนวนกิจกรรมของระดับนั้น
+    // ======================================================
+    const studentSkillPercentMap: Record<
+      string,
+      Record<string, number>
+    > = {};
+
+    const studentSkillActivityMap: Record<
+      string,
+      Record<string, number>
+    > = {};
+
+    studentIds.forEach((studentId) => {
+      studentSkillPercentMap[studentId] = {};
+      studentSkillActivityMap[studentId] = {};
+
+      ALL_SKILL_NAMES.forEach((skillName) => {
+        const levels =
+          studentSkillLevelMap[studentId]?.[skillName] || {};
+
+        const basic =
+          levels["พื้นฐาน"] || {
+            activityCount: 0,
+            earned: 0,
+            max: 0,
+          };
+
+        const intermediate =
+          levels["กลาง"] || {
+            activityCount: 0,
+            earned: 0,
+            max: 0,
+          };
+
+        const advanced =
+          levels["สูง"] || {
+            activityCount: 0,
+            earned: 0,
+            max: 0,
+          };
+
+        const totalActivities =
+          basic.activityCount +
+          intermediate.activityCount +
+          advanced.activityCount;
+
+        studentSkillActivityMap[studentId][skillName] =
+          totalActivities;
+
+        const levelPercent = (item: LevelScore) =>
+          item.max > 0
+            ? Math.min(
+                100,
+                Math.max(
+                  0,
+                  round2(
+                    (item.earned / item.max) * 100
+                  )
+                )
               )
-            : 0,
-      };
+            : 0;
+
+        const basicPercent = levelPercent(basic);
+        const intermediatePercent =
+          levelPercent(intermediate);
+        const advancedPercent =
+          levelPercent(advanced);
+
+        const percent =
+          totalActivities > 0
+            ? round2(
+                (
+                  basicPercent *
+                    basic.activityCount +
+                  intermediatePercent *
+                    intermediate.activityCount +
+                  advancedPercent *
+                    advanced.activityCount
+                ) / totalActivities
+              )
+            : 0;
+
+        studentSkillPercentMap[studentId][skillName] =
+          percent;
+      });
     });
 
     // ======================================================
+    // 4. ค่าเฉลี่ยรายทักษะ
+    // ไม่เอานิสิตที่ยังไม่มีผลประเมินทักษะนั้นมานับเป็น 0
+    // ======================================================
+    const allSkillAverages = ALL_SKILL_NAMES.map(
+      (skillName) => {
+        const participatingStudents =
+          studentIds.filter(
+            (studentId) =>
+              (
+                studentSkillActivityMap[
+                  studentId
+                ]?.[skillName] || 0
+              ) > 0
+          );
+
+        const average =
+          participatingStudents.length > 0
+            ? round2(
+                participatingStudents.reduce(
+                  (sum, studentId) =>
+                    sum +
+                    studentSkillPercentMap[
+                      studentId
+                    ][skillName],
+                  0
+                ) / participatingStudents.length
+              )
+            : 0;
+
+        return {
+          skillName,
+          average,
+        };
+      }
+    );
+
+    // ======================================================
     // 5. Overall ของนิสิตแต่ละคน
-    // เฉพาะทักษะที่นิสิตมีผลประเมินแล้วเท่านั้น
-    // ไม่เอาทักษะที่ยังไม่ได้เข้าร่วมมานับเป็น 0
+    // เฉพาะทักษะที่มีผลประเมินจริงเท่านั้น
     // ======================================================
     const studentOverallScores: number[] = [];
 
     for (const studentId of studentIds) {
-      const assessedSkillScores: number[] = [];
-      const studentMap = scoreMap.get(studentId);
-
-      for (const skillName of ALL_SKILL_NAMES) {
-        const row = studentMap?.get(normalizeSkillName(skillName));
-        if (!row || Number(row.maxScore || 0) <= 0) continue;
-
-        assessedSkillScores.push(
-          calculateSkillPercent(
-            Number(row.earned || 0),
-            Number(row.maxScore || 0)
-          )
+      const assessedSkills =
+        ALL_SKILL_NAMES.filter(
+          (skillName) =>
+            (
+              studentSkillActivityMap[
+                studentId
+              ]?.[skillName] || 0
+            ) > 0
         );
+
+      if (assessedSkills.length === 0) {
+        continue;
       }
 
-      // ไม่มีผลประเมินเลย = ไม่นับนิสิตคนนี้ใน Overall
-      if (assessedSkillScores.length === 0) continue;
-
-      studentOverallScores.push(
-        round2(
-          assessedSkillScores.reduce((sum, score) => sum + score, 0) /
-            assessedSkillScores.length
-        )
+      const studentOverall = round2(
+        assessedSkills.reduce(
+          (sum, skillName) =>
+            sum +
+            studentSkillPercentMap[
+              studentId
+            ][skillName],
+          0
+        ) / assessedSkills.length
       );
+
+      studentOverallScores.push(studentOverall);
     }
 
     const averageOverallScore =
       studentOverallScores.length > 0
         ? round2(
-            studentOverallScores.reduce((sum, score) => sum + score, 0) /
-              studentOverallScores.length
+            studentOverallScores.reduce(
+              (sum, score) => sum + score,
+              0
+            ) / studentOverallScores.length
           )
         : 0;
 
     // ======================================================
     // 6. Radar + แยกกลุ่มทักษะ
     // ======================================================
-    const radarData = allSkillAverages.map((skill) => ({
-      skill: skill.skillName,
-      score: skill.average,
-    }));
+    const radarData = allSkillAverages.map(
+      (skill) => ({
+        skill: skill.skillName,
+        score: skill.average,
+      })
+    );
 
-    const facultySkills = allSkillAverages.filter((skill) =>
-      isFacultySkill(skill.skillName)
-    );
-    const essentialSkills = allSkillAverages.filter(
-      (skill) => !isFacultySkill(skill.skillName)
-    );
+    const facultySkills =
+      allSkillAverages.filter((skill) =>
+        isFacultySkill(skill.skillName)
+      );
+
+    const essentialSkills =
+      allSkillAverages.filter(
+        (skill) =>
+          !isFacultySkill(skill.skillName)
+      );
 
     // ======================================================
-    // 7. ระดับนิสิตจาก Overall ที่มีผลประเมินจริง
+    // 7. ระดับนิสิตจาก Overall
+    // ใช้เฉพาะนิสิตที่มีผลประเมินจริง
     // ======================================================
     let excellent = 0;
     let medium = 0;
@@ -319,14 +505,20 @@ export async function GET(request: NextRequest) {
       else poor++;
     }
 
-    const assessedStudentCount = studentOverallScores.length;
+    const assessedStudentCount =
+      studentOverallScores.length;
+
     const levelDistribution = [
       {
         level: "ดีมาก",
         count: excellent,
         percent:
           assessedStudentCount > 0
-            ? Math.round((excellent / assessedStudentCount) * 100)
+            ? Math.round(
+                (excellent /
+                  assessedStudentCount) *
+                  100
+              )
             : 0,
       },
       {
@@ -334,7 +526,11 @@ export async function GET(request: NextRequest) {
         count: medium,
         percent:
           assessedStudentCount > 0
-            ? Math.round((medium / assessedStudentCount) * 100)
+            ? Math.round(
+                (medium /
+                  assessedStudentCount) *
+                  100
+              )
             : 0,
       },
       {
@@ -342,7 +538,11 @@ export async function GET(request: NextRequest) {
         count: poor,
         percent:
           assessedStudentCount > 0
-            ? Math.round((poor / assessedStudentCount) * 100)
+            ? Math.round(
+                (poor /
+                  assessedStudentCount) *
+                  100
+              )
             : 0,
       },
     ];
@@ -350,27 +550,48 @@ export async function GET(request: NextRequest) {
     // ======================================================
     // 8. จำนวนกิจกรรมที่กลุ่มที่เลือกเข้าร่วมจริง
     // ======================================================
-    const [activityRows] = await pool.query<ActivityRow[]>(
-      `
-      SELECT DISTINCT a.activityId, a.term
-      FROM participation p
-      INNER JOIN activity a ON a.activityId = p.activityId
-      WHERE p.status = 'completed'
-        AND p.studentId IN (${placeholders})
-        ${term !== "all" ? "AND a.term = ?" : ""}
-      `,
-      term !== "all" ? [...studentIds, term] : studentIds
+    const [activityRows] =
+      await pool.query<ActivityRow[]>(
+        `
+        SELECT DISTINCT
+          a.activityId,
+          a.term
+        FROM participation p
+        INNER JOIN activity a
+          ON a.activityId = p.activityId
+        WHERE p.status = 'completed'
+          AND p.studentId IN (${placeholders})
+          ${term !== "all" ? "AND a.term = ?" : ""}
+        `,
+        term !== "all"
+          ? [...studentIds, term]
+          : studentIds
+      );
+
+    const totalActivities =
+      activityRows.length;
+
+    // ======================================================
+    // 9. สรุปตามภาคการศึกษา
+    // ======================================================
+    const termSummary = terms.map(
+      (termName) => {
+        const termActivityCount =
+          activityRows.filter(
+            (row) =>
+              row.term === termName
+          ).length;
+
+        return {
+          term: termName,
+          avgScore: 0,
+          studentCount: 0,
+          activityCount:
+            termActivityCount,
+          level: "ยังไม่มีข้อมูล",
+        };
+      }
     );
-
-    const totalActivities = activityRows.length;
-
-    // ======================================================
-    // 9. สรุปตามภาคการศึกษา ใช้หลักเดียวกัน
-    // ======================================================
-    const termSummary = terms.map((termName) => ({
-      term: termName,
-      activityCount: activityRows.filter((row) => row.term === termName).length,
-    }));
 
     return NextResponse.json({
       academicYear,
