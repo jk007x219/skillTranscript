@@ -193,11 +193,15 @@ function Card({
           </button>
         ) : s === "registered" ? (
           <button
-            onClick={onShowQr}
-            className="inline-flex h-11 flex-1 items-center justify-center gap-2 rounded-xl border border-[#2455A4] text-sm font-semibold text-[#2455A4] transition hover:bg-blue-50"
+            type="button"
+            disabled
+            className="h-11 flex-1 cursor-not-allowed rounded-xl bg-slate-400 text-sm font-bold text-white"
+            aria-disabled="true"
           >
-            <QrCode className="h-4 w-4" />
-            แสดง QR ลงทะเบียน
+            <span className="inline-flex items-center justify-center gap-2">
+              <CheckCircle2 className="h-4 w-4" />
+              ลงทะเบียนแล้ว
+            </span>
           </button>
         ) : s === "confirmed" ? (
           <button
@@ -326,7 +330,7 @@ export default function StudentActivitiesPage() {
         .filter((x) =>
           tab === "open"
             ? x.applicationEnabled ||
-              ["applied", "registered", "confirmed"].includes(
+              ["applied", "registered"].includes(
                 x.participationStatus || "",
               )
             : ["applied", "registered", "confirmed"].includes(
