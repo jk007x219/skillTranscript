@@ -48,8 +48,8 @@ export async function GET() {
        FROM activity a
        LEFT JOIN participation p ON p.activityId = a.activityId AND p.studentId = ?
        ${isPublic || isStudent ? "WHERE a.status = 'active'" : ""}
-       ${isStudent ? "AND (a.applicationEnabled = 1 OR p.ParticipationId IS NOT NULL)" : ""}
-       ORDER BY a.date DESC, a.time DESC`,
+       ${isStudent ? "AND (a.applicationEnabled = 1 OR p.status IN ('applied', 'registered'))" : ""}
+       ORDER BY a.date DESC, a.time DESC, a.activityId ASC`,
       [session?.user?.studentId || ""],
     );
 
@@ -116,7 +116,11 @@ export async function GET() {
       skills: skillMap[r.activityId] || [],
       participationStatus: isPublic ? null : r.participationStatus || null,
       registrationQrToken: isPublic ? null : r.registrationQrToken || null,
-      qrPayload: isPublic ? null : (r.studentId ? buildRegistrationQrPayload(r.activityId, r.studentId) : null),
+      qrPayload: isPublic
+        ? null
+        : r.registrationQrToken
+          ? buildRegistrationQrPayload(r.activityId, r.registrationQrToken)
+          : null,
     })));
   } catch (error) {
     return jsonError(error);
