@@ -299,10 +299,10 @@ function formatThaiTime(value?: string | null): string {
   let text = "";
 
   // รองรับทั้งเวลา HH:mm / HH:mm:ss และวันที่เวลา ISO เช่น 2026-09-23T11:25:00.000Z
-  if (/^\\d{2}:\\d{2}/.test(raw)) {
+  if (/^\d{2}:\d{2}/.test(raw)) {
     text = raw.slice(0, 5);
   } else {
-    const timeMatch = raw.match(/[T ](\\d{2}:\\d{2})/);
+    const timeMatch = raw.match(/[T ](\d{2}:\d{2})/);
     text = timeMatch?.[1] || "";
   }
 
