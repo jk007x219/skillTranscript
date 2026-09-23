@@ -19,6 +19,7 @@ type Skill = {
 };
 
 type CertificateData = {
+  activityName: string;
   studentName: string;
   skills: Skill[];
   certifiedDate: string | null;
@@ -84,13 +85,14 @@ function CertificatePreview({ certificate }: { certificate: CertificateData }) {
         />
       </div>
 
-      <div className="absolute left-[10%] right-[10%] top-[20%] text-center text-[#173F70]">
+      <div className="absolute left-[10%] right-[10%] top-[18%] text-center text-[#173F70]">
         <p className="text-[18px] font-bold sm:text-2xl">ใบรับรองทักษะ</p>
-        <p className="mt-1 text-[8px] font-medium sm:text-xs">คณะวิทยาศาสตร์และนวัตกรรมดิจิทัล มหาวิทยาลัยทักษิณ</p>
+        <p className="mt-2 text-[11px] font-bold sm:text-base">{certificate.activityName || "-"}</p>
+        <p className="mt-1 text-[8px] font-bold sm:text-xs">คณะวิทยาศาสตร์และนวัตกรรมดิจิทัล มหาวิทยาลัยทักษิณ</p>
       </div>
 
       <div className="absolute left-[15%] right-[15%] top-[38%] text-center text-[#24466D]">
-        <p className="text-[10px] font-medium sm:text-sm">ขอรับรองว่า</p>
+        <p className="text-[10px] font-bold sm:text-sm">ขอรับรองว่า</p>
       </div>
 
       <div className="absolute left-[15%] right-[15%] top-[44%] flex justify-center">
@@ -100,16 +102,15 @@ function CertificatePreview({ certificate }: { certificate: CertificateData }) {
       </div>
 
       <div className="absolute left-[14%] right-[14%] top-[56%] text-center text-[#24466D]">
-        <p className="text-[9px] font-medium sm:text-sm">ได้รับทักษะการรับรองทักษะ</p>
-        <div className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1.5 rounded-md bg-white/80 px-3 py-2 sm:grid-cols-3">
+        <p className="text-[9px] font-bold sm:text-sm">ได้รับทักษะการรับรองทักษะ</p>
+        <div className="mt-2 rounded-md bg-white/80 px-3 py-2">
           {certificate.skills.map((skill) => (
-            <p key={`${skill.name}-${skill.level}`} className="text-[7px] font-medium leading-tight text-[#173F70] sm:text-[10px]">
-              {skill.name} <span className="text-slate-600">ระดับ{skill.level}</span>
+            <p key={`${skill.name}-${skill.level}`} className="text-[9px] font-bold leading-tight text-[#173F70] sm:text-sm">
+              {skill.name} ระดับ{skill.level}
             </p>
           ))}
         </div>
       </div>
-
       {/* วันที่รับรอง */}
       <div className="absolute left-[28%] right-[28%] top-[77%] text-center text-[10px] font-medium text-[#24466D] sm:text-sm">
         ให้ไว้ ณ วันที่&nbsp;
@@ -212,6 +213,7 @@ const res = await fetch(
           "ใบรับรองทักษะ";
 
         setCertificate({
+          activityName: data.activityName || "ไม่ระบุชื่อกิจกรรม",
           studentName,
           skills,
           certifiedDate,
