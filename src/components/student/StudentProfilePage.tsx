@@ -10,9 +10,14 @@ import { useAuth } from "@/context/auth-context";
 // ✅ ฟังก์ชันคำนวณปีการศึกษาและชั้นปี
 function getCurrentAcademicYear(): number {
   const now = new Date();
-  const currentYear = now.getFullYear();
   const currentMonth = now.getMonth() + 1;
-  return currentMonth < 6 ? currentYear - 1 : currentYear;
+
+  // ข้อมูล admissionYear ของนิสิตในระบบใช้ปีการศึกษา พ.ศ.
+  // เช่น รหัส 66xxxxxx = เข้าปีการศึกษา 2566
+  // ปีการศึกษาปัจจุบัน 2569 ในปี ค.ศ. 2026
+  const buddhistYear = now.getFullYear() + 543;
+
+  return currentMonth < 6 ? buddhistYear - 1 : buddhistYear;
 }
 
 function calculateYearOfStudy(admissionYear: number): number {
