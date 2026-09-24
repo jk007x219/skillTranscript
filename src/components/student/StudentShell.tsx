@@ -152,7 +152,11 @@ export default function StudentShell({
                 <div className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-full bg-slate-200 text-slate-600 shadow-sm">
                   {user?.profileImageUrl ? (
                     <img
-                      src={withBasePath(user.profileImageUrl)}
+                      src={withBasePath(
+                        user.profileImageUrl?.startsWith("/uploads/")
+                          ? `/api/profile-image${user.profileImageUrl}`
+                          : user.profileImageUrl
+                      )}
                       alt={displayName}
                       className="h-full w-full rounded-full object-cover"
                     />
@@ -243,7 +247,11 @@ export default function StudentShell({
           <div className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-full bg-white/20">
             {user?.profileImageUrl ? (
               <img
-                src={withBasePath(user.profileImageUrl)}
+                src={withBasePath(
+                        user.profileImageUrl?.startsWith("/uploads/")
+                          ? `/api/profile-image${user.profileImageUrl}`
+                          : user.profileImageUrl
+                      )}
                 alt={displayName}
                 className="h-full w-full rounded-full object-cover"
               />
