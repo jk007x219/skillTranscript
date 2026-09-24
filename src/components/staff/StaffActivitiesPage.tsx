@@ -642,7 +642,7 @@ function TimeField({
   required = false,
 }: {
   value: string;
-  onChange: (value: string) => void;
+  onChange: (value: string, part: "hour" | "minute") => void;
   required?: boolean;
 }) {
   const [hour = "", minute = ""] = value ? value.split(":") : [];
@@ -652,11 +652,11 @@ function TimeField({
     const nextMinute = part === "minute" ? nextValue : minute;
 
     if (!nextHour && !nextMinute) {
-      onChange("");
+      onChange("", part);
       return;
     }
 
-    onChange(`${nextHour || "00"}:${nextMinute || "00"}`);
+    onChange(`${nextHour || "00"}:${nextMinute || "00"}`, part);
   };
 
   return (
@@ -707,7 +707,7 @@ function DateTimeField({
   maxDate,
 }: {
   value: string;
-  onChange: (value: string, part: "date" | "time") => void;
+  onChange: (value: string, part: "date" | "hour" | "minute") => void;
   minDate?: string;
   maxDate?: string;
 }) {
@@ -729,8 +729,11 @@ function DateTimeField({
       />
       <TimeField
         value={time}
-        onChange={(nextTime) => {
-          onChange(date && nextTime ? `${date}T${nextTime}` : "", "time");
+        onChange={(nextTime, part) => {
+          onChange(
+            date && nextTime ? `${date}T${nextTime}` : "",
+            part,
+          );
         }}
       />
     </div>
@@ -952,16 +955,37 @@ function AddActivityModal({
                     if (form.endDate && nextDate && nextDate > form.endDate) {
                       return;
                     }
-                  } else if (
-                    form.registrationEnd &&
-                    value &&
-                    value >= form.registrationEnd
-                  ) {
-                    return;
+                  } else if (value && form.registrationEnd) {
+                    const startTime = value.slice(11, 16);
+                    const endTime = form.registrationEnd.slice(11, 16);
+
+                    if (part === "minute") {
+                      if (value >= form.registrationEnd) {
+                        return;
+                      }
+                    } else if (part === "hour" && startTime && endTime) {
+                      const startHour = Number(startTime.slice(0, 2));
+                      const endHour = Number(endTime.slice(0, 2));
+
+                      // ชั่วโมงเดียวกันเลือกได้ก่อน เพื่อให้ตั้งเวลาเช่น 09:00 - 09:30
+                      // เมื่อตั้งนาทีแล้วจะตรวจลำดับเวลาแบบเข้มงวด
+                      if (startHour > endHour) {
+                        return;
+                      }
+                      if (
+                        startHour === endHour &&
+                        form.registrationStart.slice(14, 16) !== "" &&
+                        form.registrationEnd.slice(14, 16) !== ""
+                      ) {
+                        if (value >= form.registrationEnd) {
+                          return;
+                        }
+                      }
+                    }
                   }
 
                   if (
-                    part === "time" &&
+                    (part === "minute" || part === "hour") &&
                     form.endDate &&
                     form.endTime &&
                     value &&
@@ -994,16 +1018,37 @@ function AddActivityModal({
                     if (nextDate && startDate && nextDate < startDate) {
                       return;
                     }
-                  } else if (
-                    form.registrationStart &&
-                    value &&
-                    value <= form.registrationStart
-                  ) {
-                    return;
+                  } else if (value && form.registrationStart) {
+                    const startTime = form.registrationStart.slice(11, 16);
+                    const endTime = value.slice(11, 16);
+
+                    if (part === "minute") {
+                      if (value <= form.registrationStart) {
+                        return;
+                      }
+                    } else if (part === "hour" && startTime && endTime) {
+                      const startHour = Number(startTime.slice(0, 2));
+                      const endHour = Number(endTime.slice(0, 2));
+
+                      // ชั่วโมงเดียวกันเลือกได้ก่อน เพื่อให้ตั้งเวลาเช่น 09:00 - 09:30
+                      // เมื่อตั้งนาทีแล้วจะตรวจลำดับเวลาแบบเข้มงวด
+                      if (endHour < startHour) {
+                        return;
+                      }
+                      if (
+                        endHour === startHour &&
+                        form.registrationStart.slice(14, 16) !== "" &&
+                        form.registrationEnd.slice(14, 16) !== ""
+                      ) {
+                        if (value <= form.registrationStart) {
+                          return;
+                        }
+                      }
+                    }
                   }
 
                   if (
-                    part === "time" &&
+                    (part === "minute" || part === "hour") &&
                     form.endDate &&
                     form.endTime &&
                     value &&
