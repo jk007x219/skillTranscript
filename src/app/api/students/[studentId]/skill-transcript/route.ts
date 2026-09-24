@@ -467,18 +467,20 @@ export async function GET(
           basic.max +
           intermediate.max +
           advanced.max,
+        // คะแนนประเมินคือ "จำนวนข้อ" จึงต้องเป็นจำนวนเต็ม
+        // ป้องกันการแสดงค่าแบบ 2.5/2.5, 7/8.3 หรือ 1.3/1.7
         assessmentCorrectCount:
           Math.round(
-            (basic.assessmentCorrect +
+            basic.assessmentCorrect +
               intermediate.assessmentCorrect +
-              advanced.assessmentCorrect) * 100
-          ) / 100,
+              advanced.assessmentCorrect
+          ),
         assessmentTotalCount:
           Math.round(
-            (basic.assessmentTotal +
+            basic.assessmentTotal +
               intermediate.assessmentTotal +
-              advanced.assessmentTotal) * 100
-          ) / 100,
+              advanced.assessmentTotal
+          ),
         percent,
       };
     });
