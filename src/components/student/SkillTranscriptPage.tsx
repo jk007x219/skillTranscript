@@ -96,9 +96,11 @@ const ESSENTIAL_SKILL_NAMES = [
 ];
 
 function formatScore(value: number) {
-  return Number.isInteger(value)
-    ? String(value)
-    : value.toFixed(1);
+  // คะแนนประเมินและคะแนนแยกตามทักษะ
+  // ต้องสื่อเป็นจำนวนข้อ จึงไม่แสดงทศนิยม
+  const integerValue = Math.round(Number(value) || 0);
+
+  return String(integerValue);
 }
 
 // ============================================================
