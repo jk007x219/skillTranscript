@@ -226,7 +226,7 @@ export default function ScanQrPage({
       }
 
       setScanResult(data);
-      setQrPayload("");
+      setQrPayload(data?.student?.studentId ? String(data.student.studentId) : "");
     } catch (error) {
       setScanError(error instanceof Error ? error.message : "สแกน QR ไม่สำเร็จ");
     } finally {
