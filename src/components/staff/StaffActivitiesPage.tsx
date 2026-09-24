@@ -3066,7 +3066,7 @@ export default function StaffActivitiesPage() {
             </button>
             <button
               type="button"
-              onClick={submitScan}
+              onClick={() => submitScan()}
               disabled={!scanActivityCode.trim() || !scanPayload.trim() || scanSubmitting}
               className="h-11 flex-1 rounded-xl bg-[#2455A4] text-sm font-semibold text-white transition hover:bg-[#1B3F80] disabled:bg-slate-300"
             >
