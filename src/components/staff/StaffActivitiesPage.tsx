@@ -2810,61 +2810,57 @@ export default function StaffActivitiesPage() {
                         </div>
                       )}
 
-                      <div className="my-4 h-px bg-slate-100" />
+                      {!external && (
+                        <>
+                          <div className="my-4 h-px bg-slate-100" />
 
-                      {/* สรุปตัวเลข + คำสั่งย่อย */}
-                      <div className="grid gap-3 sm:grid-cols-3">
-                        <StatBlock
-                          label="เปิดรับสมัคร"
-                          value={`${activity.attendeeCount || 0}/${activity.capacity || 0}`}
-                          caption="สมัครแล้ว / จำนวนที่รับ"
-                        >
-                          <ToggleRow
-                            label={activity.applicationEnabled ? "เปิดรับสมัครอยู่" : "ปิดรับสมัคร"}
-                            enabled={Boolean(activity.applicationEnabled)}
-                            onClick={() => updateWorkflow(activity.id, "applicationEnabled")}
-                          />
-                        </StatBlock>
+                          {/* สรุปตัวเลข + คำสั่งย่อยสำหรับกิจกรรมปกติเท่านั้น */}
+                          <div className="grid gap-3 sm:grid-cols-3">
+                            <StatBlock
+                              label="เปิดรับสมัคร"
+                              value={`${activity.attendeeCount || 0}/${activity.capacity || 0}`}
+                              caption="สมัครแล้ว / จำนวนที่รับ"
+                            >
+                              <ToggleRow
+                                label={activity.applicationEnabled ? "เปิดรับสมัครอยู่" : "ปิดรับสมัคร"}
+                                enabled={Boolean(activity.applicationEnabled)}
+                                onClick={() => updateWorkflow(activity.id, "applicationEnabled")}
+                              />
+                            </StatBlock>
 
-                        <StatBlock
-                          label="ลงทะเบียนนิสิต"
-                          value={activity.attendeeCount}
-                          caption="จำนวนผู้ลงทะเบียนเข้าร่วม"
-                        >
-                          <div className="flex gap-2">
-                            <ActionButton
-                              icon={QrCode}
-                              label="สแกน QR"
-                              onClick={() => openScanModal(activity)}
-                            />
-                            <ActionButton
-                              icon={Users}
-                              label="รายชื่อ"
-                              onClick={() => handleViewParticipants(activity.id)}
-                            />
+                            <StatBlock
+                              label="ลงทะเบียนนิสิต"
+                              value={activity.attendeeCount}
+                              caption="จำนวนผู้ลงทะเบียนเข้าร่วม"
+                            >
+                              <div className="flex gap-2">
+                                <ActionButton
+                                  icon={QrCode}
+                                  label="สแกน QR"
+                                  onClick={() => openScanModal(activity)}
+                                />
+                                <ActionButton
+                                  icon={Users}
+                                  label="รายชื่อ"
+                                  onClick={() => handleViewParticipants(activity.id)}
+                                />
+                              </div>
+                            </StatBlock>
+
+                            <StatBlock
+                              label="เปิด/ปิดแบบประเมิน"
+                              value={activity.evaluationCompletedCount}
+                              caption="ทำแบบประเมินแล้ว"
+                            >
+                              <ToggleRow
+                                label={activity.confirmationEnabled ? "เปิดแบบประเมิน" : "ปิดแบบประเมิน"}
+                                enabled={activity.confirmationEnabled}
+                                onClick={() => updateConfirmation(activity.id)}
+                              />
+                            </StatBlock>
                           </div>
-                        </StatBlock>
-
-                        {!external ? (
-                          <StatBlock
-                            label="เปิด/ปิดแบบประเมิน"
-                            value={activity.evaluationCompletedCount}
-                            caption="ทำแบบประเมินแล้ว"
-                          >
-                            <ToggleRow
-                              label={activity.confirmationEnabled ? "เปิดแบบประเมิน" : "ปิดแบบประเมิน"}
-                              enabled={activity.confirmationEnabled}
-                              onClick={() => updateConfirmation(activity.id)}
-                            />
-                          </StatBlock>
-                        ) : (
-                          <StatBlock
-                            label="ผู้ลงทะเบียนทั้งหมด"
-                            value={activity.registeredCount}
-                            caption="รวมทุกช่องทาง"
-                          />
-                        )}
-                      </div>
+                        </>
+                      )}
                     </article>
                   );
                 })
