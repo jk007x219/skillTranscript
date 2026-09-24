@@ -62,26 +62,35 @@ export default function ChangePasswordPage() {
       setMessage(data.message || "เปลี่ยนรหัสผ่านสำเร็จ");
       setSuccess(true);
 
-      // สำคัญ:
-      // refresh NextAuth session เพื่อให้ token/session
-      // อัปเดต mustChangePassword
-      await refreshUser();
+      // อัปเดต session แต่ห้ามให้การ refresh session ที่อาจใช้เวลานาน
+      // ขัดขวางการ redirect หลังเปลี่ยนรหัสผ่านสำเร็จ
+      try {
+        await Promise.race([
+          refreshUser(),
+          new Promise<void>((resolve) => setTimeout(resolve, 1500)),
+        ]);
+      } catch {
+        // ไม่ต้องหยุดการ redirect หาก session refresh มีปัญหา
+      }
 
-      // รอเล็กน้อยเพื่อให้ผู้ใช้เห็นข้อความสำเร็จ
+      // ใช้เส้นทางเดียวกับหลังเข้าสู่ระบบสำเร็จ
+      const destination =
+        user?.role === "teacher"
+          ? user.isExecutive
+            ? "/executive/dashboard"
+            : "/teacher/students"
+          : user?.role === "student"
+          ? "/student/dashboard"
+          : user?.role === "officer"
+          ? "/staff/dashboard"
+          : user?.role === "executive"
+          ? "/executive/dashboard"
+          : "/login";
+
+      // ให้ผู้ใช้เห็นข้อความสำเร็จสั้น ๆ แล้วเปลี่ยนหน้า
       setTimeout(() => {
-        if (user?.role === "student") {
-          router.replace("/student/dashboard");
-        } else if (
-          user?.role === "teacher" ||
-          user?.role === "executive"
-        ) {
-          router.replace("/teacher/students");
-        } else if (user?.role === "officer") {
-          router.replace("/staff");
-        } else {
-          router.replace("/login");
-        }
-      }, 1000);
+        router.replace(destination);
+      }, 700);
     } catch (err) {
       setError(
         err instanceof Error
