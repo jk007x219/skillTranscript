@@ -1618,6 +1618,7 @@ export default function StaffActivitiesPage() {
   const [scanActivity, setScanActivity] = useState<StaffActivity | null>(null);
   const [scanActivityCode, setScanActivityCode] = useState("");
   const [scanPayload, setScanPayload] = useState("");
+  const [scanStudentId, setScanStudentId] = useState("");
   const [scanMessage, setScanMessage] = useState("");
   const [scanError, setScanError] = useState("");
   const [scanSubmitting, setScanSubmitting] = useState(false);
@@ -2023,6 +2024,7 @@ export default function StaffActivitiesPage() {
     setScanActivity(activity);
     setScanActivityCode(activity.id);
     setScanPayload("");
+    setScanStudentId("");
     setScanMessage("");
     setScanError("");
     setCameraError("");
@@ -2045,6 +2047,7 @@ export default function StaffActivitiesPage() {
       const data = await res.json();
       if (!res.ok) throw new Error(data?.error || data?.message || "สแกน QR ไม่สำเร็จ");
       const studentName = `${data.student?.firstname || ""} ${data.student?.lastname || ""}`.trim();
+      setScanStudentId(String(data.student?.studentId || ""));
       setScanMessage(`ลงทะเบียนสำเร็จ: ${data.student?.studentId || ""}${studentName ? ` ${studentName}` : ""}`);
       setScanPayload("");
       await fetchActivities();
@@ -3028,12 +3031,15 @@ export default function StaffActivitiesPage() {
               )}
             </div>
 
-            <Field label="ข้อมูลจาก QR นิสิต">
+            <Field label="รับข้อมูลจากนิสิต">
               <textarea
-                value={scanPayload}
-                onChange={(e) => setScanPayload(e.target.value)}
+                value={scanStudentId || scanPayload}
+                onChange={(e) => {
+                  setScanStudentId("");
+                  setScanPayload(e.target.value);
+                }}
                 autoFocus
-                placeholder="สแกน QR ด้วยเครื่องสแกน หรือวางข้อมูล QR ที่นิสิตแสดง"
+                placeholder="รหัสนิสิตจะแสดงที่นี่หลังจากสแกน QR"
                 className="min-h-[120px] w-full resize-none rounded-lg border border-slate-200 bg-white p-3 text-sm text-slate-800 outline-none transition focus:border-[#2455A4] focus:ring-4 focus:ring-blue-100"
               />
             </Field>
