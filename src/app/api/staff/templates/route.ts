@@ -52,7 +52,10 @@ export async function GET(request: NextRequest) {
       templateId: row.templateId,
       name: row.name,
       description: row.description,
-      imageUrl: row.imageUrl,
+      // เสิร์ฟไฟล์แบบ dynamic ผ่าน API เพื่อให้ไฟล์ที่อัปโหลดหลัง build แสดงได้ทันทีใน production
+      imageUrl: row.imageUrl.startsWith("/uploads/templates/")
+        ? `/api/staff/templates/image/${row.imageUrl.replace("/uploads/templates/", "")}`
+        : row.imageUrl,
       fileType: row.fileType,
       status: row.status,
       uploadedBy: row.uploadedBy,
