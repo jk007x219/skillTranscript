@@ -532,7 +532,7 @@ export default function ScanQrPage({
                   disabled={!activity || !qrPayload.trim() || submitting}
                   className="mt-2 h-11 w-full rounded-xl bg-[#1565C0] text-sm font-semibold text-white hover:bg-[#0D47A1] disabled:bg-slate-300"
                 >
-                  {submitting ? "กำลังบันทึก..." : "ยืนยันการเข้าร่วม"}
+                  {submitting ? "กำลังบันทึก..." : "บันทึกการลงทะเบียน"}
                 </button>
               </div>
 
