@@ -45,6 +45,7 @@ type A = {
   qrPayload?: string | null;
   hours?: number | null;
   term?: string | null;
+  isExternal?: boolean;
   attendeeCount?: number;
   capacity?: number;
   applicantCount?: number;
@@ -172,13 +173,24 @@ function Card({
       </div>
       <div className="mt-auto flex gap-2 pt-5">
         {tab === "past" ? (
-          <button
-            onClick={onCertificate}
-            className="inline-flex h-11 flex-1 items-center justify-center gap-2 rounded-xl bg-[#2455A4] text-sm font-semibold text-white transition hover:bg-[#1B3F80]"
-          >
-            <FileBadge className="h-4 w-4" />
-            ดูใบรับรอง
-          </button>
+          a.isExternal ? (
+            <button
+              type="button"
+              disabled
+              className="h-11 flex-1 cursor-not-allowed rounded-xl bg-slate-100 text-sm font-semibold text-slate-400"
+              aria-disabled="true"
+            >
+              ไม่มีใบรับรองทักษะ
+            </button>
+          ) : (
+            <button
+              onClick={onCertificate}
+              className="inline-flex h-11 flex-1 items-center justify-center gap-2 rounded-xl bg-[#2455A4] text-sm font-semibold text-white transition hover:bg-[#1B3F80]"
+            >
+              <FileBadge className="h-4 w-4" />
+              ดูใบรับรอง
+            </button>
+          )
         ) : s === "applied" ? (
           <button
             type="button"
@@ -461,6 +473,7 @@ export default function StudentActivitiesPage() {
                           confirmationEnabled: false,
                           participationStatus: "completed",
                           qrPayload: null,
+                          isExternal: x.term === "ภายนอก",
                         }
                       : x;
                     return (
@@ -572,8 +585,8 @@ export default function StudentActivitiesPage() {
                     </div>
                   </div>
 
-                  {("term" in detail && detail.term) ||
-                  ("attendeeCount" in detail && detail.attendeeCount != null) ? (
+                  {(("term" in detail && detail.term) ||
+                  ("attendeeCount" in detail && detail.attendeeCount != null)) ? (
                     <div className="mt-3 flex flex-wrap gap-2">
                       {"term" in detail && detail.term ? (
                         <span className="rounded-full bg-blue-50 px-3 py-1.5 text-xs font-semibold text-[#2455A4]">
