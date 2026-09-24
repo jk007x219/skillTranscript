@@ -406,10 +406,21 @@ function DashboardPanel({
     return { ...item, percent: activityCount > 0 ? percent : 0 };
   });
 
-  // รายการด้านขวาแสดงเฉพาะทักษะที่มีข้อมูลจริง
-  const visibleItems = activeTab === "all"
-    ? items.filter((item) => item.activityCount > 0)
-    : grouped[activeTab];
+  // Progress Bar ต้องใช้ค่าคะแนนจากชุด chartItems ที่เลือกแท็บเดียวกับ Radar
+  // เพื่อให้ "รวม / พื้นฐาน / กลาง / สูง" แสดงข้อมูลตรงกัน
+  const visibleItems =
+    activeTab === "all"
+      ? chartItems.filter((item) => item.activityCount > 0)
+      : chartItems.filter((item) => {
+          const activityCount =
+            activeTab === "basic"
+              ? item.basicActivityCount ?? 0
+              : activeTab === "intermediate"
+                ? item.intermediateActivityCount ?? 0
+                : item.advancedActivityCount ?? 0;
+
+          return activityCount > 0;
+        });
 
 
   const tabs: Array<{ key: ProgressTab; count: number }> = [
