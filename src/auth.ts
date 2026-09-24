@@ -87,7 +87,7 @@ export const {
              s.major AS studentMajor,
              s.year,
              s.phone AS studentPhone,
-             s.profileImageUrl,
+             COALESCE(s.profileImageUrl, t.profileImageUrl, o.profileImageUrl) AS profileImageUrl,
              s.admissionYear,
              t.firstname AS teacherFirstName,
              t.lastname AS teacherLastName,
@@ -106,9 +106,9 @@ export const {
            LEFT JOIN teacher ta ON ta.userId = a.advisorUserId
            WHERE LOWER(u.email) = ?
            GROUP BY u.userId, u.email, u.password, u.role, u.status, u.must_change_password,
-                    s.studentId, s.firstname, s.lastname, s.faculty, s.major, s.year, s.phone, s.profileImageUrl, s.admissionYear,
-                    t.firstname, t.lastname, t.faculty, t.program, t.isExecutive,
-                    o.firstname, o.lastname, o.faculty`,
+                    s.studentId, s.firstname, s.lastname, s.faculty, s.major, s.year, s.phone, s.admissionYear,
+                    t.firstname, t.lastname, t.faculty, t.program, t.isExecutive, t.profileImageUrl,
+                    o.firstname, o.lastname, o.faculty, o.profileImageUrl`,
           [email]
         );
 
