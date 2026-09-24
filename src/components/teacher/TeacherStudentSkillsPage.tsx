@@ -155,7 +155,31 @@ function RadarChart({ accent, values, labels, id }: { accent: string; values: nu
   );
 }
 
-function ProgressList({ items, accent, onSkillClick }: { items: SkillWithIcon[]; accent: string; onSkillClick?: (skill: SkillWithIcon) => void }) {\n  if (items.length === 0) return <div className="flex h-full min-h-[160px] items-center justify-center rounded-xl border border-dashed border-slate-200 px-4 py-6 text-center text-sm text-slate-400">ยังไม่มีข้อมูลทักษะในหมวดนี้</div>;\n  return <div className="space-y-2.5">{items.map((item) => <div key={item.skillId} onClick={() => onSkillClick?.(item)} className="flex cursor-pointer items-center gap-3 rounded-xl border border-slate-100 bg-white px-3 py-2.5 transition-colors hover:border-slate-200"><div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-slate-50 text-slate-700"><item.icon className="h-4.5 w-4.5" aria-hidden="true" /></div><div className="min-w-0 flex-1"><p className="truncate text-sm font-medium text-slate-700">{item.skillName}</p><div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-slate-100"><div className="h-full rounded-full transition-all duration-500" style={{ width: "${item.percent}%", backgroundColor: accent }} /></div></div><span className="shrink-0 text-sm font-semibold tabular-nums text-slate-700">{item.percent}%</span></div>)}</div>;\n}\ntype SkillLevel = "basic" | "intermediate" | "advanced";
+function ProgressList({ items, accent, onSkillClick }: { items: SkillWithIcon[]; accent: string; onSkillClick?: (skill: SkillWithIcon) => void }) {
+  if (items.length === 0) {
+    return <div className="flex h-full min-h-[160px] items-center justify-center rounded-xl border border-dashed border-slate-200 px-4 py-6 text-center text-sm text-slate-400">ยังไม่มีข้อมูลทักษะในหมวดนี้</div>;
+  }
+
+  return (
+    <div className="space-y-2.5">
+      {items.map((item) => (
+        <div key={item.skillId} onClick={() => onSkillClick?.(item)} className="flex cursor-pointer items-center gap-3 rounded-xl border border-slate-100 bg-white px-3 py-2.5 transition-colors hover:border-slate-200">
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-slate-50 text-slate-700">
+            <item.icon className="h-4.5 w-4.5" aria-hidden="true" />
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-sm font-medium text-slate-700">{item.skillName}</p>
+            <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-slate-100">
+              <div className="h-full rounded-full transition-all duration-500" style={{ width: `${item.percent}%`, backgroundColor: accent }} />
+            </div>
+          </div>
+          <span className="shrink-0 text-sm font-semibold tabular-nums text-slate-700">{item.percent}%</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+type SkillLevel = "basic" | "intermediate" | "advanced";
 type ProgressTab = SkillLevel | "all";
 
 const levelLabels: Record<ProgressTab, string> = {
@@ -210,4 +234,15 @@ function DashboardPanel({ title, subtitle, accent, items, chartId, onSkillClick 
   });
 
   // รายการด้านขวา: รวมเฉพาะทักษะที่มีข้อมูลจริง
-  const visibleItems =\n    activeTab === "all"\n      ? chartItems.filter((item) => item.activities > 0)\n      : chartItems.filter((item) => {\n          const activityCount = activeTab === "basic" ? item.basicActivityCount ?? 0 : activeTab === "intermediate" ? item.intermediateActivityCount ?? 0 : item.advancedActivityCount ?? 0;\n          return activityCount > 0;\n        });
+  const visibleItems =
+    activeTab === "all"
+      ? chartItems.filter((item) => item.activities > 0)
+      : chartItems.filter((item) => {
+          const activityCount =
+            activeTab === "basic"
+              ? item.basicActivityCount ?? 0
+              : activeTab === "intermediate"
+                ? item.intermediateActivityCount ?? 0
+                : item.advancedActivityCount ?? 0;
+          return activityCount > 0;
+        });
