@@ -86,33 +86,33 @@ function CertificatePreview({ certificate }: { certificate: CertificateData }) {
       </div>
 
       <div className="absolute left-[10%] right-[10%] top-[18%] text-center text-[#173F70]">
-        <p className="text-[18px] font-bold sm:text-2xl">ใบรับรองทักษะ</p>
-        <p className="mt-2 text-[11px] font-bold sm:text-base">{certificate.activityName || "-"}</p>
-        <p className="mt-1 text-[8px] font-bold sm:text-xs">คณะวิทยาศาสตร์และนวัตกรรมดิจิทัล มหาวิทยาลัยทักษิณ</p>
+        <p className="text-[24px] font-bold sm:text-4xl">ใบรับรองทักษะ</p>
+        <p className="mt-2 text-[15px] font-bold sm:text-xl">{certificate.activityName || "-"}</p>
+        <p className="mt-1 text-[11px] font-bold sm:text-sm">คณะวิทยาศาสตร์และนวัตกรรมดิจิทัล มหาวิทยาลัยทักษิณ</p>
       </div>
 
       <div className="absolute left-[15%] right-[15%] top-[38%] text-center text-[#24466D]">
-        <p className="text-[10px] font-bold sm:text-sm">ขอรับรองว่า</p>
+        <p className="text-[13px] font-bold sm:text-lg">ขอรับรองว่า</p>
       </div>
 
       <div className="absolute left-[15%] right-[15%] top-[44%] flex justify-center">
-        <div className="rounded-md bg-white/85 px-4 py-1 text-center text-[21px] font-bold leading-tight text-[#173F70] sm:text-3xl md:text-4xl">
+        <div className="rounded-md bg-white/85 px-4 py-1 text-center text-[27px] font-bold leading-tight text-[#173F70] sm:text-4xl md:text-5xl">
           {certificate.studentName || "-"}
         </div>
       </div>
 
       <div className="absolute left-[14%] right-[14%] top-[56%] text-center text-[#24466D]">
-        <p className="text-[9px] font-bold sm:text-sm">ได้รับทักษะการรับรองทักษะ</p>
+        <p className="text-[12px] font-bold sm:text-lg">ได้รับทักษะการรับรองทักษะ</p>
         <div className="mt-2 rounded-md bg-white/80 px-3 py-2">
           {certificate.skills.map((skill) => (
-            <p key={`${skill.name}-${skill.level}`} className="text-[9px] font-bold leading-tight text-[#173F70] sm:text-sm">
+            <p key={`${skill.name}-${skill.level}`} className="text-[12px] font-bold leading-tight text-[#173F70] sm:text-lg">
               {skill.name} ระดับ{skill.level}
             </p>
           ))}
         </div>
       </div>
       {/* วันที่รับรอง */}
-      <div className="absolute left-[28%] right-[28%] top-[77%] text-center text-[10px] font-medium text-[#24466D] sm:text-sm">
+      <div className="absolute left-[28%] right-[28%] top-[77%] text-center text-[13px] font-medium text-[#24466D] sm:text-lg">
         ให้ไว้ ณ วันที่&nbsp;
         {formatThaiDate(certificate.certifiedDate)}
       </div>
@@ -126,10 +126,10 @@ function CertificatePreview({ certificate }: { certificate: CertificateData }) {
           />
         )}
         <div className="mb-2 border-t border-[#24466D]" />
-        <p className="text-[8px] font-medium text-[#24466D] sm:text-xs">
+        <p className="text-[11px] font-medium text-[#24466D] sm:text-base">
           ( {certificate.signerName || "-"} )
         </p>
-        <p className="mt-1 text-[7px] leading-tight text-[#24466D] sm:text-[10px]">
+        <p className="mt-1 text-[10px] leading-tight text-[#24466D] sm:text-sm">
           คณบดีคณะวิทยาศาสตร์และนวัตกรรมดิจิทัล
           <br />
           มหาวิทยาลัยทักษิณ

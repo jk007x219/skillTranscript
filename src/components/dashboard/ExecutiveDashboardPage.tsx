@@ -435,19 +435,29 @@ export default function ExecutiveDashboardPage() {
            PRINT / PDF
         ================================================== */
 
+        @import url("https://fonts.googleapis.com/css2?family=Sarabun:wght@400;500;600;700&display=swap");
+
         @media print {
           @page {
             size: A4 portrait;
-            margin: 15mm 14mm 15mm 14mm;
+            margin: 16mm 16mm 18mm 16mm;
           }
 
           html,
           body {
             background: #ffffff !important;
-            color: #111827 !important;
+            color: #1f2937 !important;
             -webkit-print-color-adjust: exact !important;
             print-color-adjust: exact !important;
+            font-family: "Sarabun", "TH Sarabun New", "Noto Sans Thai", sans-serif !important;
           }
+
+          .executive-dashboard-print,
+          .executive-dashboard-print * {
+            font-family: "Sarabun", "TH Sarabun New", "Noto Sans Thai", sans-serif !important;
+          }
+
+
 
           /* ================================================
              ซ่อน Header / Sidebar / ปุ่ม / Filter
@@ -484,7 +494,7 @@ export default function ExecutiveDashboardPage() {
           }
 
           /* ================================================
-             Print Header
+             Print Header — ตราครุฑ / ชื่อหน่วยงาน / เลขที่เอกสาร
           ================================================= */
 
           .executive-dashboard-print
@@ -492,28 +502,92 @@ export default function ExecutiveDashboardPage() {
             display: flex !important;
             align-items: flex-start !important;
             justify-content: space-between !important;
-            gap: 20px !important;
+            gap: 16px !important;
 
-            margin-bottom: 18px !important;
-            padding-bottom: 12px !important;
+            margin-bottom: 4px !important;
+            padding-bottom: 0 !important;
 
-            border-bottom: 2px solid #1e3a8a !important;
+            border-bottom: 0 !important;
           }
 
           .executive-dashboard-print
-            .print-report-header
-            p {
-            margin: 0 0 3px 0 !important;
-            color: #374151 !important;
-            line-height: 1.5 !important;
+            .print-header-text {
+            flex: 1 !important;
           }
 
           .executive-dashboard-print
-            .print-report-header
-            p:first-child {
-            color: #111827 !important;
-            font-size: 14px !important;
+            .print-header-text
+            .print-org-th {
+            margin: 0 !important;
+            font-size: 19px !important;
             font-weight: 700 !important;
+            color: #0f2f66 !important;
+            letter-spacing: 0.2px !important;
+          }
+
+          .executive-dashboard-print
+            .print-header-text
+            .print-org-sub {
+            margin: 2px 0 0 0 !important;
+            font-size: 12px !important;
+            color: #4b5563 !important;
+          }
+
+          .executive-dashboard-print
+            .print-header-text
+            .print-doc-title {
+            margin: 12px 0 0 0 !important;
+            font-size: 16px !important;
+            font-weight: 700 !important;
+            color: #111827 !important;
+          }
+
+          .executive-dashboard-print
+            .print-header-meta {
+            flex-shrink: 0 !important;
+            text-align: right !important;
+            font-size: 10.5px !important;
+            color: #6b7280 !important;
+            line-height: 1.75 !important;
+            white-space: nowrap !important;
+          }
+
+          .executive-dashboard-print
+            .print-header-meta
+            strong {
+            color: #111827 !important;
+            font-weight: 700 !important;
+          }
+
+          .executive-dashboard-print
+            .print-header-divider {
+            display: block !important;
+            height: 0 !important;
+            margin: 10px 0 14px 0 !important;
+            border-top: 2.2pt solid #0f2f66 !important;
+            border-bottom: 1pt solid #c9a227 !important;
+          }
+
+          .executive-dashboard-print
+            .print-filter-line {
+            display: block !important;
+            margin: -6px 0 16px 0 !important;
+            padding: 7px 12px !important;
+
+            border: 1pt solid #dbe3ef !important;
+            border-left: 3pt solid #c9a227 !important;
+            border-radius: 3px !important;
+
+            background: #f7f9fc !important;
+
+            font-size: 11px !important;
+            color: #374151 !important;
+          }
+
+          .executive-dashboard-print
+            .print-filter-line
+            strong {
+            color: #0f2f66 !important;
           }
 
           /* ================================================
@@ -523,11 +597,15 @@ export default function ExecutiveDashboardPage() {
           .executive-dashboard-print
             .print-overview {
             display: grid !important;
-            grid-template-columns: repeat(3, 1fr) !important;
-            gap: 8px !important;
+            grid-template-columns: repeat(4, 1fr) !important;
+            gap: 0 !important;
 
             margin-top: 0 !important;
-            margin-bottom: 18px !important;
+            margin-bottom: 20px !important;
+
+            border: 1pt solid #dbe3ef !important;
+            border-radius: 4px !important;
+            overflow: hidden !important;
           }
 
           .executive-dashboard-print
@@ -537,8 +615,9 @@ export default function ExecutiveDashboardPage() {
 
             padding: 10px 12px !important;
 
-            border: 1px solid #d1d5db !important;
-            border-radius: 6px !important;
+            border: 0 !important;
+            border-right: 1pt solid #e5e9f2 !important;
+            border-radius: 0 !important;
 
             background: #ffffff !important;
 
@@ -546,6 +625,12 @@ export default function ExecutiveDashboardPage() {
 
             break-inside: avoid !important;
             page-break-inside: avoid !important;
+          }
+
+          .executive-dashboard-print
+            .print-overview
+            > div:last-child {
+            border-right: 0 !important;
           }
 
           .executive-dashboard-print
@@ -564,24 +649,28 @@ export default function ExecutiveDashboardPage() {
           .executive-dashboard-print
             .print-overview
             p:first-child {
-            font-size: 9px !important;
+            font-size: 10px !important;
+            font-weight: 600 !important;
             color: #6b7280 !important;
+            text-transform: uppercase !important;
+            letter-spacing: 0.4px !important;
           }
 
           .executive-dashboard-print
             .print-overview
             p:nth-child(2) {
-            margin-top: 3px !important;
-            font-size: 16px !important;
+            margin-top: 4px !important;
+            font-size: 21px !important;
             font-weight: 700 !important;
-            color: #111827 !important;
+            color: #0f2f66 !important;
           }
 
           .executive-dashboard-print
             .print-overview
             p:nth-child(3) {
-            font-size: 8px !important;
-            color: #6b7280 !important;
+            margin-top: 1px !important;
+            font-size: 9.5px !important;
+            color: #9ca3af !important;
           }
 
           /* ================================================
@@ -625,22 +714,25 @@ export default function ExecutiveDashboardPage() {
             h2 {
             margin: 0 !important;
             padding-bottom: 7px !important;
+            padding-left: 8px !important;
 
-            border-bottom: 1px solid #d1d5db !important;
+            border-bottom: 1.4pt solid #0f2f66 !important;
+            border-left: 3pt solid #c9a227 !important;
 
-            font-size: 13px !important;
+            font-size: 15px !important;
             font-weight: 700 !important;
-            color: #111827 !important;
+            color: #0f2f66 !important;
           }
 
           .executive-dashboard-print
             .print-pdf-skills
             > p {
-            margin-top: 5px !important;
-            margin-bottom: 8px !important;
+            margin-top: 6px !important;
+            margin-bottom: 10px !important;
 
-            font-size: 9px !important;
+            font-size: 10.5px !important;
             color: #6b7280 !important;
+            font-style: italic !important;
           }
 
           .executive-dashboard-print
@@ -652,7 +744,7 @@ export default function ExecutiveDashboardPage() {
 
             table-layout: fixed !important;
 
-            font-size: 8.5px !important;
+            font-size: 10.5px !important;
           }
 
           .executive-dashboard-print
@@ -670,14 +762,21 @@ export default function ExecutiveDashboardPage() {
 
           .executive-dashboard-print
             .print-pdf-skills
+            tbody
+            tr:nth-child(even) {
+            background: #f6f8fb !important;
+          }
+
+          .executive-dashboard-print
+            .print-pdf-skills
             th {
-            padding: 7px 5px !important;
+            padding: 8px 6px !important;
 
-            border: 1px solid #d1d5db !important;
+            border: 1pt solid #0f2f66 !important;
 
-            background: #f3f4f6 !important;
+            background: #0f2f66 !important;
 
-            color: #374151 !important;
+            color: #ffffff !important;
 
             font-weight: 700 !important;
           }
@@ -685,9 +784,9 @@ export default function ExecutiveDashboardPage() {
           .executive-dashboard-print
             .print-pdf-skills
             td {
-            padding: 6px 5px !important;
+            padding: 7px 6px !important;
 
-            border: 1px solid #e5e7eb !important;
+            border: 1pt solid #dbe3ef !important;
 
             color: #374151 !important;
 
@@ -711,9 +810,11 @@ export default function ExecutiveDashboardPage() {
 
           .executive-dashboard-print
             .print-summary-box {
-            border: 1px solid #d1d5db !important;
+            border: 1pt solid #dbe3ef !important;
+            border-top: 2.2pt solid #c9a227 !important;
 
             padding: 9px 11px !important;
+            background: #f7f9fc !important;
 
             break-inside: avoid !important;
             page-break-inside: avoid !important;
@@ -728,7 +829,7 @@ export default function ExecutiveDashboardPage() {
           .executive-dashboard-print
             .print-summary-box
             p:first-child {
-            font-size: 8.5px !important;
+            font-size: 10px !important;
             color: #6b7280 !important;
           }
 
@@ -737,11 +838,11 @@ export default function ExecutiveDashboardPage() {
             p:last-child {
             margin-top: 3px !important;
 
-            font-size: 13px !important;
+            font-size: 17px !important;
 
             font-weight: 700 !important;
 
-            color: #111827 !important;
+            color: #0f2f66 !important;
           }
 
           /* ================================================
@@ -760,11 +861,14 @@ export default function ExecutiveDashboardPage() {
             h2 {
             margin: 0 !important;
             padding-bottom: 7px !important;
+            padding-left: 8px !important;
 
-            border-bottom: 1px solid #d1d5db !important;
+            border-bottom: 1.4pt solid #0f2f66 !important;
+            border-left: 3pt solid #c9a227 !important;
 
-            font-size: 13px !important;
+            font-size: 15px !important;
             font-weight: 700 !important;
+            color: #0f2f66 !important;
           }
 
           .executive-dashboard-print
@@ -776,7 +880,7 @@ export default function ExecutiveDashboardPage() {
 
             border-collapse: collapse !important;
 
-            font-size: 8.5px !important;
+            font-size: 10.5px !important;
           }
 
           .executive-dashboard-print
@@ -785,16 +889,24 @@ export default function ExecutiveDashboardPage() {
           .executive-dashboard-print
             .print-level-summary
             td {
-            padding: 6px 5px !important;
+            padding: 7px 6px !important;
 
-            border: 1px solid #d1d5db !important;
+            border: 1pt solid #dbe3ef !important;
           }
 
           .executive-dashboard-print
             .print-level-summary
             th {
-            background: #f3f4f6 !important;
+            background: #0f2f66 !important;
+            color: #ffffff !important;
             font-weight: 700 !important;
+          }
+
+          .executive-dashboard-print
+            .print-level-summary
+            tbody
+            tr:nth-child(even) {
+            background: #f6f8fb !important;
           }
 
           .executive-dashboard-print
@@ -827,22 +939,25 @@ export default function ExecutiveDashboardPage() {
             h2 {
             margin: 0 !important;
             padding-bottom: 7px !important;
+            padding-left: 8px !important;
 
-            border-bottom: 1px solid #d1d5db !important;
+            border-bottom: 1.4pt solid #0f2f66 !important;
+            border-left: 3pt solid #c9a227 !important;
 
-            font-size: 13px !important;
+            font-size: 15px !important;
             font-weight: 700 !important;
-            color: #111827 !important;
+            color: #0f2f66 !important;
           }
 
           .executive-dashboard-print
             .print-terms
             > p {
-            margin-top: 5px !important;
-            margin-bottom: 8px !important;
+            margin-top: 6px !important;
+            margin-bottom: 10px !important;
 
-            font-size: 9px !important;
+            font-size: 10.5px !important;
             color: #6b7280 !important;
+            font-style: italic !important;
           }
 
           .executive-dashboard-print
@@ -861,7 +976,7 @@ export default function ExecutiveDashboardPage() {
 
             table-layout: fixed !important;
 
-            font-size: 8.5px !important;
+            font-size: 10.5px !important;
           }
 
           .executive-dashboard-print
@@ -880,13 +995,13 @@ export default function ExecutiveDashboardPage() {
           .executive-dashboard-print
             .print-terms
             th {
-            padding: 7px 5px !important;
+            padding: 8px 6px !important;
 
-            border: 1px solid #d1d5db !important;
+            border: 1pt solid #0f2f66 !important;
 
-            background: #f3f4f6 !important;
+            background: #0f2f66 !important;
 
-            color: #374151 !important;
+            color: #ffffff !important;
 
             font-weight: 700 !important;
           }
@@ -894,14 +1009,21 @@ export default function ExecutiveDashboardPage() {
           .executive-dashboard-print
             .print-terms
             td {
-            padding: 6px 5px !important;
+            padding: 7px 6px !important;
 
-            border: 1px solid #e5e7eb !important;
+            border: 1pt solid #dbe3ef !important;
 
             color: #374151 !important;
 
             overflow-wrap: anywhere !important;
             word-break: break-word !important;
+          }
+
+          .executive-dashboard-print
+            .print-terms
+            tbody
+            tr:nth-child(even) {
+            background: #f6f8fb !important;
           }
 
           /* ซ่อนคอลัมน์แนวโน้ม */
@@ -920,13 +1042,17 @@ export default function ExecutiveDashboardPage() {
 
           .executive-dashboard-print
             .print-footer {
-            margin-top: 14px !important;
+            display: flex !important;
+            align-items: center !important;
+            justify-content: space-between !important;
 
-            padding-top: 7px !important;
+            margin-top: 20px !important;
 
-            border-top: 1px solid #e5e7eb !important;
+            padding-top: 8px !important;
 
-            font-size: 8px !important;
+            border-top: 1pt solid #dbe3ef !important;
+
+            font-size: 9px !important;
 
             color: #9ca3af !important;
           }
@@ -1013,28 +1139,52 @@ export default function ExecutiveDashboardPage() {
               Print Header
           ================================================== */}
 
-          <div className="print-report-header hidden items-center justify-between border-b border-slate-300 pb-3 text-xs text-slate-600">
-            <div>
-              <p className="font-semibold text-slate-900">
+          <div className="print-report-header hidden">
+            <div className="print-header-text">
+              <p className="print-org-th">
                 คณะวิทยาศาสตร์และนวัตกรรมดิจิทัล
                 มหาวิทยาลัยทักษิณ
               </p>
 
-              <p>
-                รายงานภาพรวมทักษะของนิสิต
+              <p className="print-org-sub">
+                Faculty of Science and Digital Innovation, Thaksin University
               </p>
 
-              <p className="mt-1">
-                {filterDescription}
+              <p className="print-doc-title">
+                รายงานสรุปภาพรวมทักษะของนิสิต
+                (Student Skill Transcript Summary)
               </p>
             </div>
 
-            <p>
-              พิมพ์เมื่อ{" "}
-              {new Date().toLocaleString(
-                "th-TH"
-              )}
-            </p>
+            <div className="print-header-meta">
+              <div>
+                เลขที่เอกสาร:{" "}
+                <strong>
+                  SKL-
+                  {new Date().getFullYear() + 543}
+                  -
+                  {String(Date.now()).slice(-5)}
+                </strong>
+              </div>
+
+              <div>
+                วันที่ออกรายงาน:{" "}
+                <strong>
+                  {new Date().toLocaleDateString("th-TH", {
+                    year: "numeric",
+                    month: "long",
+                    day: "numeric",
+                  })}
+                </strong>
+              </div>
+            </div>
+          </div>
+
+          <div className="print-header-divider hidden" />
+
+          <div className="print-filter-line hidden">
+            <strong>ขอบเขตข้อมูลในรายงาน:</strong>{" "}
+            {filterDescription}
           </div>
 
           {/* ==================================================
@@ -2008,10 +2158,13 @@ export default function ExecutiveDashboardPage() {
           ================================================== */}
 
           <div className="print-footer mt-4 text-xs text-slate-400">
-            * ข้อมูลอัปเดตล่าสุดเมื่อ{" "}
-            {new Date().toLocaleString(
-              "th-TH"
-            )}
+            <span>
+              เอกสารฉบับนี้จัดทำโดยระบบ Skill Transcript System
+              — ข้อมูลอัปเดตล่าสุดเมื่อ{" "}
+              {new Date().toLocaleString("th-TH")}
+            </span>
+
+            <span>คณะวิทยาศาสตร์และนวัตกรรมดิจิทัล มหาวิทยาลัยทักษิณ</span>
           </div>
         </div>
       </section>

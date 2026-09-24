@@ -1,4 +1,4 @@
-// components/executive/ExecutiveShell.tsx (ลบปุ่มกระดิ่ง)
+// components/executive/ExecutiveShell.tsx 
 "use client";
 
 import Image from "next/image";
