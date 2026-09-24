@@ -117,19 +117,20 @@ function CertificatePreview({ certificate }: { certificate: CertificateData }) {
         {formatThaiDate(certificate.certifiedDate)}
       </div>
 
-      <div className="absolute bottom-[7%] left-1/2 w-[34%] -translate-x-1/2 text-center">
+      {/* ลายเซ็นคณบดี: แยกจากวันที่ และจัดให้ภาพลายเซ็นพาดบนเส้นอย่างพอดี */}
+      <div className="absolute left-1/2 top-[81%] w-[34%] -translate-x-1/2 text-center">
         {certificate.deanSignatureUrl && (
           <img
             src={withBasePath(certificate.deanSignatureUrl)}
             alt="ลายเซ็นคณบดี"
-            className="mx-auto mb-[-2px] h-10 max-w-full object-contain"
+            className="relative z-10 mx-auto mb-[-9px] h-9 max-w-[75%] object-contain sm:h-11"
           />
         )}
-        <div className="mb-2 border-t border-[#24466D]" />
-        <p className="text-[11px] font-medium text-[#24466D] sm:text-base">
+        <div className="mb-1.5 border-t border-[#24466D]" />
+        <p className="text-[10px] font-medium leading-tight text-[#24466D] sm:text-base">
           ( {certificate.signerName || "-"} )
         </p>
-        <p className="mt-1 text-[10px] leading-tight text-[#24466D] sm:text-sm">
+        <p className="mt-0.5 text-[9px] leading-tight text-[#24466D] sm:text-sm">
           คณบดีคณะวิทยาศาสตร์และนวัตกรรมดิจิทัล
           <br />
           มหาวิทยาลัยทักษิณ
