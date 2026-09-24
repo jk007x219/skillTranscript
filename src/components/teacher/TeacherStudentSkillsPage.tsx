@@ -227,11 +227,21 @@ function DashboardPanel({ title, subtitle, accent, items, chartId, onSkillClick 
     return { ...item, percent: activityCount > 0 ? percent : 0 };
   });
 
-  // รายการด้านขวา: รวมเฉพาะทักษะที่มีข้อมูลจริง
+  // Progress Bar ต้องใช้ค่าคะแนนจากชุด chartItems ที่เลือกแท็บเดียวกับ Radar
+  // เพื่อให้ "รวม / พื้นฐาน / กลาง / สูง" แสดงข้อมูลตรงกัน
   const visibleItems =
     activeTab === "all"
-      ? items.filter((item) => item.activities > 0)
-      : grouped[activeTab];
+      ? chartItems.filter((item) => item.activities > 0)
+      : chartItems.filter((item) => {
+          const activityCount =
+            activeTab === "basic"
+              ? item.basicActivityCount ?? 0
+              : activeTab === "intermediate"
+                ? item.intermediateActivityCount ?? 0
+                : item.advancedActivityCount ?? 0;
+
+          return activityCount > 0;
+        });
 
   const tabs: Array<{ key: ProgressTab; count: number }> = [
     { key: "all", count: items.filter((item) => item.activities > 0).length },
