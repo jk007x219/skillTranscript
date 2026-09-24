@@ -61,9 +61,10 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
               s.firstname, s.lastname, s.program, s.major
        FROM participation p
        JOIN students s ON s.studentId = p.studentId
-       WHERE p.activityId = ? AND p.registrationQrToken = ?
+       WHERE p.activityId = ?
+         AND (p.registrationQrToken = ? OR p.studentId = ?)
        LIMIT 1`,
-      [id, payload.token],
+      [id, payload.token, payload.token],
     );
     const registration = registrations[0];
     if (!registration) {
