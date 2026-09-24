@@ -64,14 +64,27 @@ export default function TeacherStudentsPage() {
     fetchStudents();
   }, [user, authLoading]);
 
-  const filteredStudents = students.filter((student) => {
-    const search = searchTerm.toLowerCase();
-    return (
-      student.name.toLowerCase().includes(search) ||
-      student.studentId.toLowerCase().includes(search) ||
-      student.email.toLowerCase().includes(search)
-    );
-  });
+  // เรียงลำดับนิสิตตามชั้นปี: ปี 1 → ปี 2 → ปี 3 → ปี 4
+  // หากชั้นปีเท่ากัน ให้เรียงต่อด้วยรหัสนิสิต
+  const filteredStudents = students
+    .filter((student) => {
+      const search = searchTerm.toLowerCase();
+      return (
+        student.name.toLowerCase().includes(search) ||
+        student.studentId.toLowerCase().includes(search) ||
+        student.email.toLowerCase().includes(search)
+      );
+    })
+    .sort((a, b) => {
+      const yearA = a.year ?? Number.MAX_SAFE_INTEGER;
+      const yearB = b.year ?? Number.MAX_SAFE_INTEGER;
+
+      if (yearA !== yearB) {
+        return yearA - yearB;
+      }
+
+      return a.studentId.localeCompare(b.studentId, "th");
+    });
 
   const handleViewSkills = (studentId: string) => {
     router.push(`/teacher/students/${studentId}/skills`);
