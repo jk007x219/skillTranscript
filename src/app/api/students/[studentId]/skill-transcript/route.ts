@@ -259,30 +259,28 @@ export async function GET(
           COALESCE(SUM(ps.maxScore), 0) AS maxPossibleScore,
 
           /*
-           * คะแนนดิบของแบบประเมินเป็นคะแนนถ่วงน้ำหนักตามระดับกิจกรรม:
-           * พื้นฐาน = 1, กลาง = 2, สูง = 3
-           * ดังนั้นหารคะแนนด้วยน้ำหนักจะได้จำนวนข้อที่ตอบถูก
+           * คะแนนประเมินต้องสื่อว่า
+           * "ตอบถูกกี่ข้อ / มีข้อประเมินทั้งหมดกี่ข้อ"
+           *
+           * participation_skill ของการประเมินปัจจุบันเก็บ
+           * earnedScore = จำนวนข้อที่ตอบถูก
+           * maxScore    = จำนวนข้อประเมินทั้งหมด
+           *
+           * ดังนั้นต้องรวมคะแนนจากทุกกิจกรรมที่นิสิตทำแบบประเมิน
+           * โดยไม่หารหรือถ่วงน้ำหนักตามระดับทักษะ
            */
           COALESCE(SUM(
             CASE
-              WHEN a_score.hasEvaluation = 1 THEN
-                CASE
-                  WHEN acs.level LIKE '%สูง%' THEN ps.earnedScore / 3
-                  WHEN acs.level LIKE '%กลาง%' THEN ps.earnedScore / 2
-                  ELSE ps.earnedScore
-                END
+              WHEN a_score.hasEvaluation = 1
+                THEN COALESCE(ps.earnedScore, 0)
               ELSE 0
             END
           ), 0) AS assessmentCorrectCount,
 
           COALESCE(SUM(
             CASE
-              WHEN a_score.hasEvaluation = 1 THEN
-                CASE
-                  WHEN acs.level LIKE '%สูง%' THEN ps.maxScore / 3
-                  WHEN acs.level LIKE '%กลาง%' THEN ps.maxScore / 2
-                  ELSE ps.maxScore
-                END
+              WHEN a_score.hasEvaluation = 1
+                THEN COALESCE(ps.maxScore, 0)
               ELSE 0
             END
           ), 0) AS assessmentTotalCount
