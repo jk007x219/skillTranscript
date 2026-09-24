@@ -132,7 +132,7 @@ export async function GET() {
       qrPayload: isPublic
         ? null
         : r.registrationQrToken
-          ? buildRegistrationQrPayload(r.activityId, r.registrationQrToken)
+          ? buildRegistrationQrPayload(r.activityId, r.registrationQrToken, r.studentId)
           : null,
     })));
   } catch (error) {
