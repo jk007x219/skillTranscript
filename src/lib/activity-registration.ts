@@ -1,4 +1,5 @@
 import type { RowDataPacket } from "mysql2";
+import { createCipheriv, createDecipheriv, createHash, randomBytes } from "crypto";
 import { pool } from "@/lib/db";
 
 export async function ensureActivityRegistrationColumns() {
@@ -14,11 +15,7 @@ export async function ensureActivityRegistrationColumns() {
   if (!columns.has("registrationEnd")) await pool.query("ALTER TABLE activity ADD COLUMN registrationEnd DATETIME NULL");
   if (!columns.has("registrationEnabled")) await pool.query("ALTER TABLE activity ADD COLUMN registrationEnabled TINYINT(1) NOT NULL DEFAULT 0");
   if (!columns.has("applicationEnabled")) await pool.query("ALTER TABLE activity ADD COLUMN applicationEnabled TINYINT(1) NOT NULL DEFAULT 0");
-
-  // กิจกรรมที่สร้างใหม่ต้องรอเจ้าหน้าที่เปิดการมองเห็นก่อน
-  if (columns.has("applicationEnabled")) {
-    await pool.query("ALTER TABLE activity ALTER COLUMN applicationEnabled SET DEFAULT 0");
-  }
+  if (columns.has("applicationEnabled")) await pool.query("ALTER TABLE activity ALTER COLUMN applicationEnabled SET DEFAULT 0");
 }
 
 export async function ensureParticipationStatusWorkflow() {
@@ -46,12 +43,39 @@ export async function ensureParticipationStatusWorkflow() {
   if (!columns.has("confirmedAt")) await pool.query("ALTER TABLE participation ADD COLUMN confirmedAt DATETIME NULL");
 }
 
-export function buildRegistrationQrPayload(activityId: string, token: string, studentId?: string) {
-  return studentId?.trim() || JSON.stringify({
+function getQrKey() {
+  const secret = process.env.AUTH_SECRET || process.env.NEXTAUTH_SECRET;
+  if (!secret) throw new Error("AUTH_SECRET is required for activity QR encryption");
+  return createHash("sha256").update(secret).digest();
+}
+
+/**
+ * QR ภายนอกจะเห็นเป็นข้อมูลเข้ารหัสแบบ opaque เท่านั้น
+ * จึงไม่สามารถอ่านรหัสกิจกรรมจากข้อความที่ได้จากการสแกนทั่วไปได้
+ */
+export function buildRegistrationQrPayload(activityId: string, token: string) {
+  return encryptRegistrationQrPayload(activityId, token);
+}
+
+function encryptRegistrationQrPayload(activityId: string, token: string) {
+  const iv = randomBytes(12);
+  const cipher = createCipheriv("aes-256-gcm", getQrKey(), iv);
+  const plaintext = JSON.stringify({
     type: "skilltranscript.activity.registration",
     activityId,
     token,
   });
+  const encrypted = Buffer.concat([cipher.update(plaintext, "utf8"), cipher.final()]);
+  const authTag = cipher.getAuthTag();
+
+  return [
+    "skilltranscript",
+    "qr",
+    "v1",
+    iv.toString("base64url"),
+    authTag.toString("base64url"),
+    encrypted.toString("base64url"),
+  ].join(":");
 }
 
 export function parseRegistrationQrPayload(value: unknown) {
@@ -59,32 +83,34 @@ export function parseRegistrationQrPayload(value: unknown) {
   const raw = value.trim();
   if (!raw) return null;
 
-  try {
-    const parsed = JSON.parse(raw);
-    if (
-      parsed?.type === "skilltranscript.activity.registration" &&
-      typeof parsed.activityId === "string" &&
-      typeof parsed.token === "string"
-    ) {
-      return {
-        activityId: parsed.activityId.trim(),
-        token: parsed.token.trim(),
-      };
-    }
-  } catch {}
-
-  const match = raw.match(/^skilltranscript:activity:([^:]+):registration:([^:]+)$/);
-  if (match) {
-    return {
-      activityId: match[1],
-      token: match[2],
-    };
+  const parts = raw.split(":");
+  if (parts.length !== 6 || parts[0] !== "skilltranscript" || parts[1] !== "qr" || parts[2] !== "v1") {
+    return null;
   }
 
-  return {
-    activityId: "",
-    token: raw,
-  };
+  try {
+    const [, , , ivPart, tagPart, cipherPart] = parts;
+    const decipher = createDecipheriv("aes-256-gcm", getQrKey(), Buffer.from(ivPart, "base64url"));
+    decipher.setAuthTag(Buffer.from(tagPart, "base64url"));
+    const decrypted = Buffer.concat([
+      decipher.update(Buffer.from(cipherPart, "base64url")),
+      decipher.final(),
+    ]);
+    const parsed = JSON.parse(decrypted.toString("utf8"));
+
+    if (
+      parsed?.type !== "skilltranscript.activity.registration" ||
+      typeof parsed.activityId !== "string" ||
+      typeof parsed.token !== "string"
+    ) return null;
+
+    return {
+      activityId: parsed.activityId.trim(),
+      token: parsed.token.trim(),
+    };
+  } catch {
+    return null;
+  }
 }
 
 export function toMySqlDateTime(value: unknown) {
