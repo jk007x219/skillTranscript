@@ -98,7 +98,7 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
       return NextResponse.json({
         message: "คุณสมัครกิจกรรมนี้แล้ว",
         status: existing[0].status,
-        qrPayload: buildRegistrationQrPayload(id, token),
+        qrPayload: buildRegistrationQrPayload(id, token, session.user.studentId),
         registrationQrToken: token,
       });
     }
@@ -116,7 +116,7 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
       {
         message: "สมัครกิจกรรมสำเร็จ",
         status: "applied",
-        qrPayload: buildRegistrationQrPayload(id, registrationQrToken),
+        qrPayload: buildRegistrationQrPayload(id, registrationQrToken, session.user.studentId),
         registrationQrToken,
       },
       { status: 201 },
