@@ -1851,6 +1851,34 @@ export default function StaffActivitiesPage() {
     setCameraStarting(false);
   }, []);
 
+  const submitScan = async (payload = scanPayload) => {
+    if (!scanActivity || !payload.trim()) return;
+    setScanSubmitting(true);
+    setScanError("");
+    setScanMessage("");
+    try {
+      const res = await fetch(apiPath(`/api/activities/${scanActivity.id}/scan-qr`), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          activityCode: scanActivityCode,
+          qrPayload: payload.trim(),
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data?.error || data?.message || "สแกน QR ไม่สำเร็จ");
+      const studentName = `${data.student?.firstname || ""} ${data.student?.lastname || ""}`.trim();
+      setScanStudentId(String(data.student?.studentId || ""));
+      setScanMessage(`ลงทะเบียนสำเร็จ: ${data.student?.studentId || ""}${studentName ? ` ${studentName}` : ""}`);
+      setScanPayload("");
+      await fetchActivities();
+    } catch (err) {
+      setScanError(err instanceof Error ? err.message : "เกิดข้อผิดพลาด");
+    } finally {
+      setScanSubmitting(false);
+    }
+  };
+
   const readCameraFrame = useCallback(async () => {
     const video = videoRef.current;
     if (!video) return;
@@ -1888,9 +1916,9 @@ export default function StaffActivitiesPage() {
 
         if (value) {
           setScanPayload(value);
-          setScanMessage("อ่าน QR สำเร็จ กดบันทึกการลงทะเบียนได้เลย");
           setScanError("");
           stopCamera();
+          await submitScan(value);
           return;
         }
       }
@@ -1899,7 +1927,7 @@ export default function StaffActivitiesPage() {
     }
 
     scanFrameRef.current = window.requestAnimationFrame(readCameraFrame);
-  }, [stopCamera]);
+  }, [stopCamera, submitScan]);
 
   const startCamera = useCallback(async () => {
     setCameraError("");
@@ -1993,11 +2021,11 @@ export default function StaffActivitiesPage() {
       }
 
       setScanPayload(result.data.trim());
-      setScanMessage("อ่าน QR จากรูปภาพสำเร็จ กดบันทึกการลงทะเบียนได้เลย");
+      await submitScan(result.data.trim());
     } catch (error) {
       setCameraError(error instanceof Error ? error.message : "อ่าน QR จากรูปภาพไม่สำเร็จ");
     }
-  }, []);
+  }, [submitScan]);
 
   const handleQrImageChange = useCallback(
     (event: ChangeEvent<HTMLInputElement>) => {
@@ -2028,34 +2056,6 @@ export default function StaffActivitiesPage() {
     setScanMessage("");
     setScanError("");
     setCameraError("");
-  };
-
-  const submitScan = async () => {
-    if (!scanActivity) return;
-    setScanSubmitting(true);
-    setScanError("");
-    setScanMessage("");
-    try {
-      const res = await fetch(apiPath(`/api/activities/${scanActivity.id}/scan-qr`), {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          activityCode: scanActivityCode,
-          qrPayload: scanPayload,
-        }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data?.error || data?.message || "สแกน QR ไม่สำเร็จ");
-      const studentName = `${data.student?.firstname || ""} ${data.student?.lastname || ""}`.trim();
-      setScanStudentId(String(data.student?.studentId || ""));
-      setScanMessage(`ลงทะเบียนสำเร็จ: ${data.student?.studentId || ""}${studentName ? ` ${studentName}` : ""}`);
-      setScanPayload("");
-      await fetchActivities();
-    } catch (err) {
-      setScanError(err instanceof Error ? err.message : "เกิดข้อผิดพลาด");
-    } finally {
-      setScanSubmitting(false);
-    }
   };
 
   // ===== สร้างกิจกรรม =====
