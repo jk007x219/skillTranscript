@@ -1,4 +1,4 @@
-// components/teacher/TeacherActivitiesPage.tsx
+// components/staff/TeacherActivitiesPage.tsx
 // รีดีไซน์เลเอาท์ใหม่ทั้งหมด: การ์ดกิจกรรมแบบชั้นเดียว อ่านง่าย ลดความรก
 // ตรรกะ/สถานะ/การเรียก API ทั้งหมดยังเหมือนเดิม มีการปรับเฉพาะโครงสร้าง UI
 
@@ -19,10 +19,14 @@ import {
   Users,
   X,
   Trash2,
+  Copy,
+  Check,
   Clock,
   Loader2,
   Edit,
   QrCode,
+  KeyRound,
+  CheckCircle2,
 } from "lucide-react";
 import TeacherShell from "@/components/teacher/TeacherShell";
 
@@ -65,7 +69,9 @@ declare global {
 }
 
 type ActivityStatus = "active" | "past";
+type ActivityDisplayStatus = "not_open" | "open" | "running" | "registration_closed" | "past";
 type ActivityCategory = "all" | "mine" | "past" | "external";
+type MineStatusFilter = "all" | "active" | "past";
 
 type ActivitySkill = {
   skillId?: string;
@@ -118,13 +124,20 @@ type TeacherActivity = {
   status: ActivityStatus;
   skills: ActivitySkill[];
   evaluation?: EvaluationQuestion[];
+  verificationCode?: string | null;
+  codeExpiresAt?: string | null;
   templateId?: string | null;
   registrationStart?: string | null;
   registrationEnd?: string | null;
+  registrationOpen?: boolean;
+  normalRegistrationOpen?: boolean;
+  emergencyRegistrationOpen?: boolean;
+  activityStarted?: boolean;
   createdBy?: string | null;
 };
 
 type ActivityForm = {
+  activityCode: string;
   title: string;
   description: string;
   startDate: string; // YYYY-MM-DD
@@ -149,6 +162,7 @@ type SkillOption = {
 
 const LEVELS = ["พื้นฐาน", "กลาง", "สูง"];
 const emptyForm: ActivityForm = {
+  activityCode: "",
   title: "",
   description: "",
   startDate: "",
@@ -266,6 +280,81 @@ function getActivityStartDateTime(activity: TeacherActivity): Date | null {
   return new Date(`${date}T${time}`);
 }
 
+function formatThaiDate(value?: string | null, short = false): string {
+  if (!value) return "ไม่ระบุ";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "ไม่ระบุ";
+
+  return date.toLocaleDateString("th-TH", {
+    year: "numeric",
+    month: short ? "short" : "long",
+    day: "numeric",
+  });
+}
+
+function formatThaiTime(value?: string | null): string {
+  if (!value) return "ไม่ระบุ";
+
+  const raw = String(value).trim();
+  let text = "";
+
+  // รองรับทั้งเวลา HH:mm / HH:mm:ss และวันที่เวลา ISO เช่น 2026-09-23T11:25:00.000Z
+  if (/^\d{2}:\d{2}/.test(raw)) {
+    text = raw.slice(0, 5);
+  } else {
+    const timeMatch = raw.match(/[T ](\d{2}:\d{2})/);
+    text = timeMatch?.[1] || "";
+  }
+
+  if (!text) return "ไม่ระบุ";
+
+  const date = new Date(`2000-01-01T${text}`);
+  if (Number.isNaN(date.getTime())) return "ไม่ระบุ";
+
+  return (
+    date.toLocaleTimeString("th-TH", {
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false,
+    }) + " น."
+  );
+}
+
+function formatActivityDateRange(activity: TeacherActivity): string {
+  const startDate = formatThaiDate(activity.date);
+  const endDate = activity.endDate ? formatThaiDate(activity.endDate) : startDate;
+
+  if (startDate === "ไม่ระบุ") return "ไม่ระบุวันที่";
+  if (endDate === startDate) return startDate;
+
+  return `${startDate} - ${endDate}`;
+}
+
+function formatActivityTimeRange(activity: TeacherActivity): string {
+  const startTime = formatThaiTime(activity.time);
+  const endTime = activity.endTime ? formatThaiTime(activity.endTime) : "";
+
+  if (startTime === "ไม่ระบุ") return "ไม่ระบุเวลา";
+  return endTime ? `${startTime} – ${endTime}` : startTime;
+}
+
+function formatRegistrationRange(activity: TeacherActivity): string {
+  const start = activity.registrationStart;
+  const end = activity.registrationEnd;
+
+  if (!start && !end) return "ไม่ระบุ";
+
+  const startText = start
+    ? `${formatThaiDate(start, true)} · ${formatThaiTime(start)}`
+    : "ไม่ระบุ";
+
+  const endText = end
+    ? `${formatThaiDate(end, true)} · ${formatThaiTime(end)}`
+    : "ไม่ระบุ";
+
+  return `${startText} - ${endText}`;
+}
+
 function isExternalActivity(activity: TeacherActivity) {
   return activity.location === "กิจกรรมภายนอก";
 }
@@ -276,7 +365,46 @@ function isActivityPast(activity: TeacherActivity, now: Date = new Date()) {
   const activityEnd = new Date(`${date}T${time}`);
   return !Number.isNaN(activityEnd.getTime()) && activityEnd < now;
 }
+function getActivityDisplayStatus(activity: TeacherActivity, now: Date = new Date()) {
+  const past = activity.status === "past" || isActivityPast(activity, now);
 
+  if (past) return {
+    key: "past" as ActivityDisplayStatus,
+    label: "สิ้นสุดกิจกรรม",
+    description: "กิจกรรมสิ้นสุดแล้ว",
+    badgeClass: "border border-slate-300 bg-slate-100 text-slate-600",
+    dotClass: "bg-slate-500",
+  };
+
+  // สวิตช์ของเจ้าหน้าที่เป็นตัวกำหนดสถานะหลัก
+  // เปิดรับสมัคร = แสดง "เปิดรับสมัครอยู่"
+  // ปิดรับสมัคร + เปิดลงทะเบียน = แสดง "เปิดลงทะเบียนอยู่"
+  // ปิดทั้งสอง = แสดง "ปิดรับสมัครแล้ว"
+  // วันที่มีไว้กำหนดสถานะ "สิ้นสุดกิจกรรม" เท่านั้น
+  if (activity.applicationEnabled) return {
+    key: "open" as ActivityDisplayStatus,
+    label: "เปิดรับสมัครอยู่",
+    description: "เจ้าหน้าที่เปิดสวิตช์รับสมัครอยู่",
+    badgeClass: "border border-sky-200 bg-sky-50 text-sky-700",
+    dotClass: "bg-sky-500",
+  };
+
+  if (activity.registrationEnabled) return {
+    key: "open" as ActivityDisplayStatus,
+    label: "เปิดลงทะเบียนอยู่",
+    description: "เจ้าหน้าที่เปิดสวิตช์ลงทะเบียนอยู่",
+    badgeClass: "border border-blue-200 bg-blue-100 text-blue-700",
+    dotClass: "bg-blue-600",
+  };
+
+  return {
+    key: "registration_closed" as ActivityDisplayStatus,
+    label: "ปิดรับสมัครแล้ว",
+    description: "เจ้าหน้าที่ปิดสวิตช์รับสมัครและลงทะเบียนแล้ว",
+    badgeClass: "border border-amber-200 bg-amber-50 text-amber-700",
+    dotClass: "bg-amber-500",
+  };
+}
 // ---------- shared presentational building blocks ----------
 
 // เชลล์กลางของโมดัลทั้งหมด ให้หน้าตาสม่ำเสมอ ลดโค้ดซ้ำ
@@ -507,6 +635,111 @@ function requestCameraStream(constraints: MediaStreamConstraints) {
   });
 }
 
+
+function TimeField({
+  value,
+  onChange,
+  required = false,
+}: {
+  value: string;
+  onChange: (value: string, part: "hour" | "minute") => void;
+  required?: boolean;
+}) {
+  const [hour = "", minute = ""] = value ? value.split(":") : [];
+
+  const updatePart = (part: "hour" | "minute", nextValue: string) => {
+    const nextHour = part === "hour" ? nextValue : hour;
+    const nextMinute = part === "minute" ? nextValue : minute;
+
+    if (!nextHour && !nextMinute) {
+      onChange("", part);
+      return;
+    }
+
+    onChange(`${nextHour || "00"}:${nextMinute || "00"}`, part);
+  };
+
+  return (
+    <div className="grid grid-cols-2 gap-2">
+      <select
+        value={hour}
+        onChange={(e) => updatePart("hour", e.target.value)}
+        className="staff-activity-input appearance-none bg-white pr-8"
+        required={required}
+        aria-label="ชั่วโมง"
+      >
+        <option value="">ชั่วโมง</option>
+        {Array.from({ length: 24 }, (_, index) => {
+          const item = String(index).padStart(2, "0");
+          return (
+            <option key={item} value={item}>
+              {item} นาฬิกา
+            </option>
+          );
+        })}
+      </select>
+
+      <select
+        value={minute}
+        onChange={(e) => updatePart("minute", e.target.value)}
+        className="staff-activity-input appearance-none bg-white pr-8"
+        required={required}
+        aria-label="นาที"
+      >
+        <option value="">นาที</option>
+        {Array.from({ length: 60 }, (_, index) => {
+          const item = String(index).padStart(2, "0");
+          return (
+            <option key={item} value={item}>
+              {item} นาที
+            </option>
+          );
+        })}
+      </select>
+    </div>
+  );
+}
+
+function DateTimeField({
+  value,
+  onChange,
+  minDate,
+  maxDate,
+}: {
+  value: string;
+  onChange: (value: string, part: "date" | "hour" | "minute") => void;
+  minDate?: string;
+  maxDate?: string;
+}) {
+  const date = value ? value.slice(0, 10) : "";
+  const time = value && value.length >= 16 ? value.slice(11, 16) : "";
+
+  return (
+    <div className="grid gap-2 sm:grid-cols-[1.15fr_1fr]">
+      <input
+        type="date"
+        value={date}
+        min={minDate}
+        max={maxDate}
+        onChange={(e) => {
+          const nextDate = e.target.value;
+          onChange(nextDate ? `${nextDate}T${time || ""}` : "", "date");
+        }}
+        className="staff-activity-input"
+      />
+      <TimeField
+        value={time}
+        onChange={(nextTime, part) => {
+          onChange(
+            date && nextTime ? `${date}T${nextTime}` : "",
+            part,
+          );
+        }}
+      />
+    </div>
+  );
+}
+
 // ---------- AddActivityModal ----------
 function AddActivityModal({
   form,
@@ -556,11 +789,28 @@ function AddActivityModal({
         }}
       >
         <div className="space-y-4">
+          {!isEditing && (
+            <Field
+              label="รหัสกิจกรรม"
+              hint="กำหนดเองได้ เช่น AI01, CS01, OPENHOUSE69 (ไม่เกิน 20 ตัวอักษร และห้ามซ้ำ)"
+            >
+              <input
+                value={form.activityCode}
+                onChange={(e) => onChange("activityCode", e.target.value.toUpperCase())}
+                className="staff-activity-input"
+                maxLength={20}
+                pattern="[A-Z0-9_-]{1,20}"
+                placeholder="เช่น AI01"
+                required
+              />
+            </Field>
+          )}
+
           <Field label="ชื่อกิจกรรม/อบรม">
             <input
               value={form.title}
               onChange={(e) => onChange("title", e.target.value)}
-              className="teacher-activity-input"
+              className="staff-activity-input"
               required
             />
           </Field>
@@ -570,7 +820,7 @@ function AddActivityModal({
               value={form.description}
               onChange={(e) => onChange("description", e.target.value)}
               rows={3}
-              className="teacher-activity-input min-h-[90px] resize-none py-2.5"
+              className="staff-activity-input min-h-[90px] resize-none py-2.5"
             />
           </Field>
         </div>
@@ -583,18 +833,15 @@ function AddActivityModal({
                 type="date"
                 value={form.startDate}
                 onChange={(e) => onChange("startDate", e.target.value)}
-                min={today}
-                className="teacher-activity-input"
+                min={isEditing ? undefined : today}
+                className="staff-activity-input"
                 required
               />
             </Field>
-            <Field label="เวลาเริ่มต้น">
-              <input
-                type="time"
+            <Field label="เวลาเริ่มต้น" hint="เลือกชั่วโมงและนาที">
+              <TimeField
                 value={form.startTime}
-                onChange={(e) => onChange("startTime", e.target.value)}
-                step="60"
-                className="teacher-activity-input"
+                onChange={(value) => onChange("startTime", value)}
                 required
               />
             </Field>
@@ -607,34 +854,30 @@ function AddActivityModal({
                   if (form.startDate && val && val < form.startDate) return;
                   onChange("endDate", val);
                 }}
-                min={form.startDate || today}
-                className="teacher-activity-input"
+                min={form.startDate || (isEditing ? undefined : today)}
+                className="staff-activity-input"
                 required
               />
             </Field>
-            <Field label="เวลาสิ้นสุด">
-              <input
-                type="time"
+            <Field label="เวลาสิ้นสุด" hint="เลือกชั่วโมงและนาที">
+              <TimeField
                 value={form.endTime}
-                onChange={(e) => {
-                  const val = e.target.value;
+                onChange={(value) => {
                   if (
                     form.startDate &&
                     form.startTime &&
-                    val &&
+                    value &&
                     !isValidEndDateTime(
                       form.startDate,
                       form.startTime,
                       form.endDate,
-                      val,
+                      value,
                     )
                   ) {
                     return;
                   }
-                  onChange("endTime", val);
+                  onChange("endTime", value);
                 }}
-                step="60"
-                className="teacher-activity-input"
                 required
               />
             </Field>
@@ -652,7 +895,7 @@ function AddActivityModal({
             <select
               value={form.term}
               onChange={(e) => onChange("term", e.target.value)}
-              className="teacher-activity-input appearance-none bg-white pr-8"
+              className="staff-activity-input appearance-none bg-white pr-8"
             >
               <option value="1">ภาคเรียนที่ 1</option>
               <option value="2">ภาคเรียนที่ 2</option>
@@ -663,7 +906,7 @@ function AddActivityModal({
             <input
               value={form.location}
               onChange={(e) => onChange("location", e.target.value)}
-              className="teacher-activity-input"
+              className="staff-activity-input"
             />
           </Field>
           <Field label="จำนวนที่รับนิสิต">
@@ -672,7 +915,7 @@ function AddActivityModal({
               min="1"
               value={form.capacity}
               onChange={(e) => onChange("capacity", e.target.value)}
-              className="teacher-activity-input"
+              className="staff-activity-input"
               placeholder="เช่น 30"
               required
             />
@@ -681,7 +924,7 @@ function AddActivityModal({
             <input
               value={form.organizer}
               onChange={(e) => onChange("organizer", e.target.value)}
-              className="teacher-activity-input"
+              className="staff-activity-input"
               placeholder="คณะวิทยาศาสตร์และนวัตกรรมดิจิทัล"
             />
           </Field>
@@ -696,19 +939,53 @@ function AddActivityModal({
           </p>
           <div className="mt-3 grid gap-3 sm:grid-cols-2">
             <Field label="เริ่มลงทะเบียน">
-              <input
-                type="datetime-local"
+              <DateTimeField
                 value={form.registrationStart}
-                onChange={(e) => {
-                  const value = e.target.value;
-                  if (
-                    form.registrationEnd &&
-                    value &&
-                    value >= form.registrationEnd
-                  ) {
-                    return;
+                minDate={isEditing ? undefined : today}
+                maxDate={form.endDate || undefined}
+                onChange={(value, part) => {
+                  if (part === "date") {
+                    const nextDate = value.slice(0, 10);
+                    const endDate = form.registrationEnd
+                      ? form.registrationEnd.slice(0, 10)
+                      : "";
+                    if (nextDate && endDate && nextDate > endDate) {
+                      return;
+                    }
+                    if (form.endDate && nextDate && nextDate > form.endDate) {
+                      return;
+                    }
+                  } else if (value && form.registrationEnd) {
+                    const startTime = value.slice(11, 16);
+                    const endTime = form.registrationEnd.slice(11, 16);
+
+                    if (part === "minute") {
+                      if (value >= form.registrationEnd) {
+                        return;
+                      }
+                    } else if (part === "hour" && startTime && endTime) {
+                      const startHour = Number(startTime.slice(0, 2));
+                      const endHour = Number(endTime.slice(0, 2));
+
+                      // ชั่วโมงเดียวกันเลือกได้ก่อน เพื่อให้ตั้งเวลาเช่น 09:00 - 09:30
+                      // เมื่อตั้งนาทีแล้วจะตรวจลำดับเวลาแบบเข้มงวด
+                      if (startHour > endHour) {
+                        return;
+                      }
+                      if (
+                        startHour === endHour &&
+                        form.registrationStart.slice(14, 16) !== "" &&
+                        form.registrationEnd.slice(14, 16) !== ""
+                      ) {
+                        if (value >= form.registrationEnd) {
+                          return;
+                        }
+                      }
+                    }
                   }
+
                   if (
+                    (part === "minute" || part === "hour") &&
                     form.endDate &&
                     form.endTime &&
                     value &&
@@ -716,31 +993,62 @@ function AddActivityModal({
                   ) {
                     return;
                   }
+
                   onChange("registrationStart", value);
                 }}
-                min={`${today}T00:00`}
-                max={
-                  form.endDate && form.endTime
-                    ? `${form.endDate}T${form.endTime}`
-                    : undefined
-                }
-                className="teacher-activity-input"
               />
             </Field>
             <Field label="สิ้นสุดลงทะเบียน">
-              <input
-                type="datetime-local"
+              <DateTimeField
                 value={form.registrationEnd}
-                onChange={(e) => {
-                  const value = e.target.value;
-                  if (
-                    form.registrationStart &&
-                    value &&
-                    value <= form.registrationStart
-                  ) {
-                    return;
+                minDate={
+                  form.registrationStart
+                    ? form.registrationStart.slice(0, 10)
+                    : isEditing
+                      ? undefined
+                      : today
+                }
+                maxDate={form.endDate || undefined}
+                onChange={(value, part) => {
+                  if (part === "date") {
+                    const nextDate = value.slice(0, 10);
+                    const startDate = form.registrationStart
+                      ? form.registrationStart.slice(0, 10)
+                      : "";
+                    if (nextDate && startDate && nextDate < startDate) {
+                      return;
+                    }
+                  } else if (value && form.registrationStart) {
+                    const startTime = form.registrationStart.slice(11, 16);
+                    const endTime = value.slice(11, 16);
+
+                    if (part === "minute") {
+                      if (value <= form.registrationStart) {
+                        return;
+                      }
+                    } else if (part === "hour" && startTime && endTime) {
+                      const startHour = Number(startTime.slice(0, 2));
+                      const endHour = Number(endTime.slice(0, 2));
+
+                      // ชั่วโมงเดียวกันเลือกได้ก่อน เพื่อให้ตั้งเวลาเช่น 09:00 - 09:30
+                      // เมื่อตั้งนาทีแล้วจะตรวจลำดับเวลาแบบเข้มงวด
+                      if (endHour < startHour) {
+                        return;
+                      }
+                      if (
+                        endHour === startHour &&
+                        form.registrationStart.slice(14, 16) !== "" &&
+                        form.registrationEnd.slice(14, 16) !== ""
+                      ) {
+                        if (value <= form.registrationStart) {
+                          return;
+                        }
+                      }
+                    }
                   }
+
                   if (
+                    (part === "minute" || part === "hour") &&
                     form.endDate &&
                     form.endTime &&
                     value &&
@@ -748,15 +1056,9 @@ function AddActivityModal({
                   ) {
                     return;
                   }
+
                   onChange("registrationEnd", value);
                 }}
-                min={form.registrationStart || `${today}T00:00`}
-                max={
-                  form.endDate && form.endTime
-                    ? `${form.endDate}T${form.endTime}`
-                    : undefined
-                }
-                className="teacher-activity-input"
               />
             </Field>
           </div>
@@ -769,7 +1071,7 @@ function AddActivityModal({
           <select
             value={form.templateId || ""}
             onChange={(e) => onTemplateChange(e.target.value)}
-            className="teacher-activity-input appearance-none bg-white pr-8"
+            className="staff-activity-input appearance-none bg-white pr-8"
           >
             <option value="">-- ไม่ระบุ --</option>
             {templates.map((t) => (
@@ -1115,20 +1417,31 @@ function EvaluationModal({
               </label>
               <div className="mt-1 flex flex-wrap gap-3">
                 {skillOptions.length > 0 ? (
-                  skillOptions.map((skill) => (
-                    <label
-                      key={skill}
-                      className="flex items-center gap-1.5 text-sm"
-                    >
-                      <input
-                        type="checkbox"
-                        checked={(q.skillNames || []).includes(skill)}
-                        onChange={() => toggleSkill(q.id, skill)}
-                        className="h-4 w-4 rounded border-slate-300 text-[#2455A4] focus:ring-[#2455A4]"
-                      />
-                      <span>{skill}</span>
-                    </label>
-                  ))
+                  skillOptions.map((skill) => {
+                    const activitySkill = activity.skills.find((s) => s.name === skill);
+                    return (
+                      <label
+                        key={skill}
+                        className={"flex items-center gap-2 rounded-lg border px-3 py-2 transition cursor-pointer " +
+                          ((q.skillNames || []).includes(skill)
+                            ? "border-[#2455A4] bg-blue-50"
+                            : "border-slate-200 bg-white hover:border-slate-300")}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={(q.skillNames || []).includes(skill)}
+                          onChange={() => toggleSkill(q.id, skill)}
+                          className="h-4 w-4 rounded border-slate-300 text-[#2455A4] focus:ring-[#2455A4]"
+                        />
+                        <span className="flex items-center gap-2 text-sm">
+                          <span className="font-medium text-slate-700">{skill}</span>
+                          <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-500">
+                            {activitySkill?.level || "ไม่ระบุระดับ"}
+                          </span>
+                        </span>
+                      </label>
+                    );
+                  })
                 ) : (
                   <span className="text-sm text-slate-400">
                     ไม่มีทักษะในกิจกรรมนี้ กรุณาเพิ่มทักษะก่อน
@@ -1168,11 +1481,122 @@ function EvaluationModal({
   );
 }
 
-export default function StaffActivitiesPage() {
+// ---------- VerificationCodeModal ----------
+function VerificationCodeModal({
+  code,
+  expiresAt,
+  onClose,
+  onRegenerate,
+  isRegenerating,
+}: {
+  code: string;
+  expiresAt: string;
+  onClose: () => void;
+  onRegenerate: () => void;
+  isRegenerating: boolean;
+}) {
+  const [copied, setCopied] = useState(false);
+  const handleCopy = () => {
+    navigator.clipboard.writeText(code);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+  const formatDate = (dateStr: string) => {
+    const date = new Date(dateStr);
+    return date.toLocaleString("th-TH", {
+      day: "numeric",
+      month: "long",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  };
+
+  return (
+    <ModalShell
+      title={code ? "รหัสยืนยันการเข้าร่วม" : "ยังไม่มีรหัสยืนยัน"}
+      onClose={onClose}
+      maxWidthClass="max-w-md"
+      zIndexClass="z-[90]"
+    >
+      <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-blue-50 text-[#2455A4]">
+        <KeyRound className="h-7 w-7" />
+      </div>
+
+      <div className="mt-6 space-y-5">
+        <div className="rounded-xl border border-slate-100 bg-slate-50 p-6 text-center">
+          <p className="text-sm text-slate-500">รหัสยืนยัน</p>
+          {code ? (
+            <p className="mt-2 font-mono text-4xl font-bold tracking-[0.3em] text-[#2455A4]">
+              {code}
+            </p>
+          ) : (
+            <p className="mt-2 text-sm text-slate-400">
+              ยังไม่มีรหัส กรุณาสร้างรหัสใหม่
+            </p>
+          )}
+        </div>
+
+        {code && (
+          <div className="flex items-center justify-between rounded-lg border border-slate-100 bg-slate-50 px-4 py-3">
+            <div className="flex items-center gap-3">
+              <Clock className="h-5 w-5 text-slate-400" />
+              <div>
+                <p className="text-xs text-slate-500">หมดอายุ</p>
+                <p className="text-sm font-medium text-slate-700">
+                  {formatDate(expiresAt)}
+                </p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={handleCopy}
+              className="inline-flex items-center gap-2 rounded-lg border border-[#2455A4] bg-white px-4 py-2 text-sm font-medium text-[#2455A4] transition hover:bg-blue-50"
+            >
+              {copied ? (
+                <>
+                  <Check className="h-4 w-4" /> คัดลอกแล้ว
+                </>
+              ) : (
+                <>
+                  <Copy className="h-4 w-4" /> คัดลอก
+                </>
+              )}
+            </button>
+          </div>
+        )}
+
+        <div className="flex gap-3">
+          {code && (
+            <button
+              type="button"
+              onClick={onRegenerate}
+              disabled={isRegenerating}
+              className="flex-1 h-11 rounded-xl border border-[#2455A4] text-sm font-semibold text-[#2455A4] transition hover:bg-blue-50 disabled:opacity-50"
+            >
+              {isRegenerating ? "กำลังสร้าง..." : "สร้างรหัสใหม่"}
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={onClose}
+            className={`${code ? "flex-1" : "w-full"} h-11 rounded-xl bg-[#2455A4] text-sm font-semibold text-white shadow-md transition hover:bg-[#1B3F80]`}
+          >
+            ปิด
+          </button>
+        </div>
+      </div>
+    </ModalShell>
+  );
+}
+
+// ---------- Main Page ----------
+export default function TeacherActivitiesPage() {
   const [activities, setActivities] = useState<TeacherActivity[]>([]);
   const [skillOptions, setSkillOptions] = useState<SkillOption[]>([]);
   const [templates, setTemplates] = useState<Template[]>([]);
   const [activeTab, setActiveTab] = useState<ActivityCategory>("mine");
+  const [mineStatusFilter, setMineStatusFilter] = useState<MineStatusFilter>("all");
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [form, setForm] = useState<ActivityForm>(emptyForm);
@@ -1182,6 +1606,10 @@ export default function StaffActivitiesPage() {
     useState<TeacherActivity | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [generatingId, setGeneratingId] = useState<string | null>(null);
+  const [isRegenerating, setIsRegenerating] = useState(false);
+  const [showCodeModal, setShowCodeModal] = useState(false);
+  const [modalActivityId, setModalActivityId] = useState<string | null>(null);
   const [showParticipantsModal, setShowParticipantsModal] = useState(false);
   const [participants, setParticipants] = useState<any[]>([]);
   const [selectedParticipantActivityId, setSelectedParticipantActivityId] =
@@ -1190,6 +1618,7 @@ export default function StaffActivitiesPage() {
   const [scanActivity, setScanActivity] = useState<TeacherActivity | null>(null);
   const [scanActivityCode, setScanActivityCode] = useState("");
   const [scanPayload, setScanPayload] = useState("");
+  const [scanStudentId, setScanStudentId] = useState("");
   const [scanMessage, setScanMessage] = useState("");
   const [scanError, setScanError] = useState("");
   const [scanSubmitting, setScanSubmitting] = useState(false);
@@ -1238,7 +1667,12 @@ export default function StaffActivitiesPage() {
     try {
       const res = await fetch(apiPath("/api/auth/session"));
       if (!res.ok) return;
-      const session = await res.json();
+      const text = await res.text();
+      if (!text.trim()) {
+        setCurrentUserId(null);
+        return;
+      }
+      const session = JSON.parse(text);
       setCurrentUserId(session?.user?.id ? String(session.user.id) : null);
     } catch (err) {
       console.error(err);
@@ -1276,22 +1710,33 @@ export default function StaffActivitiesPage() {
 
   const matchesActivityCategory = useCallback(
     (activity: TeacherActivity, category: ActivityCategory) => {
-      // อาจารย์เห็นได้เฉพาะกิจกรรมที่ตนเองสร้างเท่านั้น
-      if (!currentUserId || activity.createdBy !== currentUserId) {
-        return false;
-      }
+      if (category === "mine") {
+        if (!currentUserId || activity.createdBy !== currentUserId) return false;
 
-      const past = isActivityPast(activity);
+        if (mineStatusFilter === "past") {
+          return activity.status === "past" || isActivityPast(activity);
+        }
+
+        if (mineStatusFilter === "active") {
+          return activity.status !== "past" && !isActivityPast(activity);
+        }
+
+        return true;
+      }
 
       if (category === "past") {
-        return past;
+        return activity.status === "past" || isActivityPast(activity);
       }
 
-      // แท็บ "กิจกรรมที่สร้างโดยฉัน" แสดงเฉพาะกิจกรรมของอาจารย์
-      // ส่วนกิจกรรมที่สิ้นสุดแล้วจะแยกไปอยู่แท็บ "กิจกรรมที่สิ้นสุดแล้ว"
-      return category === "mine" && !past;
+      if (category === "external") {
+        return isExternalActivity(activity);
+      }
+
+      // กิจกรรมทั้งหมด: แสดงเฉพาะกิจกรรมที่กำลังดำเนินอยู่
+      // ไม่รวมกิจกรรมที่ถูกสิ้นสุดแล้ว หรือหมดเวลาจัดกิจกรรม
+      return activity.status !== "past" && !isActivityPast(activity);
     },
-    [currentUserId],
+    [currentUserId, mineStatusFilter],
   );
 
   const filteredActivities = useMemo(
@@ -1404,6 +1849,35 @@ export default function StaffActivitiesPage() {
     setCameraStarting(false);
   }, []);
 
+  const submitScan = async (payload = scanPayload) => {
+    if (!scanActivity || !payload.trim()) return;
+    setScanSubmitting(true);
+    setScanError("");
+    setScanMessage("");
+    try {
+      const res = await fetch(apiPath(`/api/activities/${scanActivity.id}/scan-qr`), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          activityCode: scanActivityCode,
+          qrPayload: payload.trim(),
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data?.error || data?.message || "สแกน QR ไม่สำเร็จ");
+      const studentName = `${data.student?.firstname || ""} ${data.student?.lastname || ""}`.trim();
+      setScanStudentId(String(data.student?.studentId || ""));
+      setScanMessage(`ลงทะเบียนสำเร็จ: ${data.student?.studentId || ""}${studentName ? ` ${studentName}` : ""}`);
+      setScanStudentId(String(data.student?.studentId || ""));
+      setScanPayload("");
+      await fetchActivities();
+    } catch (err) {
+      setScanError(err instanceof Error ? err.message : "เกิดข้อผิดพลาด");
+    } finally {
+      setScanSubmitting(false);
+    }
+  };
+
   const readCameraFrame = useCallback(async () => {
     const video = videoRef.current;
     if (!video) return;
@@ -1441,9 +1915,9 @@ export default function StaffActivitiesPage() {
 
         if (value) {
           setScanPayload(value);
-          setScanMessage("อ่าน QR สำเร็จ กดบันทึกการลงทะเบียนได้เลย");
           setScanError("");
           stopCamera();
+          await submitScan(value);
           return;
         }
       }
@@ -1452,7 +1926,7 @@ export default function StaffActivitiesPage() {
     }
 
     scanFrameRef.current = window.requestAnimationFrame(readCameraFrame);
-  }, [stopCamera]);
+  }, [stopCamera, submitScan]);
 
   const startCamera = useCallback(async () => {
     setCameraError("");
@@ -1546,11 +2020,11 @@ export default function StaffActivitiesPage() {
       }
 
       setScanPayload(result.data.trim());
-      setScanMessage("อ่าน QR จากรูปภาพสำเร็จ กดบันทึกการลงทะเบียนได้เลย");
+      await submitScan(result.data.trim());
     } catch (error) {
       setCameraError(error instanceof Error ? error.message : "อ่าน QR จากรูปภาพไม่สำเร็จ");
     }
-  }, []);
+  }, [submitScan]);
 
   const handleQrImageChange = useCallback(
     (event: ChangeEvent<HTMLInputElement>) => {
@@ -1577,36 +2051,10 @@ export default function StaffActivitiesPage() {
     setScanActivity(activity);
     setScanActivityCode(activity.id);
     setScanPayload("");
+    setScanStudentId("");
     setScanMessage("");
     setScanError("");
     setCameraError("");
-  };
-
-  const submitScan = async () => {
-    if (!scanActivity) return;
-    setScanSubmitting(true);
-    setScanError("");
-    setScanMessage("");
-    try {
-      const res = await fetch(apiPath(`/api/activities/${scanActivity.id}/scan-qr`), {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          activityCode: scanActivityCode,
-          qrPayload: scanPayload,
-        }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data?.error || data?.message || "สแกน QR ไม่สำเร็จ");
-      const studentName = `${data.student?.firstname || ""} ${data.student?.lastname || ""}`.trim();
-      setScanMessage(`ลงทะเบียนสำเร็จ: ${data.student?.studentId || ""}${studentName ? ` ${studentName}` : ""}`);
-      setScanPayload("");
-      await fetchActivities();
-    } catch (err) {
-      setScanError(err instanceof Error ? err.message : "เกิดข้อผิดพลาด");
-    } finally {
-      setScanSubmitting(false);
-    }
   };
 
   // ===== สร้างกิจกรรม =====
@@ -1650,6 +2098,7 @@ export default function StaffActivitiesPage() {
       }
 
       const payload = {
+        activityCode: form.activityCode,
         title: form.title,
         description: form.description,
         dateTime: startDateTime,
@@ -1693,6 +2142,16 @@ export default function StaffActivitiesPage() {
     const activity = activities.find((item) => item.id === activityId);
     if (!activity) {
       alert("ไม่พบกิจกรรม");
+      return;
+    }
+
+    if (activity.evaluationCompletedCount > 0) {
+      alert("มีนิสิตทำแบบประเมินแล้ว จึงไม่สามารถแก้ไขแบบประเมินได้");
+      return;
+    }
+
+    if (activity.confirmationEnabled) {
+      alert("แบบประเมินกำลังเปิดอยู่ กรุณาปิดแบบประเมินก่อนจึงจะแก้ไขได้");
       return;
     }
 
@@ -1818,28 +2277,11 @@ export default function StaffActivitiesPage() {
     }
   };
 
-  const handleViewParticipants = async (activityId: string) => {
-    setSelectedParticipantActivityId(activityId);
-    setShowParticipantsModal(true);
-    setLoadingParticipants(true);
-    try {
-      const res = await fetch(apiPath(`/api/activities/${activityId}/participants`));
-      if (!res.ok) throw new Error("ไม่สามารถโหลดรายชื่อผู้เข้าร่วม");
-      const data = await res.json();
-      setParticipants(data);
-    } catch (err) {
-      alert(err instanceof Error ? err.message : "เกิดข้อผิดพลาด");
-      setParticipants([]);
-    } finally {
-      setLoadingParticipants(false);
-    }
-  };
-
-  // ---------- แก้ไขกิจกรรม ----------
   const handleEdit = (activity: TeacherActivity) => {
     setEditingActivity(activity);
 
     setEditForm({
+      activityCode: activity.id,
       title: activity.title,
       description: activity.description,
       startDate: toDateInputValue(activity.date),
@@ -1869,6 +2311,42 @@ export default function StaffActivitiesPage() {
     setIsEditModalOpen(true);
   };
 
+  const handleEndActivity = async (activityId: string) => {
+    const activity = activities.find((a) => a.id === activityId);
+    if (!activity) return;
+
+    const isPast = activity.status === "past";
+
+    const message = isPast
+      ? `ต้องการเปิดกิจกรรม "${activity.title}" กลับมาใช้งานหรือไม่?\\n\\nเมื่อเปิดกลับมา กิจกรรมจะย้ายไปอยู่ใน "กิจกรรมที่กำลังดำเนินอยู่"`
+      : `ต้องการสิ้นสุดกิจกรรม "${activity.title}" ใช่หรือไม่?\\n\\nเมื่อสิ้นสุดแล้ว กิจกรรมจะย้ายไปอยู่ใน "กิจกรรมที่สิ้นสุดแล้ว"`;
+
+    if (!confirm(message)) return;
+
+    try {
+      const res = await fetch(apiPath("/api/activities/workflow"), {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          activityId,
+          field: "status",
+          value: isPast ? "active" : "past",
+        }),
+      });
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.message || (isPast ? "เปิดกิจกรรมกลับไม่สำเร็จ" : "สิ้นสุดกิจกรรมไม่สำเร็จ"));
+      }
+
+      await fetchActivities();
+      setActiveTab(isPast ? "all" : "past");
+      alert(isPast ? "เปิดกิจกรรมกลับมาเรียบร้อยแล้ว" : "สิ้นสุดกิจกรรมเรียบร้อยแล้ว");
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "เกิดข้อผิดพลาด");
+    }
+  };
+
   const handleDelete = async (activityId: string) => {
     if (
       !confirm(
@@ -1888,6 +2366,29 @@ export default function StaffActivitiesPage() {
       alert("ลบกิจกรรมสำเร็จ");
     } catch (err) {
       alert(err instanceof Error ? err.message : "เกิดข้อผิดพลาด");
+    }
+  };
+
+  const handleViewParticipants = async (activityId: string) => {
+    setSelectedParticipantActivityId(activityId);
+    setShowParticipantsModal(true);
+    setLoadingParticipants(true);
+    setParticipants([]);
+    try {
+      const res = await fetch(apiPath(`/api/activities/${encodeURIComponent(activityId)}/participants`), {
+        cache: "no-store",
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.message || "ไม่สามารถโหลดรายชื่อผู้เข้าร่วมได้");
+      }
+      const data = await res.json();
+      setParticipants(Array.isArray(data) ? data : []);
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "ไม่สามารถโหลดรายชื่อผู้เข้าร่วมได้");
+      setShowParticipantsModal(false);
+    } finally {
+      setLoadingParticipants(false);
     }
   };
 
@@ -2047,7 +2548,6 @@ export default function StaffActivitiesPage() {
     setEditForm((prev) => ({ ...prev, templateId }));
   };
 
-
   const formatActivityHours = (hours: number | null | undefined): string => {
     if (hours === null || hours === undefined || hours === 0) return "";
     const h = Math.floor(hours);
@@ -2056,7 +2556,7 @@ export default function StaffActivitiesPage() {
   };
 
   return (
-    <TeacherShell activePath="/teacher/activities">
+    <TeacherShell activePath="/staff/activities">
       <section className="bg-[#F5F6F8] p-4 sm:p-6 lg:p-7">
         <div className="mx-auto max-w-6xl">
           {/* หัวเรื่อง */}
@@ -2066,7 +2566,7 @@ export default function StaffActivitiesPage() {
                 จัดการกิจกรรมและการอบรม
               </h1>
               <p className="mt-1.5 text-sm text-slate-500">
-                สร้าง ติดตาม และจัดการกิจกรรมที่สร้างโดยคุณ
+                สร้าง ติดตาม และจัดการกิจกรรมทั้งหมดของหน่วยงาน
               </p>
             </div>
             <button
@@ -2118,6 +2618,25 @@ export default function StaffActivitiesPage() {
             })}
           </nav>
 
+          {activeTab === "mine" && (
+            <div className="mt-4 flex flex-wrap items-center gap-3">
+              <span className="text-sm font-medium text-slate-600">
+                สถานะกิจกรรม
+              </span>
+              <select
+                value={mineStatusFilter}
+                onChange={(e) =>
+                  setMineStatusFilter(e.target.value as MineStatusFilter)
+                }
+                className="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-700 outline-none transition focus:border-[#2455A4] focus:ring-2 focus:ring-blue-100"
+              >
+                <option value="all">ทั้งหมด</option>
+                <option value="active">กำลังดำเนินอยู่</option>
+                <option value="past">สิ้นสุดแล้ว</option>
+              </select>
+            </div>
+          )}
+
           {/* รายการกิจกรรม */}
           {loading ? (
             <div className="mt-10 flex items-center justify-center gap-2 text-slate-500">
@@ -2131,7 +2650,8 @@ export default function StaffActivitiesPage() {
                 </div>
               ) : (
                 filteredActivities.map((activity) => {
-                  const past = isActivityPast(activity);
+                  const displayStatus = getActivityDisplayStatus(activity);
+                  const past = displayStatus.key === "past";
                   const external = isExternalActivity(activity);
                   return (
                     <article
@@ -2142,16 +2662,13 @@ export default function StaffActivitiesPage() {
                       <div className="flex flex-wrap items-start justify-between gap-3">
                         <div className="flex flex-wrap items-center gap-2">
                           <span
-                            className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium ${
-                              past
-                                ? "bg-slate-100 text-slate-500"
-                                : "bg-emerald-50 text-emerald-600"
-                            }`}
+                            title={displayStatus.description}
+                            className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium ${displayStatus.badgeClass}`}
                           >
                             <span
-                              className={`h-1.5 w-1.5 rounded-full ${past ? "bg-slate-400" : "bg-emerald-500"}`}
+                              className={`h-1.5 w-1.5 rounded-full ${displayStatus.dotClass}`}
                             />
-                            {past ? "สิ้นสุดแล้ว" : "กำลังดำเนินอยู่"}
+                            {displayStatus.label}
                           </span>
                           {external && (
                             <span className="inline-flex items-center rounded-full bg-amber-50 px-2.5 py-1 text-xs font-medium text-amber-700">
@@ -2164,6 +2681,15 @@ export default function StaffActivitiesPage() {
                         </div>
 
                         <div className="flex items-center gap-2">
+                          <div className="inline-flex items-center rounded-lg border border-slate-100 bg-white px-2">
+                            <span className="mr-2 text-xs font-medium text-slate-600">
+                              สิ้นสุดกิจกรรม
+                            </span>
+                            <ToggleSwitch
+                              enabled={past}
+                              onClick={() => handleEndActivity(activity.id)}
+                            />
+                          </div>
                           <ActionButton
                             icon={Edit}
                             label="แก้ไข"
@@ -2189,38 +2715,47 @@ export default function StaffActivitiesPage() {
                         {activity.title}
                       </h2>
 
-                      <div className="mt-2.5 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-sm text-slate-500">
-                        <span className="inline-flex items-center gap-1.5">
-                          <CalendarDays className="h-4 w-4 text-slate-400" />
-                          {activity.date
-                            ? new Date(activity.date).toLocaleDateString("th-TH", {
-                                year: "numeric",
-                                month: "long",
-                                day: "numeric",
-                              })
-                            : "ไม่ระบุวันที่"}
-                        </span>
-                        <span className="inline-flex items-center gap-1.5">
-                          <Clock className="h-4 w-4 text-slate-400" />
-                          {activity.time
-                            ? new Date(`2000-01-01T${activity.time}`).toLocaleTimeString(
-                                "th-TH",
-                                { hour: "2-digit", minute: "2-digit" },
-                              ) + " น."
-                            : "ไม่ระบุเวลา"}
-                          {activity.endTime
-                            ? ` - ${new Date(`2000-01-01T${activity.endTime}`).toLocaleTimeString(
-                                "th-TH",
-                                { hour: "2-digit", minute: "2-digit" },
-                              )} น.`
-                            : ""}
-                          {activity.hours ? ` · ${formatActivityHours(activity.hours)}` : ""}
-                        </span>
+                      <div className="mt-3 grid gap-2.5 text-sm sm:grid-cols-2">
+                        <div className="rounded-xl border border-slate-100 bg-slate-50/70 px-3.5 py-3">
+                          <p className="text-xs font-semibold text-slate-500">วันจัดกิจกรรม</p>
+                          <div className="mt-1.5 flex items-center gap-2 text-slate-700">
+                            <CalendarDays className="h-4 w-4 shrink-0 text-slate-400" />
+                            <span className="font-medium">{formatActivityDateRange(activity)}</span>
+                          </div>
+                        </div>
+
+                        <div className="rounded-xl border border-blue-100 bg-blue-50/60 px-3.5 py-3">
+                          <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
+                            <div>
+                              <p className="text-xs font-semibold text-slate-500">เวลา</p>
+                              <div className="mt-1 flex items-center gap-2 text-blue-700">
+                                <Clock className="h-4 w-4 shrink-0" />
+                                <span className="font-medium">{formatActivityTimeRange(activity)}</span>
+                              </div>
+                            </div>
+                            {activity.hours ? (
+                              <div>
+                                <p className="text-xs font-semibold text-slate-500">ระยะเวลา</p>
+                                <p className="mt-1 font-medium text-slate-600">
+                                  {formatActivityHours(activity.hours)}
+                                </p>
+                              </div>
+                            ) : null}
+                          </div>
+                        </div>
+
+                        <div className="rounded-xl border border-emerald-100 bg-emerald-50/60 px-3.5 py-3 sm:col-span-2">
+                          <p className="text-xs font-semibold text-emerald-700">เวลาลงทะเบียน</p>
+                          <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-emerald-800">
+                            <span className="font-medium">{formatRegistrationRange(activity)}</span>
+                          </div>
+                        </div>
+
                         {activity.location && (
-                          <span className="inline-flex items-center gap-1.5">
+                          <div className="inline-flex items-center gap-1.5 text-slate-500 sm:col-span-2">
                             <MapPin className="h-4 w-4 text-slate-400" />
                             {activity.location}
-                          </span>
+                          </div>
                         )}
                       </div>
 
@@ -2249,6 +2784,16 @@ export default function StaffActivitiesPage() {
                               >
                                 สร้างแบบประเมิน
                               </button>
+                            </span>
+                          ) : activity.evaluationCompletedCount > 0 ? (
+                            <span className="inline-flex items-center gap-1 text-slate-500">
+                              <ClipboardList className="h-3.5 w-3.5" />
+                              มีนิสิตทำแบบประเมินแล้ว ไม่สามารถแก้ไขได้
+                            </span>
+                          ) : activity.confirmationEnabled ? (
+                            <span className="inline-flex items-center gap-1 text-amber-600">
+                              <ClipboardList className="h-3.5 w-3.5" />
+                              แบบประเมินเปิดอยู่ ไม่สามารถแก้ไขได้
                             </span>
                           ) : (
                             <button
@@ -2392,6 +2937,8 @@ export default function StaffActivitiesPage() {
         />
       )}
 
+      {/* Modal แสดงรหัสยืนยัน */}
+
       {/* Modal สแกน QR นิสิต */}
       {scanActivity && (
         <ModalShell
@@ -2406,7 +2953,7 @@ export default function StaffActivitiesPage() {
               <input
                 value={scanActivityCode}
                 onChange={(e) => setScanActivityCode(e.target.value)}
-                className="teacher-activity-input bg-white"
+                className="staff-activity-input bg-white"
               />
             </Field>
 
@@ -2483,12 +3030,15 @@ export default function StaffActivitiesPage() {
               )}
             </div>
 
-            <Field label="ข้อมูลจาก QR นิสิต">
+            <Field label="รับข้อมูลจากนิสิต">
               <textarea
-                value={scanPayload}
-                onChange={(e) => setScanPayload(e.target.value)}
+                value={scanStudentId || scanPayload}
+                onChange={(e) => {
+                  setScanStudentId("");
+                  setScanPayload(e.target.value);
+                }}
                 autoFocus
-                placeholder="สแกน QR ด้วยเครื่องสแกน หรือวางข้อมูล QR ที่นิสิตแสดง"
+                placeholder="รหัสนิสิตจะแสดงที่นี่หลังจากสแกน QR"
                 className="min-h-[120px] w-full resize-none rounded-lg border border-slate-200 bg-white p-3 text-sm text-slate-800 outline-none transition focus:border-[#2455A4] focus:ring-4 focus:ring-blue-100"
               />
             </Field>
@@ -2515,7 +3065,7 @@ export default function StaffActivitiesPage() {
             </button>
             <button
               type="button"
-              onClick={submitScan}
+              onClick={() => submitScan()}
               disabled={!scanActivityCode.trim() || !scanPayload.trim() || scanSubmitting}
               className="h-11 flex-1 rounded-xl bg-[#2455A4] text-sm font-semibold text-white transition hover:bg-[#1B3F80] disabled:bg-slate-300"
             >
@@ -2602,7 +3152,7 @@ export default function StaffActivitiesPage() {
       )}
 
       <style jsx global>{`
-        .teacher-activity-input {
+        .staff-activity-input {
           height: 38px;
           width: 100%;
           border-radius: 0.5rem;
@@ -2618,15 +3168,15 @@ export default function StaffActivitiesPage() {
             box-shadow 160ms ease,
             background 160ms ease;
         }
-        .teacher-activity-input:focus {
+        .staff-activity-input:focus {
           border-color: #2455a4;
           box-shadow: 0 0 0 3px rgba(36, 85, 164, 0.1);
         }
-        .teacher-activity-input[type="date"]::-webkit-calendar-picker-indicator,
-        .teacher-activity-input[type="time"]::-webkit-calendar-picker-indicator {
+        .staff-activity-input[type="date"]::-webkit-calendar-picker-indicator,
+        .staff-activity-input[type="time"]::-webkit-calendar-picker-indicator {
           filter: invert(0.4) sepia(1) hue-rotate(180deg);
         }
-        .teacher-activity-input option {
+        .staff-activity-input option {
           color: #0f172a;
         }
       `}</style>
