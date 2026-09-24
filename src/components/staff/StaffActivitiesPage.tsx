@@ -1870,6 +1870,7 @@ export default function StaffActivitiesPage() {
       const studentName = `${data.student?.firstname || ""} ${data.student?.lastname || ""}`.trim();
       setScanStudentId(String(data.student?.studentId || ""));
       setScanMessage(`ลงทะเบียนสำเร็จ: ${data.student?.studentId || ""}${studentName ? ` ${studentName}` : ""}`);
+      setScanStudentId(String(data.student?.studentId || ""));
       setScanPayload("");
       await fetchActivities();
     } catch (err) {
