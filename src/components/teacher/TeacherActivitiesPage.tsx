@@ -1725,6 +1725,7 @@ export default function TeacherActivitiesPage() {
       }
 
       if (category === "past") {
+        if (!currentUserId || activity.createdBy !== currentUserId) return false;
         return activity.status === "past" || isActivityPast(activity);
       }
 
