@@ -30,6 +30,7 @@ export async function GET(request: NextRequest, context: RouteContext) {
          a.endTime,
          a.hours,
          a.organizer,
+         a.term,
          a.templateId,
          t.name AS templateName,
          t.imageUrl,
@@ -54,6 +55,13 @@ export async function GET(request: NextRequest, context: RouteContext) {
     }
 
     const row = rows[0];
+
+    // กิจกรรมภายนอกที่นิสิตยื่นขอและเจ้าหน้าที่อนุมัติ
+    // ไม่มีใบรับรองทักษะของระบบ ไม่อนุญาตให้เรียก API ใบรับรอง
+    if (String(row.term || "").trim() === "ภายนอก") {
+      throw httpError(400, "กิจกรรมภายนอกไม่มีใบรับรองทักษะของระบบ");
+    }
+
     if (row.participationStatus !== "completed") {
       throw httpError(403, "คุณยังไม่ได้เข้าร่วมกิจกรรมนี้");
     }
