@@ -61,13 +61,13 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
               s.firstname, s.lastname, s.program, s.major
        FROM participation p
        JOIN students s ON s.studentId = p.studentId
-       WHERE p.activityId = ? AND p.studentId = ?
+       WHERE p.activityId = ? AND p.registrationQrToken = ?
        LIMIT 1`,
       [id, payload.token],
     );
     const registration = registrations[0];
     if (!registration) {
-      throw httpError(404, "ไม่พบข้อมูลการสมัครจาก QR นี้");
+      throw httpError(404, "ไม่พบข้อมูลการสมัครจาก QR นี้ หรือ QR หมดอายุ/ไม่ตรงกับกิจกรรม");
     }
     if (registration.activityId !== id) {
       throw httpError(400, "นิสิตสมัครกิจกรรมอื่น ไม่สามารถใช้ QR นี้กับกิจกรรมนี้ได้");
