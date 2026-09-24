@@ -2070,11 +2070,6 @@ export default function TeacherActivitiesPage() {
 
       const startDateObj = new Date(startDateTime);
       const endDateObj = new Date(endDateTime);
-      const now = new Date();
-
-      if (startDateObj.getTime() < now.getTime() - 60_000) {
-        throw new Error("ไม่สามารถเลือกวันที่หรือเวลาย้อนหลังได้");
-      }
       if (endDateObj <= startDateObj) {
         throw new Error("วันที่เวลาสิ้นสุดต้องมากกว่าวันที่เวลาเริ่มต้น");
       }
@@ -2325,6 +2320,36 @@ export default function TeacherActivitiesPage() {
     if (!confirm(message)) return;
 
     try {
+      // เมื่อสิ้นสุดกิจกรรม ให้ปิดรับสมัครและปิดแบบประเมินอัตโนมัติ
+      if (!isPast) {
+        const workflowUpdates = [
+          { field: "applicationEnabled", value: false },
+          { field: "confirmationEnabled", value: false },
+        ] as const;
+
+        for (const update of workflowUpdates) {
+          const workflowRes = await fetch(apiPath("/api/activities/workflow"), {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              activityId,
+              field: update.field,
+              value: update.value,
+            }),
+          });
+
+          if (!workflowRes.ok) {
+            const err = await workflowRes.json().catch(() => ({}));
+            throw new Error(
+              err.message ||
+                (update.field === "applicationEnabled"
+                  ? "ปิดรับสมัครอัตโนมัติไม่สำเร็จ"
+                  : "ปิดแบบประเมินอัตโนมัติไม่สำเร็จ"),
+            );
+          }
+        }
+      }
+
       const res = await fetch(apiPath("/api/activities/workflow"), {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
@@ -2695,12 +2720,7 @@ export default function TeacherActivitiesPage() {
                             icon={Edit}
                             label="แก้ไข"
                             onClick={() => handleEdit(activity)}
-                            disabled={activity.hasConfirmedParticipants}
-                            title={
-                              activity.hasConfirmedParticipants
-                                ? "มีนิสิตยืนยันการเข้าร่วมแล้ว"
-                                : undefined
-                            }
+                            disabled={false}
                           />
                           <ActionButton
                             icon={Trash2}
