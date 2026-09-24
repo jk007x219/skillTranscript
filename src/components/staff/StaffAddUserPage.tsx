@@ -53,12 +53,12 @@ const MAJOR_OPTIONS_BY_PROGRAM: Record<string, string[]> = {
 };
 
 const EXECUTIVE_POSITIONS = [
-  "รองคณบดีฝ่ายวิชาการ",
-  "รองคณบดีฝ่ายวิจัย",
-  "รองคณบดีฝ่ายวางแผนและพัฒนา",
-  "ผู้ช่วยคณบดี",
-  "หัวหน้าภาควิชา",
-  "ผู้อำนวยการหลักสูตร",
+  "รองคณบดีฝ่ายบริหารและพัฒนาองค์กร",
+  "รองคณบดีฝ่ายฝ่ายวิชาการและดิจิทัลองค์กร",
+  "ผู้ช่วยคณบดีฝ่ายวิจัยและนวัตกรรม",
+  "ผู้ช่วยคณบดีฝ่ายบริการวิชาการและการประกอบการ",
+  "ผู้ช่วยคณบดีฝ่ายพัฒนานิสิต สื่อสารองค์กร",
+  "อื่น ๆ",
 ];
 
 const OFFICER_POSITIONS = [
@@ -68,15 +68,6 @@ const OFFICER_POSITIONS = [
   "ฝ่ายแผนงาน",
   "ฝ่ายประชาสัมพันธ์",
   "ฝ่ายเทคโนโลยีสารสนเทศ",
-];
-
-const TEACHER_POSITIONS = [
-  "อาจารย์",
-  "อาจารย์ประจำ",
-  "อาจารย์พิเศษ",
-  "ผู้ช่วยศาสตราจารย์",
-  "รองศาสตราจารย์",
-  "ศาสตราจารย์",
 ];
 
 // ฟังก์ชันคำนวณปีการศึกษาและชั้นปี
@@ -156,8 +147,8 @@ export default function StaffAddUserPage() {
   }, [computedYear]);
 
   // state สำหรับตำแหน่งแยก (เมื่อเป็นผู้บริหาร)
-  const [academicPosition, setAcademicPosition] = useState("");
   const [executivePosition, setExecutivePosition] = useState("");
+  const [customExecutivePosition, setCustomExecutivePosition] = useState("");
 
   const [selectedAdvisorId, setSelectedAdvisorId] = useState("");
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
@@ -212,9 +203,9 @@ export default function StaffAddUserPage() {
       setFormErrors((prev) => ({ ...prev, [name]: "" }));
     }
     if (name === "isExecutive" && !checked) {
-      setAcademicPosition("");
       setExecutivePosition("");
-      setFormErrors((prev) => ({ ...prev, academicPosition: "", executivePosition: "" }));
+      setCustomExecutivePosition("");
+      setFormErrors((prev) => ({ ...prev, executivePosition: "", customExecutivePosition: "" }));
     }
     if (name === "program") {
       setFormData((prev) => ({ ...prev, major: "" }));
@@ -282,10 +273,11 @@ export default function StaffAddUserPage() {
 
     if (formData.role === "teacher" || formData.role === "officer") {
       if (formData.role === "teacher" && formData.isExecutive) {
-        if (!academicPosition) errors.academicPosition = "กรุณาเลือกตำแหน่งทางวิชาการ";
-        if (!executivePosition) errors.executivePosition = "กรุณาเลือกตำแหน่งบริหาร";
-      } else {
-        if (!formData.position) errors.position = "กรุณาเลือกตำแหน่ง";
+        if (!executivePosition) {
+          errors.executivePosition = "กรุณาเลือกตำแหน่งบริหาร";
+        } else if (executivePosition === "อื่น ๆ" && !customExecutivePosition.trim()) {
+          errors.customExecutivePosition = "กรุณาระบุตำแหน่งบริหาร";
+        }
       }
     }
 
@@ -301,9 +293,12 @@ export default function StaffAddUserPage() {
     e.preventDefault();
     if (!validateForm()) return;
 
-    let positionValue = formData.position;
+    let positionValue = "";
     if (formData.role === "teacher" && formData.isExecutive) {
-      positionValue = `${academicPosition} / ${executivePosition}`;
+      positionValue =
+        executivePosition === "อื่น ๆ"
+          ? customExecutivePosition.trim()
+          : executivePosition;
     }
 
     const payload = {
@@ -724,81 +719,71 @@ export default function StaffAddUserPage() {
                 </div>
 
                 {formData.role === "teacher" && formData.isExecutive ? (
-                  <div className="space-y-4">
-                    <div>
-                      <label htmlFor="academicPosition" className="block text-sm font-medium text-slate-700">
-                        ตำแหน่งทางวิชาการ <span className="text-red-500">*</span>
-                      </label>
-                      <select
-                        id="academicPosition"
-                        value={academicPosition}
-                        onChange={(e) => setAcademicPosition(e.target.value)}
-                        required
-                        className={`mt-1.5 h-11 w-full rounded-xl border ${
-                          formErrors.academicPosition ? "border-red-300" : "border-blue-200"
-                        } bg-white px-4 text-sm outline-none transition focus:border-[#1565C0] focus:ring-4 focus:ring-blue-100`}
-                      >
-                        <option value="">-- เลือกตำแหน่งวิชาการ --</option>
-                        {TEACHER_POSITIONS.map((pos) => (
-                          <option key={pos} value={pos}>{pos}</option>
-                        ))}
-                      </select>
-                      {formErrors.academicPosition && (
-                        <p className="mt-1 text-xs text-red-500">{formErrors.academicPosition}</p>
-                      )}
-                    </div>
-                    <div>
-                      <label htmlFor="executivePosition" className="block text-sm font-medium text-slate-700">
-                        ตำแหน่งบริหาร <span className="text-red-500">*</span>
-                      </label>
-                      <select
-                        id="executivePosition"
-                        value={executivePosition}
-                        onChange={(e) => setExecutivePosition(e.target.value)}
-                        required
-                        className={`mt-1.5 h-11 w-full rounded-xl border ${
-                          formErrors.executivePosition ? "border-red-300" : "border-blue-200"
-                        } bg-white px-4 text-sm outline-none transition focus:border-[#1565C0] focus:ring-4 focus:ring-blue-100`}
-                      >
-                        <option value="">-- เลือกตำแหน่งบริหาร --</option>
-                        {EXECUTIVE_POSITIONS.map((pos) => (
-                          <option key={pos} value={pos}>{pos}</option>
-                        ))}
-                      </select>
-                      {formErrors.executivePosition && (
-                        <p className="mt-1 text-xs text-red-500">{formErrors.executivePosition}</p>
-                      )}
-                    </div>
-                  </div>
-                ) : (
                   <div>
-                    <label htmlFor="position" className="block text-sm font-medium text-slate-700">
-                      ตำแหน่ง <span className="text-red-500">*</span>
+                    <label htmlFor="executivePosition" className="block text-sm font-medium text-slate-700">
+                      ตำแหน่งบริหาร <span className="text-red-500">*</span>
                     </label>
                     <select
-                      id="position"
-                      name="position"
-                      value={formData.position}
-                      onChange={handleChange}
+                      id="executivePosition"
+                      value={executivePosition}
+                      onChange={(e) => {
+                        setExecutivePosition(e.target.value);
+                        if (e.target.value !== "อื่น ๆ") {
+                          setCustomExecutivePosition("");
+                          setFormErrors((prev) => ({ ...prev, customExecutivePosition: "" }));
+                        }
+                      }}
                       required
                       className={`mt-1.5 h-11 w-full rounded-xl border ${
-                        formErrors.position ? "border-red-300" : "border-blue-200"
+                        formErrors.executivePosition ? "border-red-300" : "border-blue-200"
                       } bg-white px-4 text-sm outline-none transition focus:border-[#1565C0] focus:ring-4 focus:ring-blue-100`}
                     >
-                      <option value="">-- เลือกตำแหน่ง --</option>
-                      {formData.role === "teacher" && TEACHER_POSITIONS.map((pos) => (
-                        <option key={pos} value={pos}>{pos}</option>
-                      ))}
-                      {formData.role === "officer" && OFFICER_POSITIONS.map((pos) => (
+                      <option value="">-- เลือกตำแหน่งบริหาร --</option>
+                      {EXECUTIVE_POSITIONS.map((pos) => (
                         <option key={pos} value={pos}>{pos}</option>
                       ))}
                     </select>
-                    {formErrors.position && (
-                      <p className="mt-1 text-xs text-red-500">{formErrors.position}</p>
+                    {formErrors.executivePosition && (
+                      <p className="mt-1 text-xs text-red-500">{formErrors.executivePosition}</p>
+                    )}
+
+                    {executivePosition === "อื่น ๆ" && (
+                      <div className="mt-4">
+                        <label htmlFor="customExecutivePosition" className="block text-sm font-medium text-slate-700">
+                          ระบุตำแหน่งบริหาร <span className="text-red-500">*</span>
+                        </label>
+                        <input
+                          type="text"
+                          id="customExecutivePosition"
+                          value={customExecutivePosition}
+                          onChange={(e) => {
+                            setCustomExecutivePosition(e.target.value);
+                            if (formErrors.customExecutivePosition) {
+                              setFormErrors((prev) => ({ ...prev, customExecutivePosition: "" }));
+                            }
+                          }}
+                          required
+                          className={`mt-1.5 h-11 w-full rounded-xl border ${
+                            formErrors.customExecutivePosition ? "border-red-300" : "border-blue-200"
+                          } bg-white px-4 text-sm outline-none transition focus:border-[#1565C0] focus:ring-4 focus:ring-blue-100`}
+                          placeholder="พิมพ์ตำแหน่งบริหาร"
+                        />
+                        {formErrors.customExecutivePosition && (
+                          <p className="mt-1 text-xs text-red-500">{formErrors.customExecutivePosition}</p>
+                        )}
+                      </div>
                     )}
                   </div>
+                ) : (
+                  <div>
+                    <p className="text-sm text-slate-500">
+                      ตำแหน่ง <span className="text-slate-400">(ไม่จำเป็นต้องระบุ)</span>
+                    </p>
+                    <p className="mt-1 text-xs text-slate-400">
+                      กรณีเจ้าหน้าที่และอาจารย์ที่ไม่ได้เป็นผู้บริหาร ไม่ต้องระบุตำแหน่ง
+                    </p>
+                  </div>
                 )}
-
                 <div className="mt-4">
                   <label htmlFor="faculty" className="block text-sm font-medium text-slate-700">
                     คณะ
