@@ -89,7 +89,7 @@ export default function ChangePasswordPage() {
 
       // ให้ผู้ใช้เห็นข้อความสำเร็จสั้น ๆ แล้วเปลี่ยนหน้า
       setTimeout(() => {
-        router.replace(destination);
+        window.location.replace(apiPath(destination));
       }, 700);
     } catch (err) {
       setError(
