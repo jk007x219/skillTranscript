@@ -182,13 +182,22 @@ function Card({
         ) : s === "applied" ? (
           <button
             type="button"
-            disabled
-            className="h-11 flex-1 cursor-not-allowed rounded-xl bg-slate-400 text-sm font-bold text-white"
-            aria-disabled="true"
+            onClick={tab === "applied" ? onShowQr : undefined}
+            disabled={tab !== "applied"}
+            className={
+              tab === "applied"
+                ? "inline-flex h-11 flex-1 items-center justify-center gap-2 rounded-xl bg-[#2455A4] text-sm font-semibold text-white transition hover:bg-[#1B3F80]"
+                : "h-11 flex-1 cursor-not-allowed rounded-xl bg-slate-400 text-sm font-bold text-white"
+            }
+            aria-label={tab === "applied" ? "แสดง QR สำหรับลงทะเบียนกิจกรรม" : "สมัครแล้ว"}
           >
             <span className="inline-flex items-center justify-center gap-2">
-              <CheckCircle2 className="h-4 w-4" />
-              สมัครแล้ว
+              {tab === "applied" ? (
+                <QrCode className="h-4 w-4" />
+              ) : (
+                <CheckCircle2 className="h-4 w-4" />
+              )}
+              {tab === "applied" ? "แสดง QR โค้ด" : "สมัครแล้ว"}
             </span>
           </button>
         ) : s === "registered" ? (
