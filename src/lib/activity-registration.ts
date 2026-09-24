@@ -46,8 +46,8 @@ export async function ensureParticipationStatusWorkflow() {
   if (!columns.has("confirmedAt")) await pool.query("ALTER TABLE participation ADD COLUMN confirmedAt DATETIME NULL");
 }
 
-export function buildRegistrationQrPayload(activityId: string, token: string) {
-  return JSON.stringify({
+export function buildRegistrationQrPayload(activityId: string, token: string, studentId?: string) {
+  return studentId?.trim() || JSON.stringify({
     type: "skilltranscript.activity.registration",
     activityId,
     token,
