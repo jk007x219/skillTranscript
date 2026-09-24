@@ -515,11 +515,14 @@ export default function ScanQrPage({
 
               <div className="mt-4">
                 <label className="block">
-                  <span className="mb-2 block text-sm font-medium text-slate-700">ข้อมูลจาก QR</span>
+                  <span className="mb-2 block text-sm font-medium text-slate-700">รับข้อมูลจากนิสิต</span>
                   <textarea
-                    value={qrPayload}
-                    onChange={(e) => setQrPayload(e.target.value)}
-                    placeholder="วางข้อมูล QR ที่นี่ได้ หากไม่ได้ใช้กล้อง"
+                    value={scanResult?.student?.studentId || qrPayload}
+                    onChange={(e) => {
+                      setScanResult(null);
+                      setQrPayload(e.target.value);
+                    }}
+                    placeholder="รหัสนิสิตจะแสดงที่นี่หลังจากสแกน QR"
                     className="min-h-[90px] w-full resize-none rounded-xl border border-slate-200 p-3 text-sm outline-none focus:border-[#2455A4] focus:ring-4 focus:ring-blue-100"
                   />
                 </label>
