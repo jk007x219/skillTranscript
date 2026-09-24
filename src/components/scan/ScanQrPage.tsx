@@ -139,6 +139,7 @@ export default function ScanQrPage({
   const streamRef = useRef<MediaStream | null>(null);
   const frameRef = useRef<number | null>(null);
   const scanBusyRef = useRef(false);
+  const scanningRef = useRef(false);
   const qrInputRef = useRef<HTMLInputElement | null>(null);
 
   const stopCamera = () => {
@@ -149,6 +150,7 @@ export default function ScanQrPage({
     streamRef.current?.getTracks().forEach((track) => track.stop());
     streamRef.current = null;
     if (videoRef.current) videoRef.current.srcObject = null;
+    scanningRef.current = false;
     setScanning(false);
   };
 
@@ -233,7 +235,7 @@ export default function ScanQrPage({
   };
 
   const detectQr = async () => {
-    if (!videoRef.current || !canvasRef.current || scanBusyRef.current || !scanning) return;
+    if (!videoRef.current || !canvasRef.current || scanBusyRef.current || !scanningRef.current) return;
 
     const video = videoRef.current;
     if (video.readyState < 2) {
@@ -280,7 +282,7 @@ export default function ScanQrPage({
       scanBusyRef.current = false;
     }
 
-    if (scanning) {
+    if (scanningRef.current) {
       frameRef.current = requestAnimationFrame(detectQr);
     }
   };
@@ -319,6 +321,7 @@ export default function ScanQrPage({
         throw new Error("เบราว์เซอร์นี้ไม่รองรับการสแกน QR จากกล้อง");
       }
 
+      scanningRef.current = true;
       setScanning(true);
       setCameraStarting(false);
       frameRef.current = requestAnimationFrame(detectQr);
