@@ -49,6 +49,12 @@ type SkillData = {
   score: number;
   maxScore: number;
   percent: number;
+  basicPercent?: number;
+  intermediatePercent?: number;
+  advancedPercent?: number;
+  basicActivityCount?: number;
+  intermediateActivityCount?: number;
+  advancedActivityCount?: number;
 };
 
 type SkillWithIcon = SkillData & { icon: React.ElementType };
@@ -170,42 +176,106 @@ function ProgressList({ items, accent, onSkillClick }: { items: SkillWithIcon[];
 type SkillLevel = "basic" | "intermediate" | "advanced";
 type ProgressTab = SkillLevel | "all";
 
-function normalizeSkillLevel(level?: string | null): SkillLevel {
-  const value = (level || "").trim().toLowerCase();
-  if (value.includes("สูง") || value.includes("advanced") || value.includes("high") || value === "3") return "advanced";
-  if (value.includes("กลาง") || value.includes("intermediate") || value.includes("medium") || value.includes("mid") || value === "2") return "intermediate";
-  return "basic";
-}
+const levelLabels: Record<ProgressTab, string> = {
+  all: "รวม",
+  basic: "พื้นฐาน",
+  intermediate: "กลาง",
+  advanced: "สูง",
+};
 
-const levelLabels: Record<ProgressTab, string> = { all: "รวม", basic: "พื้นฐาน", intermediate: "กลาง", advanced: "สูง" };
-
-function DashboardPanel({ title, subtitle, accent, items, chartId, onSkillClick }: { title: string; subtitle: string; accent: string; items: SkillWithIcon[]; chartId: string; onSkillClick?: (skill: SkillWithIcon) => void }) {
+function DashboardPanel({ title, subtitle, accent, items, chartId, onSkillClick }: {
+  title: string;
+  subtitle: string;
+  accent: string;
+  items: SkillWithIcon[];
+  chartId: string;
+  onSkillClick?: (skill: SkillWithIcon) => void;
+}) {
   const [activeTab, setActiveTab] = useState<ProgressTab>("all");
-  const grouped = useMemo(() => ({
-    basic: items.filter((item) => normalizeSkillLevel(item.level) === "basic"),
-    intermediate: items.filter((item) => normalizeSkillLevel(item.level) === "intermediate"),
-    advanced: items.filter((item) => normalizeSkillLevel(item.level) === "advanced"),
-  }), [items]);
-  const visibleItems = activeTab === "all" ? items : grouped[activeTab];
+
+  // ใช้จำนวนกิจกรรมจริงของแต่ละระดับ เหมือน Student Dashboard
+  const grouped = useMemo(
+    () => ({
+      basic: items.filter((item) => (item.basicActivityCount ?? 0) > 0),
+      intermediate: items.filter((item) => (item.intermediateActivityCount ?? 0) > 0),
+      advanced: items.filter((item) => (item.advancedActivityCount ?? 0) > 0),
+    }),
+    [items],
+  );
+
+  // Radar ต้องแสดงทุกทักษะเสมอ
+  // ทักษะที่ไม่มีข้อมูลของระดับที่เลือกจะเป็น 0%
+  const chartItems = items.map((item) => {
+    if (activeTab === "all") {
+      return { ...item, percent: item.activities > 0 ? item.percent : 0 };
+    }
+
+    const activityCount =
+      activeTab === "basic"
+        ? item.basicActivityCount ?? 0
+        : activeTab === "intermediate"
+          ? item.intermediateActivityCount ?? 0
+          : item.advancedActivityCount ?? 0;
+
+    const percent =
+      activeTab === "basic"
+        ? item.basicPercent ?? 0
+        : activeTab === "intermediate"
+          ? item.intermediatePercent ?? 0
+          : item.advancedPercent ?? 0;
+
+    return { ...item, percent: activityCount > 0 ? percent : 0 };
+  });
+
+  // รายการด้านขวา: รวมเฉพาะทักษะที่มีข้อมูลจริง
+  const visibleItems =
+    activeTab === "all"
+      ? items.filter((item) => item.activities > 0)
+      : grouped[activeTab];
+
   const tabs: Array<{ key: ProgressTab; count: number }> = [
-    { key: "all", count: items.length },
+    { key: "all", count: items.filter((item) => item.activities > 0).length },
     { key: "basic", count: grouped.basic.length },
     { key: "intermediate", count: grouped.intermediate.length },
     { key: "advanced", count: grouped.advanced.length },
   ];
+
   return (
     <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
       <div className="flex flex-col gap-3 border-b border-slate-100 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex items-start gap-3"><span className="mt-1 h-8 w-1 shrink-0 rounded-full" style={{ backgroundColor: accent }} /><div><h2 className="text-base font-semibold text-slate-900">{title}</h2><p className="mt-0.5 text-xs text-slate-500">{subtitle}</p></div></div>
+        <div className="flex items-start gap-3">
+          <span className="mt-1 h-8 w-1 shrink-0 rounded-full" style={{ backgroundColor: accent }} />
+          <div><h2 className="text-base font-semibold text-slate-900">{title}</h2><p className="mt-0.5 text-xs text-slate-500">{subtitle}</p></div>
+        </div>
         <span className="w-fit rounded-full bg-slate-50 px-3 py-1 text-xs font-semibold text-slate-600">{items.length} ทักษะ</span>
       </div>
+
       <div className="px-5 py-5">
         <div className="mb-5 flex flex-wrap gap-1.5">
-          {tabs.map((tab) => { const active = activeTab === tab.key; return <button key={tab.key} type="button" onClick={() => setActiveTab(tab.key)} className={`rounded-full px-3.5 py-1.5 text-xs font-semibold transition-colors ${active ? "text-white shadow-sm" : "bg-slate-50 text-slate-500 hover:bg-slate-100 hover:text-slate-700"}`} style={active ? { backgroundColor: accent } : undefined}>{levelLabels[tab.key]}<span className="ml-1.5 opacity-70">{tab.count}</span></button>; })}
+          {tabs.map((tab) => {
+            const active = activeTab === tab.key;
+            return (
+              <button
+                key={tab.key}
+                type="button"
+                onClick={() => setActiveTab(tab.key)}
+                className={`rounded-full px-3.5 py-1.5 text-xs font-semibold transition-colors ${active ? "text-white shadow-sm" : "bg-slate-50 text-slate-500 hover:bg-slate-100 hover:text-slate-700"}`}
+                style={active ? { backgroundColor: accent } : undefined}
+              >
+                {levelLabels[tab.key]}<span className="ml-1.5 opacity-70">{tab.count}</span>
+              </button>
+            );
+          })}
         </div>
+
         <div className="grid gap-6 lg:grid-cols-[280px_1fr]">
           <div className="flex flex-col items-center rounded-xl bg-slate-50/60 p-4">
-            <RadarChart accent={accent} values={visibleItems.length >= 3 ? visibleItems.map((item) => item.percent) : []} labels={visibleItems.map((item) => getRadarLabel(item.skillName))} id={`${chartId}-${activeTab}`} />
+            <RadarChart
+              accent={accent}
+              values={chartItems.length >= 3 ? chartItems.map((item) => item.percent) : []}
+              labels={chartItems.map((item) => getRadarLabel(item.skillName))}
+              id={`${chartId}-${activeTab}`}
+            />
           </div>
           <ProgressList items={visibleItems} accent={accent} onSkillClick={onSkillClick} />
         </div>
@@ -213,7 +283,6 @@ function DashboardPanel({ title, subtitle, accent, items, chartId, onSkillClick 
     </section>
   );
 }
-
 function ActivityModal({ skill, activities, onClose, loading }: { skill: SkillWithIcon | null; activities: any[]; onClose: () => void; loading: boolean }) {
   if (!skill) return null;
   return (
