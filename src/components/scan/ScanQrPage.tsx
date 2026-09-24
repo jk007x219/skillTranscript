@@ -103,6 +103,16 @@ function formatDate(date?: string, time?: string) {
   return t ? `${d} ${t}` : d;
 }
 
+function DefaultPageShell({
+  children,
+}: {
+  activePath: string;
+  children: React.ReactNode;
+}) {
+  return <>{children}</>;
+}
+
+
 export default function ScanQrPage({
   Shell,
   activePath,
@@ -380,7 +390,9 @@ export default function ScanQrPage({
     }
   };
 
-  const PageShell = Shell ?? (({ children }: { activePath: string; children: React.ReactNode }) => <>{children}</>);
+  // ใช้ component ที่อยู่ระดับ module เพื่อไม่ให้ remount ทุกครั้งที่ state เปลี่ยน
+  // ป้องกัน input รหัสกิจกรรมหลุด focus หลังพิมพ์แต่ละตัว
+  const PageShell = Shell ?? DefaultPageShell;
 
   return (
     <PageShell activePath={activePath || ""}>
