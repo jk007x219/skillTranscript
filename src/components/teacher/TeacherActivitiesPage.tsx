@@ -1281,11 +1281,15 @@ export default function StaffActivitiesPage() {
         return false;
       }
 
+      const past = isActivityPast(activity);
+
       if (category === "past") {
-        return isActivityPast(activity);
+        return past;
       }
 
-      return category === "mine";
+      // แท็บ "กิจกรรมที่สร้างโดยฉัน" แสดงเฉพาะกิจกรรมของอาจารย์
+      // ส่วนกิจกรรมที่สิ้นสุดแล้วจะแยกไปอยู่แท็บ "กิจกรรมที่สิ้นสุดแล้ว"
+      return category === "mine" && !past;
     },
     [currentUserId],
   );
@@ -2052,7 +2056,7 @@ export default function StaffActivitiesPage() {
   };
 
   return (
-    <TeacherShell activePath="/staff/activities">
+    <TeacherShell activePath="/teacher/activities">
       <section className="bg-[#F5F6F8] p-4 sm:p-6 lg:p-7">
         <div className="mx-auto max-w-6xl">
           {/* หัวเรื่อง */}
@@ -2062,7 +2066,7 @@ export default function StaffActivitiesPage() {
                 จัดการกิจกรรมและการอบรม
               </h1>
               <p className="mt-1.5 text-sm text-slate-500">
-                สร้าง ติดตาม และจัดการกิจกรรมทั้งหมดของหน่วยงาน
+                สร้าง ติดตาม และจัดการกิจกรรมที่สร้างโดยคุณ
               </p>
             </div>
             <button
