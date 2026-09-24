@@ -5,10 +5,12 @@ import { nanoid } from "nanoid";
 
 export const runtime = "nodejs";
 
+// ระดับใช้สำหรับการแสดง/จัดกลุ่มข้อมูลเท่านั้น
+// น้ำหนักคะแนนของทุกระดับเท่ากัน: 1 คะแนนต่อข้อ
 const LEVEL_SCORE_MAP: Record<string, number> = {
   พื้นฐาน: 1,
-  กลาง: 2,
-  สูง: 3,
+  กลาง: 1,
+  สูง: 1,
 };
 
 type RouteContext = { params: Promise<{ id: string }> };
