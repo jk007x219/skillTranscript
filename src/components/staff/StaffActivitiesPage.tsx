@@ -707,7 +707,7 @@ function DateTimeField({
   maxDate,
 }: {
   value: string;
-  onChange: (value: string) => void;
+  onChange: (value: string, part: "date" | "time") => void;
   minDate?: string;
   maxDate?: string;
 }) {
@@ -723,14 +723,14 @@ function DateTimeField({
         max={maxDate}
         onChange={(e) => {
           const nextDate = e.target.value;
-          onChange(nextDate ? `${nextDate}T${time || "00:00"}` : "");
+          onChange(nextDate ? `${nextDate}T${time || ""}` : "", "date");
         }}
         className="staff-activity-input"
       />
       <TimeField
         value={time}
         onChange={(nextTime) => {
-          onChange(date && nextTime ? `${date}T${nextTime}` : "");
+          onChange(date && nextTime ? `${date}T${nextTime}` : "", "time");
         }}
       />
     </div>
@@ -940,15 +940,28 @@ function AddActivityModal({
                 value={form.registrationStart}
                 minDate={isEditing ? undefined : today}
                 maxDate={form.endDate || undefined}
-                onChange={(value) => {
-                  if (
+                onChange={(value, part) => {
+                  if (part === "date") {
+                    const nextDate = value.slice(0, 10);
+                    const endDate = form.registrationEnd
+                      ? form.registrationEnd.slice(0, 10)
+                      : "";
+                    if (nextDate && endDate && nextDate > endDate) {
+                      return;
+                    }
+                    if (form.endDate && nextDate && nextDate > form.endDate) {
+                      return;
+                    }
+                  } else if (
                     form.registrationEnd &&
                     value &&
                     value >= form.registrationEnd
                   ) {
                     return;
                   }
+
                   if (
+                    part === "time" &&
                     form.endDate &&
                     form.endTime &&
                     value &&
@@ -956,6 +969,7 @@ function AddActivityModal({
                   ) {
                     return;
                   }
+
                   onChange("registrationStart", value);
                 }}
               />
@@ -971,15 +985,25 @@ function AddActivityModal({
                       : today
                 }
                 maxDate={form.endDate || undefined}
-                onChange={(value) => {
-                  if (
+                onChange={(value, part) => {
+                  if (part === "date") {
+                    const nextDate = value.slice(0, 10);
+                    const startDate = form.registrationStart
+                      ? form.registrationStart.slice(0, 10)
+                      : "";
+                    if (nextDate && startDate && nextDate < startDate) {
+                      return;
+                    }
+                  } else if (
                     form.registrationStart &&
                     value &&
                     value <= form.registrationStart
                   ) {
                     return;
                   }
+
                   if (
+                    part === "time" &&
                     form.endDate &&
                     form.endTime &&
                     value &&
@@ -987,6 +1011,7 @@ function AddActivityModal({
                   ) {
                     return;
                   }
+
                   onChange("registrationEnd", value);
                 }}
               />
