@@ -237,9 +237,95 @@ function formatHoursMinutes(hours: number, minutes: number): string {
   return `${hours} ชั่วโมง ${minutes} นาที`;
 }
 
-function toDateTimeInputValue(date?: string | null, time?: string | null) {
-  if (!date || !time) return "";
-  return `${String(date).slice(0, 10)}T${String(time).slice(0, 5)}`;
+function toDateTimeInputValue(
+  value?: string | Date | null,
+): string {
+  if (!value) return "";
+
+  // กรณีเป็น Date object จาก mysql2
+  if (value instanceof Date) {
+    if (Number.isNaN(value.getTime())) return "";
+
+    const parts = new Intl.DateTimeFormat("en-CA", {
+      timeZone: "Asia/Bangkok",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      hourCycle: "h23",
+    }).formatToParts(value);
+
+    const get = (type: string) =>
+      parts.find((part) => part.type === type)?.value || "";
+
+    const year = get("year");
+    const month = get("month");
+    const day = get("day");
+    const hour = get("hour");
+    const minute = get("minute");
+
+    if (!year || !month || !day || !hour || !minute) {
+      return "";
+    }
+
+    return `${year}-${month}-${day}T${hour}:${minute}`;
+  }
+
+  const raw = String(value).trim();
+
+  if (!raw) return "";
+
+  /*
+   * กรณี MySQL DATETIME:
+   * 2026-09-23 11:25:00
+   * 2026-09-23T11:25:00
+   *
+   * MySQL DATETIME ไม่มี timezone
+   * จึงต้องใช้ค่าที่เก็บไว้ตรง ๆ
+   */
+  const mysqlMatch = raw.match(
+    /^(\d{4}-\d{2}-\d{2})[ T](\d{2}:\d{2})/,
+  );
+
+  if (mysqlMatch) {
+    return `${mysqlMatch[1]}T${mysqlMatch[2]}`;
+  }
+
+  /*
+   * กรณี ISO ที่มี timezone เช่น
+   * 2026-09-23T04:25:00.000Z
+   *
+   * แปลงเป็นเวลา Asia/Bangkok ก่อนนำเข้า input
+   */
+  const date = new Date(raw);
+
+  if (!Number.isNaN(date.getTime())) {
+    const parts = new Intl.DateTimeFormat("en-CA", {
+      timeZone: "Asia/Bangkok",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      hourCycle: "h23",
+    }).formatToParts(date);
+
+    const get = (type: string) =>
+      parts.find((part) => part.type === type)?.value || "";
+
+    const year = get("year");
+    const month = get("month");
+    const day = get("day");
+    const hour = get("hour");
+    const minute = get("minute");
+
+    if (year && month && day && hour && minute) {
+      return `${year}-${month}-${day}T${hour}:${minute}`;
+    }
+  }
+
+  return "";
 }
 
 function toDateInputValue(value?: string | Date | null): string {
@@ -2240,20 +2326,28 @@ export default function StaffActivitiesPage() {
         return { ...skill, skillId: skill.skillId || matched?.skillId || "" };
       });
 
-      const payload = {
-        title: editForm.title,
-        description: editForm.description,
-        dateTime: startDateTime,
-        endDateTime: endDateTime,
-        term: editForm.term,
-        location: editForm.location,
-        organizer: editForm.organizer,
-        selectedSkills: updatedSkills,
-        templateId: editForm.templateId || undefined,
-        registrationStart: editForm.registrationStart,
-        registrationEnd: editForm.registrationEnd,
-        capacity: Number(editForm.capacity),
-      };
+const payload = {
+  title: editForm.title,
+  description: editForm.description,
+  dateTime: startDateTime,
+  endDateTime: endDateTime,
+  term: editForm.term,
+  location: editForm.location,
+  organizer: editForm.organizer,
+  selectedSkills: updatedSkills,
+  templateId: editForm.templateId || undefined,
+
+  // ใช้เวลาไทยตรง ๆ ไม่ให้ Date แปลง timezone
+  registrationStart: editForm.registrationStart
+    ? editForm.registrationStart.replace("T", " ") + ":00"
+    : null,
+
+  registrationEnd: editForm.registrationEnd
+    ? editForm.registrationEnd.replace("T", " ") + ":00"
+    : null,
+
+  capacity: Number(editForm.capacity),
+};
 
       const res = await fetch(apiPath(`/api/activities/${editingActivity.id}`), {
         method: "PUT",
@@ -2274,39 +2368,52 @@ export default function StaffActivitiesPage() {
     }
   };
 
-  const handleEdit = (activity: StaffActivity) => {
-    setEditingActivity(activity);
+const handleEdit = (activity: StaffActivity) => {
+  setEditingActivity(activity);
 
-    setEditForm({
-      activityCode: activity.id,
-      title: activity.title,
-      description: activity.description,
-      startDate: toDateInputValue(activity.date),
-      startTime: activity.time ? String(activity.time).slice(0, 5) : "",
-      endDate: toDateInputValue(activity.endDate),
-      endTime: activity.endTime ? String(activity.endTime).slice(0, 5) : "",
-      term: activity.term,
-      location: activity.location,
-      organizer: activity.organizer || "คณะวิทยาศาสตร์และนวัตกรรมดิจิทัล",
-      capacity: String(activity.capacity ?? 30),
-      selectedSkills: activity.skills.map((skill) => ({
-        skillId: skill.skillId || "",
-        name: skill.name,
-        level: skill.level,
-      })),
-      templateId: activity.templateId || "",
-      registrationStart: toDateTimeInputValue(
-        activity.registrationStart?.slice(0, 10),
-        activity.registrationStart?.slice(11, 16),
-      ),
-      registrationEnd: toDateTimeInputValue(
-        activity.registrationEnd?.slice(0, 10),
-        activity.registrationEnd?.slice(11, 16),
-      ),
-    });
+  setEditForm({
+    activityCode: activity.id,
+    title: activity.title,
+    description: activity.description,
 
-    setIsEditModalOpen(true);
-  };
+    startDate: toDateInputValue(activity.date),
+    startTime: activity.time
+      ? String(activity.time).slice(0, 5)
+      : "",
+
+    endDate: toDateInputValue(activity.endDate),
+    endTime: activity.endTime
+      ? String(activity.endTime).slice(0, 5)
+      : "",
+
+    term: activity.term,
+    location: activity.location,
+    organizer:
+      activity.organizer ||
+      "คณะวิทยาศาสตร์และนวัตกรรมดิจิทัล",
+
+    capacity: String(activity.capacity ?? 30),
+
+    selectedSkills: activity.skills.map((skill) => ({
+      skillId: skill.skillId || "",
+      name: skill.name,
+      level: skill.level,
+    })),
+
+    templateId: activity.templateId || "",
+
+    // แก้เฉพาะส่วนช่วงเวลาลงทะเบียน
+    registrationStart: toDateTimeInputValue(
+      activity.registrationStart,
+    ),
+
+    registrationEnd: toDateTimeInputValue(
+      activity.registrationEnd,
+    ),
+  });
+
+  setIsEditModalOpen(true);
+};
 
   const handleEndActivity = async (activityId: string) => {
     const activity = activities.find((a) => a.id === activityId);

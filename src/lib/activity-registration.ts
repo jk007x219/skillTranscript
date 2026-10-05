@@ -115,7 +115,20 @@ export function parseRegistrationQrPayload(value: unknown) {
 
 export function toMySqlDateTime(value: unknown) {
   if (typeof value !== "string" || !value) return null;
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return null;
-  return `${value.slice(0, 16).replace("T", " ")}:00`;
+
+  const raw = value.trim();
+
+  // รองรับ datetime-local:
+  // 2026-10-08T01:00
+  // หรือ 2026-10-08T01:00:00
+
+  const match = raw.match(
+    /^(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2})(?::(\d{2}))?$/,
+  );
+
+  if (!match) return null;
+
+  const [, year, month, day, hour, minute, second] = match;
+
+  return `${year}-${month}-${day} ${hour}:${minute}:${second || "00"}`;
 }
