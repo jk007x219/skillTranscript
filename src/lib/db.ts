@@ -14,6 +14,12 @@ export const pool =
     database: process.env.DB_NAME,
     port: Number(process.env.DB_PORT || 3306),
     charset: "utf8mb4",
+
+    // สำคัญ:
+    // MySQL DATETIME ไม่มี timezone
+    // ต้องอ่านกลับมาเป็น string โดยตรง
+    dateStrings: ["DATETIME"],
+
     waitForConnections: true,
     connectionLimit: 10,
     queueLimit: 0,
