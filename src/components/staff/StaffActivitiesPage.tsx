@@ -368,14 +368,30 @@ function getActivityStartDateTime(activity: StaffActivity): Date | null {
 
 function formatThaiDate(value?: string | null, short = false): string {
   if (!value) return "ไม่ระบุ";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "ไม่ระบุ";
 
-  return date.toLocaleDateString("th-TH", {
-    year: "numeric",
-    month: short ? "short" : "long",
-    day: "numeric",
-  });
+  const raw = String(value).trim();
+
+  // MySQL DATETIME / DATE
+  // ใช้วันที่ตรง ๆ โดยไม่ผ่าน new Date()
+  const match = raw.match(/^(\d{4})-(\d{2})-(\d{2})/);
+
+  if (match) {
+    const [, year, month, day] = match;
+
+    const date = new Date(
+      Number(year),
+      Number(month) - 1,
+      Number(day),
+    );
+
+    return date.toLocaleDateString("th-TH", {
+      year: "numeric",
+      month: short ? "short" : "long",
+      day: "numeric",
+    });
+  }
+
+  return "ไม่ระบุ";
 }
 
 function formatThaiTime(value?: string | null): string {
