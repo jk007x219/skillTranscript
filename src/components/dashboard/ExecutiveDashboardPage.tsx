@@ -29,9 +29,6 @@ import {
   PolarGrid,
   PolarAngleAxis,
   PolarRadiusAxis,
-  PieChart,
-  Pie,
-  Cell,
   BarChart,
   Bar,
   XAxis,
@@ -99,16 +96,6 @@ type DashboardData = {
 };
 
 // ======================================================
-// สีกราฟ
-// ======================================================
-
-const COLORS = [
-  "#22C55E",
-  "#FFC107",
-  "#EF4444",
-];
-
-// ======================================================
 // Icon ของแต่ละทักษะ
 // ======================================================
 
@@ -117,31 +104,19 @@ function getSkillIcon(title: string) {
   if (title.includes("ผู้ประกอบการ")) return Briefcase;
   if (title.includes("ทีม")) return UsersRound;
 
-  if (
-    title.includes("ดิจิทัล") ||
-    title.includes("เครื่องมือ")
-  ) {
+  if (title.includes("ดิจิทัล") || title.includes("เครื่องมือ")) {
     return Monitor;
   }
 
-  if (
-    title.includes("คิด") ||
-    title.includes("แก้ปัญหา")
-  ) {
+  if (title.includes("คิด") || title.includes("แก้ปัญหา")) {
     return Puzzle;
   }
 
-  if (
-    title.includes("ปัญญาประดิษฐ์") ||
-    title.includes("AI")
-  ) {
+  if (title.includes("ปัญญาประดิษฐ์") || title.includes("AI")) {
     return Cpu;
   }
 
-  if (
-    title.includes("ปลอดภัย") ||
-    title.includes("ไซเบอร์")
-  ) {
+  if (title.includes("ปลอดภัย") || title.includes("ไซเบอร์")) {
     return ShieldCheck;
   }
 
@@ -169,39 +144,48 @@ function getAcademicYearLabel(year: number) {
 }
 
 // ======================================================
+// Radar label (ย่อชื่อทักษะให้สั้น)
+// ======================================================
+
+function getRadarLabel(title: string) {
+  const labels: Record<string, string> = {
+    "ทักษะการสร้างนวัตกรรมสังคม": "สร้างนวัตกรรมสังคม",
+    "ทักษะการใช้ห้องปฏิบัติการและความปลอดภัยในห้องปฏิบัติการ":
+      "ห้องปฏิบัติการ\nและความปลอดภัย",
+    "ทักษะการคิดเชิงออกแบบนวัตกรรม": "คิดเชิงออกแบบ\nนวัตกรรม",
+    "ทักษะการใช้เครื่องมือวิทยาศาสตร์": "ใช้เครื่องมือ\nวิทยาศาสตร์",
+    "ทักษะการใช้ปัญญาประดิษฐ์": "ใช้ปัญญาประดิษฐ์",
+    "ทักษะความปลอดภัยไซเบอร์": "ความปลอดภัย\nไซเบอร์",
+    "ทักษะการสื่อสาร": "การสื่อสาร",
+    "ทักษะการเป็นผู้ประกอบการ": "การเป็น\nผู้ประกอบการ",
+    "ทักษะการทำงานเป็นทีม": "การทำงานเป็นทีม",
+    "ทักษะการคิดและการแก้ปัญหา": "คิดและแก้ปัญหา",
+    "ทักษะดิจิทัล": "ทักษะดิจิทัล",
+  };
+  return labels[title] ?? title.replace(/^ทักษะ/, "").trim();
+}
+
+// ======================================================
 // Component
 // ======================================================
 
 export default function ExecutiveDashboardPage() {
-  const {
-    user,
-    loading: authLoading,
-  } = useAuth();
+  const { user, loading: authLoading } = useAuth();
 
-  const [data, setData] =
-    useState<DashboardData | null>(null);
+  const [data, setData] = useState<DashboardData | null>(null);
 
-  const [loading, setLoading] =
-    useState(true);
+  const [loading, setLoading] = useState(true);
 
-  const [error, setError] =
-    useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   // ====================================================
   // Filters
   // ====================================================
 
-  const [academicYear, setAcademicYear] =
-    useState("all");
-
-  const [term, setTerm] =
-    useState("all");
-
-  const [program, setProgram] =
-    useState("all");
-
-  const [major, setMajor] =
-    useState("all");
+  const [academicYear, setAcademicYear] = useState("all");
+  const [term, setTerm] = useState("all");
+  const [program, setProgram] = useState("all");
+  const [major, setMajor] = useState("all");
 
   // ====================================================
   // โหลดข้อมูล
@@ -210,22 +194,16 @@ export default function ExecutiveDashboardPage() {
   useEffect(() => {
     if (authLoading) return;
 
-    const controller =
-      new AbortController();
+    const controller = new AbortController();
 
     const fetchData = async () => {
       try {
         setLoading(true);
         setError(null);
 
-        const params =
-          new URLSearchParams();
+        const params = new URLSearchParams();
 
-        params.set(
-          "academicYear",
-          academicYear
-        );
-
+        params.set("academicYear", academicYear);
         params.set("term", term);
         params.set("program", program);
         params.set("major", major);
@@ -239,29 +217,21 @@ export default function ExecutiveDashboardPage() {
         );
 
         if (!res.ok) {
-          throw new Error(
-            "ไม่สามารถโหลดข้อมูลแดชบอร์ดได้"
-          );
+          throw new Error("ไม่สามารถโหลดข้อมูลแดชบอร์ดได้");
         }
 
-        const result =
-          (await res.json()) as DashboardData;
+        const result = (await res.json()) as DashboardData;
 
         setData(result);
       } catch (err: any) {
-        if (
-          err?.name === "AbortError"
-        ) {
+        if (err?.name === "AbortError") {
           return;
         }
 
         console.error(err);
 
         setData(null);
-
-        setError(
-          "ไม่สามารถโหลดข้อมูลแดชบอร์ดได้"
-        );
+        setError("ไม่สามารถโหลดข้อมูลแดชบอร์ดได้");
       } finally {
         setLoading(false);
       }
@@ -272,13 +242,7 @@ export default function ExecutiveDashboardPage() {
     return () => {
       controller.abort();
     };
-  }, [
-    authLoading,
-    academicYear,
-    term,
-    program,
-    major,
-  ]);
+  }, [authLoading, academicYear, term, program, major]);
 
   // ====================================================
   // Reset filter
@@ -293,11 +257,6 @@ export default function ExecutiveDashboardPage() {
 
   // ====================================================
   // Export PDF
-  //
-  // Browser Print -> Save as PDF
-  //
-  // PDF จะแสดงเฉพาะส่วนรายงานข้อความ
-  // ไม่แสดงกราฟ
   // ====================================================
 
   const handleExportPDF = () => {
@@ -314,9 +273,7 @@ export default function ExecutiveDashboardPage() {
         <div className="flex min-h-[400px] items-center justify-center">
           <Loader2 className="h-8 w-8 animate-spin text-[#1565C0]" />
 
-          <span className="ml-2 text-slate-500">
-            กำลังโหลดข้อมูล...
-          </span>
+          <span className="ml-2 text-slate-500">กำลังโหลดข้อมูล...</span>
         </div>
       </ExecutiveShell>
     );
@@ -357,8 +314,6 @@ export default function ExecutiveDashboardPage() {
   // คะแนนเฉลี่ยแต่ละหมวด
   // ====================================================
 
-  // ค่าเฉลี่ยหมวด: นับเฉพาะทักษะที่มีนิสิตเข้าร่วมจริง
-  // แต่ข้อมูล facultySkills / essentialSkills ยังคงครบทุกทักษะสำหรับกราฟ
   const assessedFacultySkills = facultySkills.filter(
     (item) => (item.participantCount ?? 0) > 0
   );
@@ -370,10 +325,7 @@ export default function ExecutiveDashboardPage() {
   const facultyAverage =
     assessedFacultySkills.length > 0
       ? Math.round(
-          (assessedFacultySkills.reduce(
-            (sum, item) => sum + item.average,
-            0
-          ) /
+          (assessedFacultySkills.reduce((sum, item) => sum + item.average, 0) /
             assessedFacultySkills.length) *
             100
         ) / 100
@@ -382,10 +334,7 @@ export default function ExecutiveDashboardPage() {
   const essentialAverage =
     assessedEssentialSkills.length > 0
       ? Math.round(
-          (assessedEssentialSkills.reduce(
-            (sum, item) => sum + item.average,
-            0
-          ) /
+          (assessedEssentialSkills.reduce((sum, item) => sum + item.average, 0) /
             assessedEssentialSkills.length) *
             100
         ) / 100
@@ -407,22 +356,25 @@ export default function ExecutiveDashboardPage() {
   // ====================================================
 
   const filterDescription = [
-    academicYear !== "all"
-      ? `ปีการศึกษา ${academicYear}`
-      : "ทุกปีการศึกษา",
-
-    term !== "all"
-      ? `ภาค ${term}`
-      : "ทุกภาคการศึกษา",
-
-    program !== "all"
-      ? program
-      : "ทุกหลักสูตร",
-
-    major !== "all"
-      ? major
-      : "ทุกวิชาเอก",
+    academicYear !== "all" ? `ปีการศึกษา ${academicYear}` : "ทุกปีการศึกษา",
+    term !== "all" ? `ภาค ${term}` : "ทุกภาคการศึกษา",
+    program !== "all" ? program : "ทุกหลักสูตร",
+    major !== "all" ? major : "ทุกวิชาเอก",
   ].join(" • ");
+
+  // ====================================================
+  // Radar data สำหรับ 2 กราฟใหม่
+  // ====================================================
+
+  const facultyRadarData = facultySkills.map((item) => ({
+    skill: getRadarLabel(item.skillName),
+    score: item.average,
+  }));
+
+  const essentialRadarData = essentialSkills.map((item) => ({
+    skill: getRadarLabel(item.skillName),
+    score: item.average,
+  }));
 
   // ====================================================
   // Render
@@ -457,12 +409,6 @@ export default function ExecutiveDashboardPage() {
             font-family: "Sarabun", "TH Sarabun New", "Noto Sans Thai", sans-serif !important;
           }
 
-
-
-          /* ================================================
-             ซ่อน Header / Sidebar / ปุ่ม / Filter
-          ================================================= */
-
           main:has(.executive-dashboard-print) > header,
           main:has(.executive-dashboard-print) > div > aside,
           .executive-dashboard-print .no-print {
@@ -484,21 +430,11 @@ export default function ExecutiveDashboardPage() {
             color: #111827 !important;
           }
 
-          /* ================================================
-             ซ่อน Header หน้า Dashboard ปกติ
-          ================================================= */
-
-          .executive-dashboard-print
-            .screen-dashboard-header {
+          .executive-dashboard-print .screen-dashboard-header {
             display: none !important;
           }
 
-          /* ================================================
-             Print Header — ตราครุฑ / ชื่อหน่วยงาน / เลขที่เอกสาร
-          ================================================= */
-
-          .executive-dashboard-print
-            .print-report-header {
+          .executive-dashboard-print .print-report-header {
             display: flex !important;
             align-items: flex-start !important;
             justify-content: space-between !important;
@@ -510,14 +446,11 @@ export default function ExecutiveDashboardPage() {
             border-bottom: 0 !important;
           }
 
-          .executive-dashboard-print
-            .print-header-text {
+          .executive-dashboard-print .print-header-text {
             flex: 1 !important;
           }
 
-          .executive-dashboard-print
-            .print-header-text
-            .print-org-th {
+          .executive-dashboard-print .print-header-text .print-org-th {
             margin: 0 !important;
             font-size: 19px !important;
             font-weight: 700 !important;
@@ -525,25 +458,20 @@ export default function ExecutiveDashboardPage() {
             letter-spacing: 0.2px !important;
           }
 
-          .executive-dashboard-print
-            .print-header-text
-            .print-org-sub {
+          .executive-dashboard-print .print-header-text .print-org-sub {
             margin: 2px 0 0 0 !important;
             font-size: 12px !important;
             color: #4b5563 !important;
           }
 
-          .executive-dashboard-print
-            .print-header-text
-            .print-doc-title {
+          .executive-dashboard-print .print-header-text .print-doc-title {
             margin: 12px 0 0 0 !important;
             font-size: 16px !important;
             font-weight: 700 !important;
             color: #111827 !important;
           }
 
-          .executive-dashboard-print
-            .print-header-meta {
+          .executive-dashboard-print .print-header-meta {
             flex-shrink: 0 !important;
             text-align: right !important;
             font-size: 10.5px !important;
@@ -552,15 +480,12 @@ export default function ExecutiveDashboardPage() {
             white-space: nowrap !important;
           }
 
-          .executive-dashboard-print
-            .print-header-meta
-            strong {
+          .executive-dashboard-print .print-header-meta strong {
             color: #111827 !important;
             font-weight: 700 !important;
           }
 
-          .executive-dashboard-print
-            .print-header-divider {
+          .executive-dashboard-print .print-header-divider {
             display: block !important;
             height: 0 !important;
             margin: 10px 0 14px 0 !important;
@@ -568,8 +493,7 @@ export default function ExecutiveDashboardPage() {
             border-bottom: 1pt solid #c9a227 !important;
           }
 
-          .executive-dashboard-print
-            .print-filter-line {
+          .executive-dashboard-print .print-filter-line {
             display: block !important;
             margin: -6px 0 16px 0 !important;
             padding: 7px 12px !important;
@@ -584,18 +508,11 @@ export default function ExecutiveDashboardPage() {
             color: #374151 !important;
           }
 
-          .executive-dashboard-print
-            .print-filter-line
-            strong {
+          .executive-dashboard-print .print-filter-line strong {
             color: #0f2f66 !important;
           }
 
-          /* ================================================
-             Overview
-          ================================================= */
-
-          .executive-dashboard-print
-            .print-overview {
+          .executive-dashboard-print .print-overview {
             display: grid !important;
             grid-template-columns: repeat(4, 1fr) !important;
             gap: 0 !important;
@@ -608,47 +525,31 @@ export default function ExecutiveDashboardPage() {
             overflow: hidden !important;
           }
 
-          .executive-dashboard-print
-            .print-overview
-            > div {
+          .executive-dashboard-print .print-overview > div {
             display: block !important;
-
             padding: 10px 12px !important;
-
             border: 0 !important;
             border-right: 1pt solid #e5e9f2 !important;
             border-radius: 0 !important;
-
             background: #ffffff !important;
-
             box-shadow: none !important;
-
             break-inside: avoid !important;
             page-break-inside: avoid !important;
           }
 
-          .executive-dashboard-print
-            .print-overview
-            > div:last-child {
+          .executive-dashboard-print .print-overview > div:last-child {
             border-right: 0 !important;
           }
 
-          .executive-dashboard-print
-            .print-overview
-            > div
-            > div:first-child {
+          .executive-dashboard-print .print-overview > div > div:first-child {
             display: none !important;
           }
 
-          .executive-dashboard-print
-            .print-overview
-            p {
+          .executive-dashboard-print .print-overview p {
             margin: 0 !important;
           }
 
-          .executive-dashboard-print
-            .print-overview
-            p:first-child {
+          .executive-dashboard-print .print-overview p:first-child {
             font-size: 10px !important;
             font-weight: 600 !important;
             color: #6b7280 !important;
@@ -656,62 +557,38 @@ export default function ExecutiveDashboardPage() {
             letter-spacing: 0.4px !important;
           }
 
-          .executive-dashboard-print
-            .print-overview
-            p:nth-child(2) {
+          .executive-dashboard-print .print-overview p:nth-child(2) {
             margin-top: 4px !important;
             font-size: 21px !important;
             font-weight: 700 !important;
             color: #0f2f66 !important;
           }
 
-          .executive-dashboard-print
-            .print-overview
-            p:nth-child(3) {
+          .executive-dashboard-print .print-overview p:nth-child(3) {
             margin-top: 1px !important;
             font-size: 9.5px !important;
             color: #9ca3af !important;
           }
 
-          /* ================================================
-             ซ่อนกราฟทั้งหมด
-          ================================================= */
-
-          .executive-dashboard-print
-            .print-hide {
+          .executive-dashboard-print .print-hide {
             display: none !important;
           }
 
-          .executive-dashboard-print
-            .recharts-responsive-container,
-          .executive-dashboard-print
-            .recharts-wrapper {
+          .executive-dashboard-print .recharts-responsive-container,
+          .executive-dashboard-print .recharts-wrapper {
             display: none !important;
           }
 
-          /* ================================================
-             ซ่อน Radar + Pie section ทั้งหมด
-          ================================================= */
-
-          .executive-dashboard-print
-            .print-level-layout {
+          .executive-dashboard-print .print-level-layout {
             display: none !important;
           }
 
-          /* ================================================
-             PDF Skill Summary
-          ================================================= */
-
-          .executive-dashboard-print
-            .print-pdf-skills {
+          .executive-dashboard-print .print-pdf-skills {
             display: block !important;
-
             margin-top: 18px !important;
           }
 
-          .executive-dashboard-print
-            .print-pdf-skills
-            h2 {
+          .executive-dashboard-print .print-pdf-skills h2 {
             margin: 0 !important;
             padding-bottom: 7px !important;
             padding-left: 8px !important;
@@ -724,9 +601,7 @@ export default function ExecutiveDashboardPage() {
             color: #0f2f66 !important;
           }
 
-          .executive-dashboard-print
-            .print-pdf-skills
-            > p {
+          .executive-dashboard-print .print-pdf-skills > p {
             margin-top: 6px !important;
             margin-bottom: 10px !important;
 
@@ -735,130 +610,80 @@ export default function ExecutiveDashboardPage() {
             font-style: italic !important;
           }
 
-          .executive-dashboard-print
-            .print-pdf-skills
-            table {
+          .executive-dashboard-print .print-pdf-skills table {
             width: 100% !important;
-
             border-collapse: collapse !important;
-
             table-layout: fixed !important;
-
             font-size: 10.5px !important;
           }
 
-          .executive-dashboard-print
-            .print-pdf-skills
-            thead {
+          .executive-dashboard-print .print-pdf-skills thead {
             display: table-header-group !important;
           }
 
-          .executive-dashboard-print
-            .print-pdf-skills
-            tr {
+          .executive-dashboard-print .print-pdf-skills tr {
             break-inside: avoid !important;
             page-break-inside: avoid !important;
           }
 
-          .executive-dashboard-print
-            .print-pdf-skills
-            tbody
-            tr:nth-child(even) {
+          .executive-dashboard-print .print-pdf-skills tbody tr:nth-child(even) {
             background: #f6f8fb !important;
           }
 
-          .executive-dashboard-print
-            .print-pdf-skills
-            th {
+          .executive-dashboard-print .print-pdf-skills th {
             padding: 8px 6px !important;
-
             border: 1pt solid #0f2f66 !important;
-
             background: #0f2f66 !important;
-
             color: #ffffff !important;
-
             font-weight: 700 !important;
           }
 
-          .executive-dashboard-print
-            .print-pdf-skills
-            td {
+          .executive-dashboard-print .print-pdf-skills td {
             padding: 7px 6px !important;
-
             border: 1pt solid #dbe3ef !important;
-
             color: #374151 !important;
-
             overflow-wrap: anywhere !important;
             word-break: break-word !important;
           }
 
-          /* ================================================
-             Summary box
-          ================================================= */
-
-          .executive-dashboard-print
-            .print-summary-boxes {
+          .executive-dashboard-print .print-summary-boxes {
             display: grid !important;
             grid-template-columns: repeat(2, 1fr) !important;
-
             gap: 8px !important;
-
             margin-top: 12px !important;
           }
 
-          .executive-dashboard-print
-            .print-summary-box {
+          .executive-dashboard-print .print-summary-box {
             border: 1pt solid #dbe3ef !important;
             border-top: 2.2pt solid #c9a227 !important;
-
             padding: 9px 11px !important;
             background: #f7f9fc !important;
-
             break-inside: avoid !important;
             page-break-inside: avoid !important;
           }
 
-          .executive-dashboard-print
-            .print-summary-box
-            p {
+          .executive-dashboard-print .print-summary-box p {
             margin: 0 !important;
           }
 
-          .executive-dashboard-print
-            .print-summary-box
-            p:first-child {
+          .executive-dashboard-print .print-summary-box p:first-child {
             font-size: 10px !important;
             color: #6b7280 !important;
           }
 
-          .executive-dashboard-print
-            .print-summary-box
-            p:last-child {
+          .executive-dashboard-print .print-summary-box p:last-child {
             margin-top: 3px !important;
-
             font-size: 17px !important;
-
             font-weight: 700 !important;
-
             color: #0f2f66 !important;
           }
 
-          /* ================================================
-             Level Distribution
-          ================================================= */
-
-          .executive-dashboard-print
-            .print-level-summary {
+          .executive-dashboard-print .print-level-summary {
             display: block !important;
-
             margin-top: 18px !important;
           }
 
-          .executive-dashboard-print
-            .print-level-summary
-            h2 {
+          .executive-dashboard-print .print-level-summary h2 {
             margin: 0 !important;
             padding-bottom: 7px !important;
             padding-left: 8px !important;
@@ -871,72 +696,44 @@ export default function ExecutiveDashboardPage() {
             color: #0f2f66 !important;
           }
 
-          .executive-dashboard-print
-            .print-level-summary
-            table {
+          .executive-dashboard-print .print-level-summary table {
             width: 100% !important;
-
             margin-top: 8px !important;
-
             border-collapse: collapse !important;
-
             font-size: 10.5px !important;
           }
 
-          .executive-dashboard-print
-            .print-level-summary
-            th,
-          .executive-dashboard-print
-            .print-level-summary
-            td {
+          .executive-dashboard-print .print-level-summary th,
+          .executive-dashboard-print .print-level-summary td {
             padding: 7px 6px !important;
-
             border: 1pt solid #dbe3ef !important;
           }
 
-          .executive-dashboard-print
-            .print-level-summary
-            th {
+          .executive-dashboard-print .print-level-summary th {
             background: #0f2f66 !important;
             color: #ffffff !important;
             font-weight: 700 !important;
           }
 
-          .executive-dashboard-print
-            .print-level-summary
-            tbody
-            tr:nth-child(even) {
+          .executive-dashboard-print .print-level-summary tbody tr:nth-child(even) {
             background: #f6f8fb !important;
           }
 
-          .executive-dashboard-print
-            .print-level-summary
-            tr {
+          .executive-dashboard-print .print-level-summary tr {
             break-inside: avoid !important;
             page-break-inside: avoid !important;
           }
 
-          /* ================================================
-             Term Statistics
-          ================================================= */
-
-          .executive-dashboard-print
-            .print-terms {
+          .executive-dashboard-print .print-terms {
             margin-top: 18px !important;
-
             padding: 0 !important;
-
             border: 0 !important;
             border-radius: 0 !important;
-
             box-shadow: none !important;
-
             break-inside: auto !important;
           }
 
-          .executive-dashboard-print
-            .print-terms
-            h2 {
+          .executive-dashboard-print .print-terms h2 {
             margin: 0 !important;
             padding-bottom: 7px !important;
             padding-left: 8px !important;
@@ -949,9 +746,7 @@ export default function ExecutiveDashboardPage() {
             color: #0f2f66 !important;
           }
 
-          .executive-dashboard-print
-            .print-terms
-            > p {
+          .executive-dashboard-print .print-terms > p {
             margin-top: 6px !important;
             margin-bottom: 10px !important;
 
@@ -960,115 +755,69 @@ export default function ExecutiveDashboardPage() {
             font-style: italic !important;
           }
 
-          .executive-dashboard-print
-            .print-terms
-            > div {
+          .executive-dashboard-print .print-terms > div {
             overflow: visible !important;
           }
 
-          .executive-dashboard-print
-            .print-terms
-            table {
+          .executive-dashboard-print .print-terms table {
             width: 100% !important;
             min-width: 0 !important;
-
             border-collapse: collapse !important;
-
             table-layout: fixed !important;
-
             font-size: 10.5px !important;
           }
 
-          .executive-dashboard-print
-            .print-terms
-            thead {
+          .executive-dashboard-print .print-terms thead {
             display: table-header-group !important;
           }
 
-          .executive-dashboard-print
-            .print-terms
-            tr {
+          .executive-dashboard-print .print-terms tr {
             break-inside: avoid !important;
             page-break-inside: avoid !important;
           }
 
-          .executive-dashboard-print
-            .print-terms
-            th {
+          .executive-dashboard-print .print-terms th {
             padding: 8px 6px !important;
-
             border: 1pt solid #0f2f66 !important;
-
             background: #0f2f66 !important;
-
             color: #ffffff !important;
-
             font-weight: 700 !important;
           }
 
-          .executive-dashboard-print
-            .print-terms
-            td {
+          .executive-dashboard-print .print-terms td {
             padding: 7px 6px !important;
-
             border: 1pt solid #dbe3ef !important;
-
             color: #374151 !important;
-
             overflow-wrap: anywhere !important;
             word-break: break-word !important;
           }
 
-          .executive-dashboard-print
-            .print-terms
-            tbody
-            tr:nth-child(even) {
+          .executive-dashboard-print .print-terms tbody tr:nth-child(even) {
             background: #f6f8fb !important;
           }
 
-          /* ซ่อนคอลัมน์แนวโน้ม */
-          .executive-dashboard-print
-            .print-terms
-            th:last-child,
-          .executive-dashboard-print
-            .print-terms
-            td:last-child {
+          .executive-dashboard-print .print-terms th:last-child,
+          .executive-dashboard-print .print-terms td:last-child {
             display: none !important;
           }
 
-          /* ================================================
-             Footer
-          ================================================= */
-
-          .executive-dashboard-print
-            .print-footer {
+          .executive-dashboard-print .print-footer {
             display: flex !important;
             align-items: center !important;
             justify-content: space-between !important;
 
             margin-top: 20px !important;
-
             padding-top: 8px !important;
 
             border-top: 1pt solid #dbe3ef !important;
 
             font-size: 9px !important;
-
             color: #9ca3af !important;
           }
 
-          /* ================================================
-             ป้องกัน card แตกกลางหน้า
-          ================================================= */
-
-          .executive-dashboard-print
-            .rounded-2xl {
+          .executive-dashboard-print .rounded-2xl {
             box-shadow: none !important;
           }
-
-          /* ================================================
-             ซ่อน interactive elements
-          ================================================= */
 
           button,
           select,
@@ -1076,10 +825,6 @@ export default function ExecutiveDashboardPage() {
             display: none !important;
           }
         }
-
-        /* ==================================================
-           ปกติบนหน้าจอ
-        ================================================== */
 
         .print-pdf-skills,
         .print-level-summary {
@@ -1089,7 +834,6 @@ export default function ExecutiveDashboardPage() {
 
       <section className="executive-dashboard-print p-4 sm:p-6 lg:p-7">
         <div className="min-h-[calc(100vh-8.5rem)]">
-
           {/* ==================================================
               Header
           ================================================== */}
@@ -1104,13 +848,9 @@ export default function ExecutiveDashboardPage() {
 
               <p className="mt-1 text-sm text-slate-500">
                 ข้อมูลล่าสุดจากฐานข้อมูล{" "}
-                {new Date().toLocaleDateString(
-                  "th-TH"
-                )}
+                {new Date().toLocaleDateString("th-TH")}
               </p>
             </div>
-
-            {/* Buttons */}
 
             <div className="no-print flex flex-wrap gap-2">
               <button
@@ -1119,7 +859,6 @@ export default function ExecutiveDashboardPage() {
                 className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-600 shadow-sm transition hover:bg-slate-50"
               >
                 <RotateCcw className="h-4 w-4" />
-
                 รีเซ็ตตัวกรอง
               </button>
 
@@ -1129,7 +868,6 @@ export default function ExecutiveDashboardPage() {
                 className="inline-flex items-center gap-2 rounded-xl bg-[#1565C0] px-4 py-2.5 text-sm font-medium text-white shadow-sm transition hover:bg-[#0D47A1]"
               >
                 <Download className="h-4 w-4" />
-
                 ส่งออก PDF
               </button>
             </div>
@@ -1142,8 +880,7 @@ export default function ExecutiveDashboardPage() {
           <div className="print-report-header hidden">
             <div className="print-header-text">
               <p className="print-org-th">
-                คณะวิทยาศาสตร์และนวัตกรรมดิจิทัล
-                มหาวิทยาลัยทักษิณ
+                คณะวิทยาศาสตร์และนวัตกรรมดิจิทัล มหาวิทยาลัยทักษิณ
               </p>
 
               <p className="print-org-sub">
@@ -1151,8 +888,7 @@ export default function ExecutiveDashboardPage() {
               </p>
 
               <p className="print-doc-title">
-                รายงานสรุปภาพรวมทักษะของนิสิต
-                (Student Skill Transcript Summary)
+                รายงานสรุปภาพรวมทักษะของนิสิต (Student Skill Transcript Summary)
               </p>
             </div>
 
@@ -1161,8 +897,7 @@ export default function ExecutiveDashboardPage() {
                 เลขที่เอกสาร:{" "}
                 <strong>
                   SKL-
-                  {new Date().getFullYear() + 543}
-                  -
+                  {new Date().getFullYear() + 543}-
                   {String(Date.now()).slice(-5)}
                 </strong>
               </div>
@@ -1183,8 +918,7 @@ export default function ExecutiveDashboardPage() {
           <div className="print-header-divider hidden" />
 
           <div className="print-filter-line hidden">
-            <strong>ขอบเขตข้อมูลในรายงาน:</strong>{" "}
-            {filterDescription}
+            <strong>ขอบเขตข้อมูลในรายงาน:</strong> {filterDescription}
           </div>
 
           {/* ==================================================
@@ -1203,9 +937,7 @@ export default function ExecutiveDashboardPage() {
             </div>
 
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-
               {/* ปีการศึกษา */}
-
               <div>
                 <label className="mb-2 block text-sm font-medium text-slate-700">
                   ปีการศึกษา
@@ -1213,34 +945,20 @@ export default function ExecutiveDashboardPage() {
 
                 <select
                   value={academicYear}
-                  onChange={(e) =>
-                    setAcademicYear(
-                      e.target.value
-                    )
-                  }
+                  onChange={(e) => setAcademicYear(e.target.value)}
                   className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-700 outline-none transition focus:border-[#1565C0] focus:ring-2 focus:ring-blue-100"
                 >
-                  <option value="all">
-                    ทุกปีการศึกษา
-                  </option>
+                  <option value="all">ทุกปีการศึกษา</option>
 
-                  {academicYears.map(
-                    (year) => (
-                      <option
-                        key={year}
-                        value={year}
-                      >
-                        {getAcademicYearLabel(
-                          year
-                        )}
-                      </option>
-                    )
-                  )}
+                  {academicYears.map((year) => (
+                    <option key={year} value={year}>
+                      {getAcademicYearLabel(year)}
+                    </option>
+                  ))}
                 </select>
               </div>
 
               {/* ภาคการศึกษา */}
-
               <div>
                 <label className="mb-2 block text-sm font-medium text-slate-700">
                   ภาคการศึกษา
@@ -1248,30 +966,20 @@ export default function ExecutiveDashboardPage() {
 
                 <select
                   value={term}
-                  onChange={(e) =>
-                    setTerm(e.target.value)
-                  }
+                  onChange={(e) => setTerm(e.target.value)}
                   className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-700 outline-none transition focus:border-[#1565C0] focus:ring-2 focus:ring-blue-100"
                 >
-                  <option value="all">
-                    ทุกภาคการศึกษา
-                  </option>
+                  <option value="all">ทุกภาคการศึกษา</option>
 
-                  {terms.map(
-                    (item) => (
-                      <option
-                        key={item}
-                        value={item}
-                      >
-                        ภาค {item}
-                      </option>
-                    )
-                  )}
+                  {terms.map((item) => (
+                    <option key={item} value={item}>
+                      ภาค {item}
+                    </option>
+                  ))}
                 </select>
               </div>
 
               {/* หลักสูตร */}
-
               <div>
                 <label className="mb-2 block text-sm font-medium text-slate-700">
                   หลักสูตร
@@ -1279,32 +987,20 @@ export default function ExecutiveDashboardPage() {
 
                 <select
                   value={program}
-                  onChange={(e) =>
-                    setProgram(
-                      e.target.value
-                    )
-                  }
+                  onChange={(e) => setProgram(e.target.value)}
                   className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-700 outline-none transition focus:border-[#1565C0] focus:ring-2 focus:ring-blue-100"
                 >
-                  <option value="all">
-                    ทุกหลักสูตร
-                  </option>
+                  <option value="all">ทุกหลักสูตร</option>
 
-                  {programs.map(
-                    (item) => (
-                      <option
-                        key={item}
-                        value={item}
-                      >
-                        {item}
-                      </option>
-                    )
-                  )}
+                  {programs.map((item) => (
+                    <option key={item} value={item}>
+                      {item}
+                    </option>
+                  ))}
                 </select>
               </div>
 
               {/* วิชาเอก */}
-
               <div>
                 <label className="mb-2 block text-sm font-medium text-slate-700">
                   วิชาเอก
@@ -1312,35 +1008,22 @@ export default function ExecutiveDashboardPage() {
 
                 <select
                   value={major}
-                  onChange={(e) =>
-                    setMajor(
-                      e.target.value
-                    )
-                  }
+                  onChange={(e) => setMajor(e.target.value)}
                   className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-700 outline-none transition focus:border-[#1565C0] focus:ring-2 focus:ring-blue-100"
                 >
-                  <option value="all">
-                    ทุกวิชาเอก
-                  </option>
+                  <option value="all">ทุกวิชาเอก</option>
 
-                  {majors.map(
-                    (item) => (
-                      <option
-                        key={item}
-                        value={item}
-                      >
-                        {item}
-                      </option>
-                    )
-                  )}
+                  {majors.map((item) => (
+                    <option key={item} value={item}>
+                      {item}
+                    </option>
+                  ))}
                 </select>
               </div>
             </div>
 
             <div className="mt-4 rounded-xl bg-blue-50 px-4 py-3 text-xs text-[#1565C0]">
-              <span className="font-semibold">
-                ข้อมูลที่กำลังแสดง:
-              </span>{" "}
+              <span className="font-semibold">ข้อมูลที่กำลังแสดง:</span>{" "}
               {filterDescription}
             </div>
           </div>
@@ -1350,30 +1033,21 @@ export default function ExecutiveDashboardPage() {
           ================================================== */}
 
           <div className="print-overview mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-
-            {/* Students */}
-
             <div className="flex items-center gap-4 rounded-2xl border border-blue-100 bg-white p-5 shadow-[0_14px_34px_rgba(15,23,42,0.07)]">
               <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-[#1565C0] text-white shadow-sm">
                 <UsersRound className="h-6 w-6" />
               </div>
 
               <div>
-                <p className="text-sm text-slate-500">
-                  นิสิตทั้งหมด
-                </p>
+                <p className="text-sm text-slate-500">นิสิตทั้งหมด</p>
 
                 <p className="mt-1 text-2xl font-semibold text-slate-950">
                   {totalStudents.toLocaleString()}
                 </p>
 
-                <p className="text-xs text-slate-400">
-                  คน
-                </p>
+                <p className="text-xs text-slate-400">คน</p>
               </div>
             </div>
-
-            {/* Activities */}
 
             <div className="flex items-center gap-4 rounded-2xl border border-blue-100 bg-white p-5 shadow-[0_14px_34px_rgba(15,23,42,0.07)]">
               <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-[#FFC107] text-slate-950 shadow-sm">
@@ -1381,21 +1055,15 @@ export default function ExecutiveDashboardPage() {
               </div>
 
               <div>
-                <p className="text-sm text-slate-500">
-                  กิจกรรมที่เข้าร่วม
-                </p>
+                <p className="text-sm text-slate-500">กิจกรรมที่เข้าร่วม</p>
 
                 <p className="mt-1 text-2xl font-semibold text-slate-950">
                   {totalActivities.toLocaleString()}
                 </p>
 
-                <p className="text-xs text-slate-400">
-                  กิจกรรม
-                </p>
+                <p className="text-xs text-slate-400">กิจกรรม</p>
               </div>
             </div>
-
-            {/* Average */}
 
             <div className="flex items-center gap-4 rounded-2xl border border-blue-100 bg-white p-5 shadow-[0_14px_34px_rgba(15,23,42,0.07)]">
               <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-[#1565C0] text-white shadow-sm">
@@ -1403,21 +1071,15 @@ export default function ExecutiveDashboardPage() {
               </div>
 
               <div>
-                <p className="text-sm text-slate-500">
-                  คะแนนเฉลี่ยทักษะรวม
-                </p>
+                <p className="text-sm text-slate-500">คะแนนเฉลี่ยทักษะรวม</p>
 
                 <p className="mt-1 text-2xl font-semibold text-slate-950">
                   {averageOverallScore}%
                 </p>
 
-                <p className="text-xs text-slate-400">
-                  {overallLevel}
-                </p>
+                <p className="text-xs text-slate-400">{overallLevel}</p>
               </div>
             </div>
-
-            {/* Latest term */}
 
             <div className="flex items-center gap-4 rounded-2xl border border-blue-100 bg-white p-5 shadow-[0_14px_34px_rgba(15,23,42,0.07)]">
               <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-[#4598D0] text-white shadow-sm">
@@ -1425,14 +1087,10 @@ export default function ExecutiveDashboardPage() {
               </div>
 
               <div>
-                <p className="text-sm text-slate-500">
-                  ภาคเรียนล่าสุด
-                </p>
+                <p className="text-sm text-slate-500">ภาคเรียนล่าสุด</p>
 
                 <p className="mt-1 text-lg font-semibold text-slate-950">
-                  {termSummary.length > 0
-                    ? termSummary[0].term
-                    : "-"}
+                  {termSummary.length > 0 ? termSummary[0].term : "-"}
                 </p>
 
                 <p className="text-xs text-slate-400">
@@ -1449,15 +1107,13 @@ export default function ExecutiveDashboardPage() {
           ================================================== */}
 
           <div className="print-pdf-skills mt-6 hidden">
-
             <div className="mb-3">
               <h2 className="text-lg font-semibold text-slate-950">
                 สรุปคะแนนเฉลี่ยทักษะรายด้าน
               </h2>
 
               <p className="mt-1 text-xs text-slate-400">
-                คะแนนเฉลี่ยคำนวณจากผลการประเมินของนิสิต
-                ที่ตรงตามตัวกรองข้อมูล
+                คะแนนเฉลี่ยคำนวณจากผลการประเมินของนิสิตที่ตรงตามตัวกรองข้อมูล
               </p>
             </div>
 
@@ -1483,50 +1139,38 @@ export default function ExecutiveDashboardPage() {
               </thead>
 
               <tbody>
-                {radarData.map(
-                  (item, index) => {
-                    const level =
-                      item.score >= 80
-                        ? "ดีมาก"
-                        : item.score >= 50
-                        ? "ปานกลาง"
-                        : "ต้องปรับปรุง";
+                {radarData.map((item, index) => {
+                  const level =
+                    item.score >= 80
+                      ? "ดีมาก"
+                      : item.score >= 50
+                      ? "ปานกลาง"
+                      : "ต้องปรับปรุง";
 
-                    return (
-                      <tr
-                        key={item.skill}
-                        className="border-b border-slate-200"
-                      >
-                        <td className="px-3 py-2 text-center text-slate-600">
-                          {index + 1}
-                        </td>
+                  return (
+                    <tr key={item.skill} className="border-b border-slate-200">
+                      <td className="px-3 py-2 text-center text-slate-600">
+                        {index + 1}
+                      </td>
 
-                        <td className="px-3 py-2 text-slate-800">
-                          {item.skill}
-                        </td>
+                      <td className="px-3 py-2 text-slate-800">{item.skill}</td>
 
-                        <td className="px-3 py-2 text-right font-semibold text-slate-900">
-                          {item.score.toFixed(2)}%
-                        </td>
+                      <td className="px-3 py-2 text-right font-semibold text-slate-900">
+                        {item.score.toFixed(2)}%
+                      </td>
 
-                        <td className="px-3 py-2 text-center text-slate-700">
-                          {level}
-                        </td>
-                      </tr>
-                    );
-                  }
-                )}
+                      <td className="px-3 py-2 text-center text-slate-700">
+                        {level}
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
 
-            {/* คะแนนเฉลี่ยแต่ละหมวด */}
-
             <div className="print-summary-boxes mt-5 grid grid-cols-2 gap-4">
-
               <div className="print-summary-box border border-slate-200 p-3">
-                <p className="text-xs text-slate-500">
-                  คะแนนเฉลี่ยทักษะคณะ
-                </p>
+                <p className="text-xs text-slate-500">คะแนนเฉลี่ยทักษะคณะ</p>
 
                 <p className="mt-1 text-lg font-semibold text-slate-900">
                   {facultyAverage.toFixed(2)}%
@@ -1534,9 +1178,7 @@ export default function ExecutiveDashboardPage() {
               </div>
 
               <div className="print-summary-box border border-slate-200 p-3">
-                <p className="text-xs text-slate-500">
-                  คะแนนเฉลี่ยทักษะจำเป็น
-                </p>
+                <p className="text-xs text-slate-500">คะแนนเฉลี่ยทักษะจำเป็น</p>
 
                 <p className="mt-1 text-lg font-semibold text-slate-900">
                   {essentialAverage.toFixed(2)}%
@@ -1550,7 +1192,6 @@ export default function ExecutiveDashboardPage() {
           ================================================== */}
 
           <div className="print-level-summary mt-6 hidden">
-
             <h2 className="text-lg font-semibold text-slate-950">
               สรุประดับทักษะของนิสิต
             </h2>
@@ -1558,76 +1199,51 @@ export default function ExecutiveDashboardPage() {
             <table className="mt-3 w-full border-collapse text-sm">
               <thead>
                 <tr>
-                  <th className="px-3 py-2 text-left">
-                    ระดับ
-                  </th>
-
-                  <th className="px-3 py-2 text-right">
-                    จำนวน
-                  </th>
-
-                  <th className="px-3 py-2 text-right">
-                    ร้อยละ
-                  </th>
+                  <th className="px-3 py-2 text-left">ระดับ</th>
+                  <th className="px-3 py-2 text-right">จำนวน</th>
+                  <th className="px-3 py-2 text-right">ร้อยละ</th>
                 </tr>
               </thead>
 
               <tbody>
-                {levelDistribution.map(
-                  (item) => (
-                    <tr key={item.level}>
-                      <td className="px-3 py-2">
-                        {item.level}
-                      </td>
+                {levelDistribution.map((item) => (
+                  <tr key={item.level}>
+                    <td className="px-3 py-2">{item.level}</td>
 
-                      <td className="px-3 py-2 text-right">
-                        {item.count.toLocaleString()} คน
-                      </td>
+                    <td className="px-3 py-2 text-right">
+                      {item.count.toLocaleString()} คน
+                    </td>
 
-                      <td className="px-3 py-2 text-right">
-                        {item.percent}%
-                      </td>
-                    </tr>
-                  )
-                )}
+                    <td className="px-3 py-2 text-right">{item.percent}%</td>
+                  </tr>
+                ))}
               </tbody>
             </table>
           </div>
 
           {/* ==================================================
-              Radar + Pie
+              2 Radar Panels — ทักษะคณะ + ทักษะจำเป็น
           ================================================== */}
 
-          <div className="print-level-layout mt-6 grid gap-4 lg:grid-cols-[1fr_360px]">
-
-            {/* Radar */}
-
-            <div className="print-hide rounded-2xl border border-blue-100 bg-white p-5 shadow-[0_14px_34px_rgba(15,23,42,0.07)]">
+          <div className="print-hide mt-6 grid gap-4 xl:grid-cols-2">
+            {/* Radar — ทักษะคณะ */}
+            <div className="rounded-2xl border border-blue-100 bg-white p-5 shadow-[0_14px_34px_rgba(15,23,42,0.07)]">
               <h2 className="text-lg font-semibold text-slate-950">
-                ภาพรวมทักษะทั้งหมด
+                ทักษะที่นิสิตคณะวิทยาศาสตร์ต้องมี
               </h2>
 
               <p className="text-xs text-slate-400">
-                คะแนนเฉลี่ยของทักษะทั้ง 11 ด้าน
+                ค่าเฉลี่ยทักษะเฉพาะคณะฯ จากนิสิตที่ตรงตามตัวกรอง
               </p>
 
               <div className="mt-4 h-[380px] w-full">
-                <ResponsiveContainer
-                  width="100%"
-                  height="100%"
-                >
-                  <RadarChart
-                    data={radarData}
-                    outerRadius="75%"
-                  >
+                <ResponsiveContainer width="100%" height="100%">
+                  <RadarChart data={facultyRadarData} outerRadius="72%">
                     <PolarGrid stroke="#DCE7F5" />
 
                     <PolarAngleAxis
                       dataKey="skill"
-                      tick={{
-                        fill: "#475569",
-                        fontSize: 10,
-                      }}
+                      tick={{ fill: "#475569", fontSize: 10 }}
                     />
 
                     <PolarRadiusAxis
@@ -1657,111 +1273,64 @@ export default function ExecutiveDashboardPage() {
 
               <div className="mt-2 flex items-center justify-center gap-2 text-xs text-slate-500">
                 <span className="h-2.5 w-2.5 rounded-full bg-[#FFC107]" />
-
-                คะแนนเฉลี่ยของนิสิตที่ตรงตามตัวกรอง
+                ทักษะคณะวิทยาศาสตร์
               </div>
             </div>
 
-            {/* Pie */}
-
-            <div className="print-level-chart rounded-2xl border border-blue-100 bg-white p-5 shadow-[0_14px_34px_rgba(15,23,42,0.07)]">
+            {/* Radar — ทักษะจำเป็น */}
+            <div className="rounded-2xl border border-blue-100 bg-white p-5 shadow-[0_14px_34px_rgba(15,23,42,0.07)]">
               <h2 className="text-lg font-semibold text-slate-950">
-                สัดส่วนนิสิตตามระดับทักษะ
+                ทักษะที่นิสิตจำเป็นต้องมี
               </h2>
 
-              <div className="relative mt-2 h-[220px] w-full">
-                <ResponsiveContainer
-                  width="100%"
-                  height="100%"
-                >
-                  <PieChart>
-                    <Pie
-                      data={levelDistribution}
-                      dataKey="count"
-                      nameKey="level"
-                      innerRadius="65%"
-                      outerRadius="95%"
-                      paddingAngle={2}
-                      startAngle={90}
-                      endAngle={-270}
-                    >
-                      {levelDistribution.map(
-                        (entry, index) => (
-                          <Cell
-                            key={entry.level}
-                            fill={
-                              COLORS[
-                                index %
-                                  COLORS.length
-                              ]
-                            }
-                            stroke="none"
-                          />
-                        )
-                      )}
-                    </Pie>
+              <p className="text-xs text-slate-400">
+                ค่าเฉลี่ยทักษะจำเป็น จากนิสิตที่ตรงตามตัวกรอง
+              </p>
+
+              <div className="mt-4 h-[380px] w-full">
+                <ResponsiveContainer width="100%" height="100%">
+                  <RadarChart data={essentialRadarData} outerRadius="72%">
+                    <PolarGrid stroke="#DCE7F5" />
+
+                    <PolarAngleAxis
+                      dataKey="skill"
+                      tick={{ fill: "#475569", fontSize: 10 }}
+                    />
+
+                    <PolarRadiusAxis
+                      angle={90}
+                      domain={[0, 100]}
+                      tick={false}
+                      axisLine={false}
+                    />
+
+                    <Radar
+                      name="คะแนนเฉลี่ย"
+                      dataKey="score"
+                      stroke="#1565C0"
+                      fill="#1565C0"
+                      fillOpacity={0.55}
+                    />
 
                     <Tooltip
                       formatter={(value) => [
-                        `${value} คน`,
-                        "จำนวน",
+                        `${Number(value).toFixed(2)}%`,
+                        "คะแนนเฉลี่ย",
                       ]}
                     />
-                  </PieChart>
+                  </RadarChart>
                 </ResponsiveContainer>
-
-                <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
-                  <p className="text-xs text-slate-500">
-                    รวมทั้งหมด
-                  </p>
-
-                  <p className="text-2xl font-semibold text-slate-950">
-                    {totalStudents.toLocaleString()}
-                  </p>
-
-                  <p className="text-xs text-slate-500">
-                    คน
-                  </p>
-                </div>
               </div>
 
-              <ul className="mt-4 space-y-3">
-                {levelDistribution.map(
-                  (item, index) => (
-                    <li
-                      key={item.level}
-                      className="flex items-center gap-3"
-                    >
-                      <span
-                        className="h-3 w-3 shrink-0 rounded-full"
-                        style={{
-                          backgroundColor:
-                            COLORS[
-                              index %
-                                COLORS.length
-                            ],
-                        }}
-                      />
-
-                      <div>
-                        <p className="text-sm font-medium text-slate-800">
-                          {item.level}
-                        </p>
-
-                        <p className="text-xs text-slate-500">
-                          {item.count.toLocaleString()}{" "}
-                          คน ({item.percent}%)
-                        </p>
-                      </div>
-                    </li>
-                  )
-                )}
-              </ul>
+              <div className="mt-2 flex items-center justify-center gap-2 text-xs text-slate-500">
+                <span className="h-2.5 w-2.5 rounded-full bg-[#1565C0]" />
+                ทักษะจำเป็น
+              </div>
             </div>
           </div>
 
           {/* ==================================================
-              Skill Comparison
+              Skill Comparison — เปรียบเทียบคะแนนเฉลี่ยทักษะ
           ================================================== */}
 
           <div className="print-hide mt-6 rounded-2xl border border-blue-100 bg-white p-5 shadow-[0_14px_34px_rgba(15,23,42,0.07)]">
@@ -1772,8 +1341,7 @@ export default function ExecutiveDashboardPage() {
                 </h2>
 
                 <p className="mt-1 text-xs text-slate-400">
-                  คะแนนคำนวณจาก earnedScore / maxScore
-                  และเฉลี่ยนิสิตที่ตรงตามตัวกรอง
+                  คะแนนคำนวณจาก earnedScore / maxScore และเฉลี่ยนิสิตที่ตรงตามตัวกรอง
                 </p>
               </div>
 
@@ -1795,28 +1363,18 @@ export default function ExecutiveDashboardPage() {
             </div>
 
             <div className="mt-4 grid gap-6 lg:grid-cols-2">
-
               {/* Faculty */}
-
               <div>
                 <h3 className="mb-3 text-sm font-semibold text-[#FFC107]">
                   🏛️ ทักษะที่นิสิตคณะวิทย์ต้องมี
                 </h3>
 
                 <div className="h-[300px] w-full">
-                  <ResponsiveContainer
-                    width="100%"
-                    height="100%"
-                  >
+                  <ResponsiveContainer width="100%" height="100%">
                     <BarChart
                       data={facultySkills}
                       layout="vertical"
-                      margin={{
-                        top: 5,
-                        right: 20,
-                        left: 10,
-                        bottom: 5,
-                      }}
+                      margin={{ top: 5, right: 20, left: 10, bottom: 5 }}
                     >
                       <CartesianGrid
                         stroke="#EEF2F7"
@@ -1827,72 +1385,45 @@ export default function ExecutiveDashboardPage() {
                       <XAxis
                         type="number"
                         domain={[0, 100]}
-                        tick={{
-                          fill: "#64748B",
-                          fontSize: 11,
-                        }}
+                        tick={{ fill: "#64748B", fontSize: 11 }}
                       />
 
                       <YAxis
                         type="category"
                         dataKey="skillName"
-                        tick={{
-                          fill: "#475569",
-                          fontSize: 11,
-                        }}
+                        tick={{ fill: "#475569", fontSize: 11 }}
                         width={120}
                         tickFormatter={(value) =>
-                          value.length > 15
-                            ? `${value.slice(
-                                0,
-                                15
-                              )}...`
-                            : value
+                          value.length > 15 ? `${value.slice(0, 15)}...` : value
                         }
                       />
 
                       <Tooltip
                         formatter={(value) => [
-                          `${Number(
-                            value
-                          ).toFixed(2)}%`,
+                          `${Number(value).toFixed(2)}%`,
                           "คะแนนเฉลี่ย",
                         ]}
-                        labelFormatter={(label) =>
-                          `ทักษะ: ${label}`
-                        }
+                        labelFormatter={(label) => `ทักษะ: ${label}`}
                       />
 
-<Bar
-  dataKey="average"
-  radius={[8, 8, 0, 0]}
-/>
+                      <Bar dataKey="average" radius={[8, 8, 0, 0]} />
                     </BarChart>
                   </ResponsiveContainer>
                 </div>
               </div>
 
               {/* Essential */}
-
               <div>
                 <h3 className="mb-3 text-sm font-semibold text-[#1565C0]">
                   ⭐ ทักษะที่นิสิตจำเป็นต้องมี
                 </h3>
 
                 <div className="h-[300px] w-full">
-                  <ResponsiveContainer
-                    width="100%"
-                    height="100%"
-                  >
+                  <ResponsiveContainer width="100%" height="100%">
                     <BarChart
                       data={essentialSkills}
                       layout="vertical"
-                      margin={{
-                        top: 5,
-                        right: 20,
-                        left: 10,
-                        bottom: 5,
-                      }}
+                      margin={{ top: 5, right: 20, left: 10, bottom: 5 }}
                     >
                       <CartesianGrid
                         stroke="#EEF2F7"
@@ -1903,87 +1434,60 @@ export default function ExecutiveDashboardPage() {
                       <XAxis
                         type="number"
                         domain={[0, 100]}
-                        tick={{
-                          fill: "#64748B",
-                          fontSize: 11,
-                        }}
+                        tick={{ fill: "#64748B", fontSize: 11 }}
                       />
 
                       <YAxis
                         type="category"
                         dataKey="skillName"
-                        tick={{
-                          fill: "#475569",
-                          fontSize: 11,
-                        }}
+                        tick={{ fill: "#475569", fontSize: 11 }}
                         width={120}
                         tickFormatter={(value) =>
-                          value.length > 15
-                            ? `${value.slice(
-                                0,
-                                15
-                              )}...`
-                            : value
+                          value.length > 15 ? `${value.slice(0, 15)}...` : value
                         }
                       />
 
                       <Tooltip
                         formatter={(value) => [
-                          `${Number(
-                            value
-                          ).toFixed(2)}%`,
+                          `${Number(value).toFixed(2)}%`,
                           "คะแนนเฉลี่ย",
                         ]}
-                        labelFormatter={(label) =>
-                          `ทักษะ: ${label}`
-                        }
+                        labelFormatter={(label) => `ทักษะ: ${label}`}
                       />
 
-<Bar
-  dataKey="average"
-  radius={[8, 8, 0, 0]}
-/>
+                      <Bar dataKey="average" radius={[8, 8, 0, 0]} />
                     </BarChart>
                   </ResponsiveContainer>
                 </div>
               </div>
             </div>
 
-            {/* Skill detail */}
-
+            {/* Skill detail cards */}
             <div className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-              {radarData.map(
-                (item) => {
-                  const Icon =
-                    getSkillIcon(
-                      item.skill
-                    );
+              {radarData.map((item) => {
+                const Icon = getSkillIcon(item.skill);
 
-                  return (
-                    <div
-                      key={item.skill}
-                      className="flex items-center gap-3 rounded-xl border border-slate-100 bg-slate-50/60 p-3"
-                    >
-                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white shadow-sm">
-                        <Icon className="h-5 w-5 text-[#1565C0]" />
-                      </div>
-
-                      <div className="min-w-0 flex-1">
-                        <p className="truncate text-xs text-slate-500">
-                          {item.skill}
-                        </p>
-
-                        <p className="mt-1 text-lg font-semibold text-slate-900">
-                          {item.score.toFixed(
-                            2
-                          )}
-                          %
-                        </p>
-                      </div>
+                return (
+                  <div
+                    key={item.skill}
+                    className="flex items-center gap-3 rounded-xl border border-slate-100 bg-slate-50/60 p-3"
+                  >
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white shadow-sm">
+                      <Icon className="h-5 w-5 text-[#1565C0]" />
                     </div>
-                  );
-                }
-              )}
+
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-xs text-slate-500">
+                        {item.skill}
+                      </p>
+
+                      <p className="mt-1 text-lg font-semibold text-slate-900">
+                        {item.score.toFixed(2)}%
+                      </p>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           </div>
 
@@ -1997,8 +1501,7 @@ export default function ExecutiveDashboardPage() {
             </h2>
 
             <p className="mt-1 text-xs text-slate-400">
-              คะแนนเฉลี่ยของนิสิตในแต่ละภาคการศึกษา
-              โดยใช้สูตรเดียวกับคะแนนรวมของแดชบอร์ด
+              คะแนนเฉลี่ยของนิสิตในแต่ละภาคการศึกษา โดยใช้สูตรเดียวกับคะแนนรวมของแดชบอร์ด
             </p>
 
             {termSummary.length > 0 ? (
@@ -2009,23 +1512,18 @@ export default function ExecutiveDashboardPage() {
                       <th className="px-4 py-3 text-left font-medium text-slate-500">
                         ภาคการศึกษา
                       </th>
-
                       <th className="px-4 py-3 text-left font-medium text-slate-500">
                         คะแนนเฉลี่ย
                       </th>
-
                       <th className="px-4 py-3 text-left font-medium text-slate-500">
                         ระดับ
                       </th>
-
                       <th className="px-4 py-3 text-left font-medium text-slate-500">
                         นิสิตที่เข้าร่วม
                       </th>
-
                       <th className="px-4 py-3 text-left font-medium text-slate-500">
                         กิจกรรม
                       </th>
-
                       <th className="px-4 py-3 text-left font-medium text-slate-500">
                         แนวโน้ม
                       </th>
@@ -2033,116 +1531,96 @@ export default function ExecutiveDashboardPage() {
                   </thead>
 
                   <tbody>
-                    {termSummary.map(
-                      (item, index) => {
-                        const previous =
-                          index <
-                          termSummary.length - 1
-                            ? termSummary[index + 1]
-                            : undefined;
+                    {termSummary.map((item, index) => {
+                      const previous =
+                        index < termSummary.length - 1
+                          ? termSummary[index + 1]
+                          : undefined;
 
-                        const trendDiff = previous
-                          ? Math.round(
-                              (item.avgScore -
-                                previous.avgScore) *
-                                100
-                            ) / 100
-                          : null;
+                      const trendDiff = previous
+                        ? Math.round((item.avgScore - previous.avgScore) * 100) /
+                          100
+                        : null;
 
-                        const trend:
-                          | "up"
-                          | "down"
-                          | "same"
-                          | null =
-                          trendDiff === null
-                            ? null
-                            : trendDiff > 0
-                            ? "up"
-                            : trendDiff < 0
-                            ? "down"
-                            : "same";
+                      const trend: "up" | "down" | "same" | null =
+                        trendDiff === null
+                          ? null
+                          : trendDiff > 0
+                          ? "up"
+                          : trendDiff < 0
+                          ? "down"
+                          : "same";
 
-                        const levelColor =
-                          item.level ===
-                          "ดีมาก"
-                            ? "text-emerald-600 bg-emerald-50"
-                            : item.level ===
-                              "ปานกลาง"
-                            ? "text-amber-600 bg-amber-50"
-                            : "text-red-600 bg-red-50";
+                      const levelColor =
+                        item.level === "ดีมาก"
+                          ? "text-emerald-600 bg-emerald-50"
+                          : item.level === "ปานกลาง"
+                          ? "text-amber-600 bg-amber-50"
+                          : "text-red-600 bg-red-50";
 
-                        return (
-                          <tr
-                            key={`${item.term}-${index}`}
-                            className="border-b border-blue-50/50 transition hover:bg-blue-50/30"
-                          >
-                            <td className="px-4 py-3 font-medium text-slate-800">
-                              {item.term}
-                            </td>
+                      return (
+                        <tr
+                          key={`${item.term}-${index}`}
+                          className="border-b border-blue-50/50 transition hover:bg-blue-50/30"
+                        >
+                          <td className="px-4 py-3 font-medium text-slate-800">
+                            {item.term}
+                          </td>
 
-                            <td className="px-4 py-3 font-semibold text-[#1565C0]">
-                              {item.avgScore}%
-                            </td>
+                          <td className="px-4 py-3 font-semibold text-[#1565C0]">
+                            {item.avgScore}%
+                          </td>
 
-                            <td className="px-4 py-3">
-                              <span
-                                className={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${levelColor}`}
-                              >
-                                {item.level}
+                          <td className="px-4 py-3">
+                            <span
+                              className={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${levelColor}`}
+                            >
+                              {item.level}
+                            </span>
+                          </td>
+
+                          <td className="px-4 py-3 text-slate-600">
+                            {(item.studentCount ?? 0).toLocaleString()} คน
+                          </td>
+
+                          <td className="px-4 py-3 text-slate-600">
+                            {item.activityCount} กิจกรรม
+                          </td>
+
+                          <td className="px-4 py-3">
+                            {trend === "up" && (
+                              <span className="flex items-center gap-1 text-emerald-600">
+                                <TrendingUp className="h-4 w-4" />
+                                <span className="text-xs">
+                                  ดีขึ้น +{trendDiff?.toFixed(2)} คะแนน
+                                </span>
                               </span>
-                            </td>
+                            )}
 
-                            <td className="px-4 py-3 text-slate-600">
-                              {(item.studentCount ?? 0).toLocaleString()}{" "}
-                              คน
-                            </td>
-
-                            <td className="px-4 py-3 text-slate-600">
-                              {item.activityCount}{" "}
-                              กิจกรรม
-                            </td>
-
-                            <td className="px-4 py-3">
-                              {trend ===
-                                "up" && (
-                                <span className="flex items-center gap-1 text-emerald-600">
-                                  <TrendingUp className="h-4 w-4" />
-
-                                  <span className="text-xs">
-                                    ดีขึ้น +{trendDiff?.toFixed(2)} คะแนน
-                                  </span>
+                            {trend === "down" && (
+                              <span className="flex items-center gap-1 text-red-600">
+                                <TrendingDown className="h-4 w-4" />
+                                <span className="text-xs">
+                                  ลดลง {trendDiff?.toFixed(2)} คะแนน
                                 </span>
-                              )}
+                              </span>
+                            )}
 
-                              {trend ===
-                                "down" && (
-                                <span className="flex items-center gap-1 text-red-600">
-                                  <TrendingDown className="h-4 w-4" />
+                            {trend === "same" && (
+                              <span className="text-xs text-slate-400">
+                                คงที่ 0.00 คะแนน
+                              </span>
+                            )}
 
-                                  <span className="text-xs">
-                                    ลดลง {trendDiff?.toFixed(2)} คะแนน
-                                  </span>
-                                </span>
-                              )}
-
-                              {trend ===
-                                "same" && (
-                                <span className="text-xs text-slate-400">
-                                  คงที่ 0.00 คะแนน
-                                </span>
-                              )}
-
-                              {trend ===
-                                null && (
-                                <span className="text-xs text-slate-400">
-                                  ไม่มีภาคก่อนหน้า
-                                </span>
-                              )}
-                            </td>
-                          </tr>
-                        );
-                      }
-                    )}
+                            {trend === null && (
+                              <span className="text-xs text-slate-400">
+                                ไม่มีภาคก่อนหน้า
+                              </span>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>
@@ -2159,8 +1637,7 @@ export default function ExecutiveDashboardPage() {
 
           <div className="print-footer mt-4 text-xs text-slate-400">
             <span>
-              เอกสารฉบับนี้จัดทำโดยระบบ Skill Transcript System
-              — ข้อมูลอัปเดตล่าสุดเมื่อ{" "}
+              เอกสารฉบับนี้จัดทำโดยระบบ Skill Transcript System — ข้อมูลอัปเดตล่าสุดเมื่อ{" "}
               {new Date().toLocaleString("th-TH")}
             </span>
 

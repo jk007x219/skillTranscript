@@ -7,26 +7,31 @@ const globalForMysql = globalThis as unknown as {
 
 export const pool =
   globalForMysql.mysqlPool ??
-mysql.createPool({
-  host: process.env.DB_HOST,
-  user: process.env.DB_USER,
-  password: process.env.DB_PASSWORD,
-  database: process.env.DB_NAME,
-  port: Number(process.env.DB_PORT || 3306),
-  charset: "utf8mb4",
+  mysql.createPool({
+    host: process.env.DB_HOST,
+    user: process.env.DB_USER,
+    password: process.env.DB_PASSWORD,
+    database: process.env.DB_NAME,
+    port: Number(process.env.DB_PORT || 3306),
+    charset: "utf8mb4",
 
-  // สำคัญมาก:
-  // MySQL DATETIME ไม่มี timezone
-  // ให้ mysql2 คืนค่าเป็น string ตรง ๆ
-  // เพื่อไม่ให้ถูกแปลงเป็น JavaScript Date แล้วเกิด +7 ชั่วโมง
-  dateStrings: ["DATETIME"],
+    // สำคัญมาก:
+    // MySQL DATETIME/TIMESTAMP/DATE/TIME ไม่มี timezone
+    // ต้องคืนค่าเป็น string ตรง ๆ
+    // ไม่ให้ mysql2 แปลงเป็น JavaScript Date
+    //
+    // หมายเหตุ:
+    // - ถ้าใช้ array เช่น ["DATETIME"] บาง environment/version
+    //   การ match type อาจไม่ทำงาน แล้วค่ากลับเป็น Date
+    // - ใช้ true เพื่อบังคับทุก type ให้ปลอดภัยที่สุด
+    dateStrings: true,
 
-  waitForConnections: true,
-  connectionLimit: 10,
-  queueLimit: 0,
-  namedPlaceholders: true,
-  multipleStatements: false,
-});
+    waitForConnections: true,
+    connectionLimit: 10,
+    queueLimit: 0,
+    namedPlaceholders: true,
+    multipleStatements: false,
+  });
 
 if (process.env.NODE_ENV !== "production") {
   globalForMysql.mysqlPool = pool;

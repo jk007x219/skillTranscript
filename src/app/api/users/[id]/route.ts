@@ -15,25 +15,39 @@ export async function GET(
 
     const [rows] = await pool.query<RowDataPacket[]>(
       `SELECT 
-         u.userId, u.email, u.role, u.status, u.must_change_password,
-         COALESCE(s.firstname, t.firstname, o.firstname) AS firstname,
-         COALESCE(s.lastname, t.lastname, o.lastname) AS lastname,
-         s.studentId, s.major, s.year, s.phone AS student_phone, s.faculty AS student_faculty,
-         t.teacherId, t.position, t.faculty AS teacher_faculty, t.program, t.isExecutive,
-         o.officerId, o.position AS officer_position, o.faculty AS officer_faculty,
-         GROUP_CONCAT(DISTINCT a.advisorUserId) AS advisorUserIds,
-         GROUP_CONCAT(DISTINCT CONCAT(ta.firstname, ' ', ta.lastname) ORDER BY ta.firstname SEPARATOR ', ') AS advisorNames
-       FROM users u
-       LEFT JOIN students s ON u.userId = s.userId
-       LEFT JOIN teacher t ON u.userId = t.userId
-       LEFT JOIN officer o ON u.userId = o.userId
-       LEFT JOIN advisor a ON a.studentId = s.studentId
-       LEFT JOIN teacher ta ON ta.userId = a.advisorUserId
-       WHERE u.userId = ?
-       GROUP BY u.userId, u.email, u.role, u.status, u.must_change_password,
-                s.firstname, s.lastname, s.studentId, s.major, s.year, s.phone, s.faculty,
-                t.teacherId, t.position, t.faculty, t.program, t.isExecutive,
-                o.officerId, o.position, o.faculty`,
+  u.userId, u.email, u.role, u.status, u.must_change_password,
+  COALESCE(s.firstname, t.firstname, o.firstname) AS firstname,
+  COALESCE(s.lastname, t.lastname, o.lastname) AS lastname,
+
+  s.studentId,
+  s.major,
+  s.program AS student_program,
+  s.admissionYear,
+  s.year,
+  s.phone AS student_phone,
+  s.faculty AS student_faculty,
+
+  t.teacherId, t.position, t.faculty AS teacher_faculty,
+  t.program AS teacher_program, t.isExecutive,
+
+  o.officerId, o.position AS officer_position, o.faculty AS officer_faculty,
+
+  GROUP_CONCAT(DISTINCT a.advisorUserId) AS advisorUserIds,
+  GROUP_CONCAT(DISTINCT CONCAT(ta.firstname, ' ', ta.lastname)
+    ORDER BY ta.firstname SEPARATOR ', ') AS advisorNames
+FROM users u
+LEFT JOIN students s ON u.userId = s.userId
+LEFT JOIN teacher  t ON u.userId = t.userId
+LEFT JOIN officer  o ON u.userId = o.userId
+LEFT JOIN advisor  a ON a.studentId = s.studentId
+LEFT JOIN teacher ta ON ta.userId = a.advisorUserId
+WHERE u.userId = ?
+GROUP BY
+  u.userId, u.email, u.role, u.status, u.must_change_password,
+  s.firstname, s.lastname, s.studentId, s.major, s.program,
+  s.admissionYear, s.year, s.phone, s.faculty,
+  t.teacherId, t.position, t.faculty, t.program, t.isExecutive,
+  o.officerId, o.position, o.faculty`,
       [id]
     );
 
@@ -44,26 +58,35 @@ export async function GET(
     const row = rows[0];
     const advisorNames = row.advisorNames ? String(row.advisorNames).split(", ").filter(Boolean) : [];
 
-    const user = {
-      id: row.userId,
-      firstName: row.firstname || "",
-      lastName: row.lastname || "",
-      name: `${row.firstname || ""} ${row.lastname || ""}`.trim(),
-      email: row.email,
-      role: row.role,
-      studentId: row.studentId || null,
-      major: row.major || null,
-      year: row.year || null,
-      phone: row.student_phone || null,
-      faculty: row.student_faculty || row.teacher_faculty || row.officer_faculty || null,
-      position: row.position || row.officer_position || null,
-      program: row.program || null,
-      isExecutive: Boolean(row.isExecutive),
-      status: row.status,
-      mustChangePassword: Boolean(row.must_change_password),
-      advisorUserIds: row.advisorUserIds ? String(row.advisorUserIds).split(",") : [],
-      advisorNames: advisorNames,
-    };
+const user = {
+  id: row.userId,
+  firstName: row.firstname || "",
+  lastName: row.lastname || "",
+  name: `${row.firstname || ""} ${row.lastname || ""}`.trim(),
+  email: row.email,
+  role: row.role,
+  studentId: row.studentId || null,
+  major: row.major || null,
+  year: row.year || null,
+  phone: row.student_phone || null,
+  faculty:
+    row.student_faculty || row.teacher_faculty || row.officer_faculty || null,
+  position: row.position || row.officer_position || null,
+
+  // ✅ นิสิตใช้ student_program, อาจารย์ใช้ teacher_program
+  program: row.student_program || row.teacher_program || null,
+
+  // ✅ ส่ง admissionYear (พ.ศ.) กลับไปให้ฟอร์ม prefill
+  admissionYear: row.admissionYear || null,
+
+  isExecutive: Boolean(row.isExecutive),
+  status: row.status,
+  mustChangePassword: Boolean(row.must_change_password),
+  advisorUserIds: row.advisorUserIds
+    ? String(row.advisorUserIds).split(",")
+    : [],
+  advisorNames,
+};
 
     return NextResponse.json({ user });
   } catch (error) {
@@ -95,6 +118,7 @@ export async function PUT(
       status,
       isExecutive,
       advisorUserIds,
+      admissionYear,
     } = body;
 
     // 1. ตรวจสอบว่าผู้ใช้มีอยู่จริง
@@ -159,19 +183,24 @@ export async function PUT(
           updates.push("faculty = ?");
           values.push(faculty);
         }
-        if (major !== undefined) {
-          updates.push("major = ?");
-          values.push(major);
-        }
-        // ❌ ไม่มี program ใน students
-        // if (program !== undefined) {
-        //   updates.push("program = ?");
-        //   values.push(program);
-        // }
-        if (year !== undefined) {
-          updates.push("year = ?");
-          values.push(year ? Number(year) : null);
-        }
+if (major !== undefined) {
+  updates.push("major = ?");
+  values.push(major);
+}
+// ✅ students.program มีอยู่จริงใน DB
+if (program !== undefined) {
+  updates.push("program = ?");
+  values.push(program || null);
+}
+// ✅ เปิดให้แก้ admissionYear ได้
+if (admissionYear !== undefined) {
+  updates.push("admissionYear = ?");
+  values.push(admissionYear ? Number(admissionYear) : null);
+}
+if (year !== undefined) {
+  updates.push("year = ?");
+  values.push(year ? Number(year) : null);
+}
         if (phone !== undefined) {
           updates.push("phone = ?");
           values.push(phone);

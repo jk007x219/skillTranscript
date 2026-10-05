@@ -218,24 +218,17 @@ function formatClientDateTime(value: unknown): string | null {
   if (value instanceof Date) {
     if (Number.isNaN(value.getTime())) return null;
 
-    const parts = new Intl.DateTimeFormat("en-GB", {
-      timeZone: "Asia/Bangkok",
-      year: "numeric",
-      month: "2-digit",
-      day: "2-digit",
-      hour: "2-digit",
-      minute: "2-digit",
-      second: "2-digit",
-      hour12: false,
-    }).formatToParts(value);
+    // ⚠️ ใช้ getUTC* เพราะ mysql2 สร้าง Date โดยใช้ TZ ของ process
+    // และ process ควรเป็น UTC (default ของ container)
+    // ถ้า process ไม่ใช่ UTC จะยังเพี้ยน — วิธีนี้เป็น fallback เท่านั้น
+    const y  = value.getUTCFullYear();
+    const mo = String(value.getUTCMonth() + 1).padStart(2, "0");
+    const d  = String(value.getUTCDate()).padStart(2, "0");
+    const hh = String(value.getUTCHours()).padStart(2, "0");
+    const mm = String(value.getUTCMinutes()).padStart(2, "0");
+    const ss = String(value.getUTCSeconds()).padStart(2, "0");
 
-    const map = Object.fromEntries(
-      parts
-        .filter((part) => part.type !== "literal")
-        .map((part) => [part.type, part.value]),
-    );
-
-    return `${map.year}-${map.month}-${map.day}T${map.hour}:${map.minute}:${map.second}`;
+    return `${y}-${mo}-${d}T${hh}:${mm}:${ss}`;
   }
 
   const raw = String(value).trim();
@@ -245,30 +238,23 @@ function formatClientDateTime(value: unknown): string | null {
     /^(\d{4}-\d{2}-\d{2})[ T](\d{2}:\d{2}(?::\d{2})?)/,
   );
   if (mysqlMatch) {
-    return `${mysqlMatch[1]}T${mysqlMatch[2]}`;
+    const time = mysqlMatch[2].length === 5
+      ? `${mysqlMatch[2]}:00`
+      : mysqlMatch[2];
+    return `${mysqlMatch[1]}T${time}`;
   }
 
   const parsed = new Date(raw);
   if (Number.isNaN(parsed.getTime())) return null;
 
-  const parts = new Intl.DateTimeFormat("en-GB", {
-    timeZone: "Asia/Bangkok",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-    second: "2-digit",
-    hour12: false,
-  }).formatToParts(parsed);
+  const y  = parsed.getUTCFullYear();
+  const mo = String(parsed.getUTCMonth() + 1).padStart(2, "0");
+  const d  = String(parsed.getUTCDate()).padStart(2, "0");
+  const hh = String(parsed.getUTCHours()).padStart(2, "0");
+  const mm = String(parsed.getUTCMinutes()).padStart(2, "0");
+  const ss = String(parsed.getUTCSeconds()).padStart(2, "0");
 
-  const map = Object.fromEntries(
-    parts
-      .filter((part) => part.type !== "literal")
-      .map((part) => [part.type, part.value]),
-  );
-
-  return `${map.year}-${map.month}-${map.day}T${map.hour}:${map.minute}:${map.second}`;
+  return `${y}-${mo}-${d}T${hh}:${mm}:${ss}`;
 }
 
 function normalizeTimePart(value: unknown): string {
