@@ -67,6 +67,14 @@ function calculateSkillPercent(earned: number, maxScore: number) {
   return Math.min(100, Math.max(0, round2((earned / maxScore) * 100)));
 }
 
+/**
+ * ✅ Normalize ปีการศึกษาให้เป็น พ.ศ.
+ * รองรับข้อมูลที่อาจปนกันระหว่าง พ.ศ. (25xx) และ ค.ศ. (20xx)
+ */
+function toBuddhistYear(year: number): number {
+  return year < 2500 ? year + 543 : year;
+}
+
 export async function GET(request: NextRequest) {
   try {
     const params = request.nextUrl.searchParams;
@@ -81,14 +89,31 @@ export async function GET(request: NextRequest) {
     const studentConditions: string[] = [];
     const studentParams: (string | number)[] = [];
 
+    // ✅ ตัวกรองปีการศึกษา — รองรับทั้ง พ.ศ. และ ค.ศ. ที่ปนกันในฐานข้อมูล
     if (academicYear !== "all") {
-      studentConditions.push("s.admissionYear = ?");
-      studentParams.push(Number(academicYear));
+      const parsedYear = Number(academicYear);
+
+      if (Number.isFinite(parsedYear)) {
+        const yearBE = parsedYear < 2500 ? parsedYear + 543 : parsedYear;
+        const yearCE = parsedYear >= 2500 ? parsedYear - 543 : parsedYear;
+
+        if (yearBE === yearCE) {
+          studentConditions.push("s.admissionYear = ?");
+          studentParams.push(yearBE);
+        } else {
+          studentConditions.push(
+            "(s.admissionYear = ? OR s.admissionYear = ?)",
+          );
+          studentParams.push(yearBE, yearCE);
+        }
+      }
     }
+
     if (program !== "all") {
       studentConditions.push("s.program = ?");
       studentParams.push(program);
     }
+
     if (major !== "all") {
       studentConditions.push("s.major = ?");
       studentParams.push(major);
@@ -105,45 +130,65 @@ export async function GET(request: NextRequest) {
       ${studentWhere}
       ORDER BY studentId
       `,
-      studentParams
+      studentParams,
     );
 
     const studentIds = students.map((s) => String(s.studentId));
 
+    // ======================================================
+    // ตัวเลือกใน dropdown
+    // ======================================================
+
+    // ✅ ปีการศึกษา — normalize เป็น พ.ศ. แล้ว dedupe
     const [academicYearsResult] = await pool.query<RowDataPacket[]>(`
       SELECT DISTINCT admissionYear
       FROM students
       WHERE admissionYear IS NOT NULL
-      ORDER BY admissionYear DESC
     `);
+
+    const academicYearsSet = new Set<number>();
+
+    for (const row of academicYearsResult) {
+      const y = Number(row.admissionYear);
+      if (!Number.isFinite(y)) continue;
+
+      academicYearsSet.add(toBuddhistYear(y));
+    }
+
+    const academicYears = Array.from(academicYearsSet).sort(
+      (a, b) => b - a,
+    );
+
     const [programsResult] = await pool.query<RowDataPacket[]>(`
       SELECT DISTINCT program
       FROM students
       WHERE program IS NOT NULL AND TRIM(program) <> ''
       ORDER BY program
     `);
-// วิชาเอกต้องอิงตามหลักสูตรที่เลือก
-const majorConditions = [
-  "major IS NOT NULL",
-  "TRIM(major) <> ''",
-];
 
-const majorParams: (string | number)[] = [];
+    // วิชาเอกต้องอิงตามหลักสูตรที่เลือก
+    const majorConditions = [
+      "major IS NOT NULL",
+      "TRIM(major) <> ''",
+    ];
 
-if (program !== "all") {
-  majorConditions.push("program = ?");
-  majorParams.push(program);
-}
+    const majorParams: (string | number)[] = [];
 
-const [majorsResult] = await pool.query<RowDataPacket[]>(
-  `
-  SELECT DISTINCT major
-  FROM students
-  WHERE ${majorConditions.join(" AND ")}
-  ORDER BY major
-  `,
-  majorParams
-);
+    if (program !== "all") {
+      majorConditions.push("program = ?");
+      majorParams.push(program);
+    }
+
+    const [majorsResult] = await pool.query<RowDataPacket[]>(
+      `
+      SELECT DISTINCT major
+      FROM students
+      WHERE ${majorConditions.join(" AND ")}
+      ORDER BY major
+      `,
+      majorParams,
+    );
+
     const [termsResult] = await pool.query<RowDataPacket[]>(`
       SELECT DISTINCT term
       FROM activity
@@ -151,10 +196,9 @@ const [majorsResult] = await pool.query<RowDataPacket[]>(
       ORDER BY term
     `);
 
-    const academicYears = academicYearsResult
-      .map((r) => Number(r.admissionYear))
-      .filter(Number.isFinite);
-    const programs = programsResult.map((r) => String(r.program)).filter(Boolean);
+    const programs = programsResult
+      .map((r) => String(r.program))
+      .filter(Boolean);
     const majors = majorsResult.map((r) => String(r.major)).filter(Boolean);
     const terms = termsResult.map((r) => String(r.term)).filter(Boolean);
 
@@ -232,7 +276,7 @@ const [majorsResult] = await pool.query<RowDataPacket[]>(
         ps.skillName,
         COALESCE(acs.level, 'พื้นฐาน')
       `,
-      activityParams
+      activityParams,
     );
 
     type LevelScore = {
@@ -241,10 +285,7 @@ const [majorsResult] = await pool.query<RowDataPacket[]>(
       max: number;
     };
 
-    type StudentSkillLevels = Record<
-      string,
-      Record<string, LevelScore>
-    >;
+    type StudentSkillLevels = Record<string, Record<string, LevelScore>>;
 
     function normalizeLevel(level: string) {
       const value = level.trim().toLowerCase();
@@ -271,10 +312,7 @@ const [majorsResult] = await pool.query<RowDataPacket[]>(
       return "พื้นฐาน";
     }
 
-    const studentSkillLevelMap: Record<
-      string,
-      StudentSkillLevels
-    > = {};
+    const studentSkillLevelMap: Record<string, StudentSkillLevels> = {};
 
     studentIds.forEach((studentId) => {
       studentSkillLevelMap[studentId] = {};
@@ -283,9 +321,7 @@ const [majorsResult] = await pool.query<RowDataPacket[]>(
     for (const row of scoreRows) {
       const studentId = String(row.studentId);
       const skillName = String(row.skillName);
-      const level = normalizeLevel(
-        String(row.skillLevel || "พื้นฐาน")
-      );
+      const level = normalizeLevel(String(row.skillLevel || "พื้นฐาน"));
 
       if (!studentSkillLevelMap[studentId]) {
         studentSkillLevelMap[studentId] = {};
@@ -295,22 +331,17 @@ const [majorsResult] = await pool.query<RowDataPacket[]>(
         studentSkillLevelMap[studentId][skillName] = {};
       }
 
-      const current =
-        studentSkillLevelMap[studentId][skillName][level] || {
-          activityCount: 0,
-          earned: 0,
-          max: 0,
-        };
+      const current = studentSkillLevelMap[studentId][skillName][level] || {
+        activityCount: 0,
+        earned: 0,
+        max: 0,
+      };
 
-      current.activityCount +=
-        Number(row.activityCount) || 0;
-      current.earned +=
-        Number(row.totalEarned) || 0;
-      current.max +=
-        Number(row.totalMax) || 0;
+      current.activityCount += Number(row.activityCount) || 0;
+      current.earned += Number(row.totalEarned) || 0;
+      current.max += Number(row.totalMax) || 0;
 
-      studentSkillLevelMap[studentId][skillName][level] =
-        current;
+      studentSkillLevelMap[studentId][skillName][level] = current;
     }
 
     // ======================================================
@@ -319,88 +350,66 @@ const [majorsResult] = await pool.query<RowDataPacket[]>(
     // แต่ละระดับคำนวณเปอร์เซ็นต์ก่อน
     // แล้วถ่วงน้ำหนักด้วยจำนวนกิจกรรมของระดับนั้น
     // ======================================================
-    const studentSkillPercentMap: Record<
-      string,
-      Record<string, number>
-    > = {};
+    const studentSkillPercentMap: Record<string, Record<string, number>> = {};
 
-    const studentSkillActivityMap: Record<
-      string,
-      Record<string, number>
-    > = {};
+    const studentSkillActivityMap: Record<string, Record<string, number>> =
+      {};
 
     studentIds.forEach((studentId) => {
       studentSkillPercentMap[studentId] = {};
       studentSkillActivityMap[studentId] = {};
 
       ALL_SKILL_NAMES.forEach((skillName) => {
-        const levels =
-          studentSkillLevelMap[studentId]?.[skillName] || {};
+        const levels = studentSkillLevelMap[studentId]?.[skillName] || {};
 
-        const basic =
-          levels["พื้นฐาน"] || {
-            activityCount: 0,
-            earned: 0,
-            max: 0,
-          };
+        const basic = levels["พื้นฐาน"] || {
+          activityCount: 0,
+          earned: 0,
+          max: 0,
+        };
 
-        const intermediate =
-          levels["กลาง"] || {
-            activityCount: 0,
-            earned: 0,
-            max: 0,
-          };
+        const intermediate = levels["กลาง"] || {
+          activityCount: 0,
+          earned: 0,
+          max: 0,
+        };
 
-        const advanced =
-          levels["สูง"] || {
-            activityCount: 0,
-            earned: 0,
-            max: 0,
-          };
+        const advanced = levels["สูง"] || {
+          activityCount: 0,
+          earned: 0,
+          max: 0,
+        };
 
         const totalActivities =
           basic.activityCount +
           intermediate.activityCount +
           advanced.activityCount;
 
-        studentSkillActivityMap[studentId][skillName] =
-          totalActivities;
+        studentSkillActivityMap[studentId][skillName] = totalActivities;
 
         const levelPercent = (item: LevelScore) =>
           item.max > 0
             ? Math.min(
                 100,
-                Math.max(
-                  0,
-                  round2(
-                    (item.earned / item.max) * 100
-                  )
-                )
+                Math.max(0, round2((item.earned / item.max) * 100)),
               )
             : 0;
 
         const basicPercent = levelPercent(basic);
-        const intermediatePercent =
-          levelPercent(intermediate);
-        const advancedPercent =
-          levelPercent(advanced);
+        const intermediatePercent = levelPercent(intermediate);
+        const advancedPercent = levelPercent(advanced);
 
         const percent =
           totalActivities > 0
             ? round2(
-                (
-                  basicPercent *
-                    basic.activityCount +
-                  intermediatePercent *
-                    intermediate.activityCount +
-                  advancedPercent *
-                    advanced.activityCount
-                ) / totalActivities
+                (basicPercent * basic.activityCount +
+                  intermediatePercent * intermediate.activityCount +
+                  advancedPercent * advanced.activityCount) /
+                  totalActivities,
               )
             : 0;
 
-        studentSkillPercentMap[studentId][skillName] =
-          percent;
+        studentSkillPercentMap[studentId][skillName] = percent;
       });
     });
 
@@ -408,39 +417,29 @@ const [majorsResult] = await pool.query<RowDataPacket[]>(
     // 4. ค่าเฉลี่ยรายทักษะ
     // ไม่เอานิสิตที่ยังไม่มีผลประเมินทักษะนั้นมานับเป็น 0
     // ======================================================
-    const allSkillAverages = ALL_SKILL_NAMES.map(
-      (skillName) => {
-        const participatingStudents =
-          studentIds.filter(
-            (studentId) =>
-              (
-                studentSkillActivityMap[
-                  studentId
-                ]?.[skillName] || 0
-              ) > 0
-          );
+    const allSkillAverages = ALL_SKILL_NAMES.map((skillName) => {
+      const participatingStudents = studentIds.filter(
+        (studentId) =>
+          (studentSkillActivityMap[studentId]?.[skillName] || 0) > 0,
+      );
 
-        const average =
-          participatingStudents.length > 0
-            ? round2(
-                participatingStudents.reduce(
-                  (sum, studentId) =>
-                    sum +
-                    studentSkillPercentMap[
-                      studentId
-                    ][skillName],
-                  0
-                ) / participatingStudents.length
-              )
-            : 0;
+      const average =
+        participatingStudents.length > 0
+          ? round2(
+              participatingStudents.reduce(
+                (sum, studentId) =>
+                  sum + studentSkillPercentMap[studentId][skillName],
+                0,
+              ) / participatingStudents.length,
+            )
+          : 0;
 
-        return {
-          skillName,
-          average,
-          participantCount: participatingStudents.length,
-        };
-      }
-    );
+      return {
+        skillName,
+        average,
+        participantCount: participatingStudents.length,
+      };
+    });
 
     // ======================================================
     // 5. Overall ของนิสิตแต่ละคน
@@ -449,15 +448,10 @@ const [majorsResult] = await pool.query<RowDataPacket[]>(
     const studentOverallScores: number[] = [];
 
     for (const studentId of studentIds) {
-      const assessedSkills =
-        ALL_SKILL_NAMES.filter(
-          (skillName) =>
-            (
-              studentSkillActivityMap[
-                studentId
-              ]?.[skillName] || 0
-            ) > 0
-        );
+      const assessedSkills = ALL_SKILL_NAMES.filter(
+        (skillName) =>
+          (studentSkillActivityMap[studentId]?.[skillName] || 0) > 0,
+      );
 
       if (assessedSkills.length === 0) {
         continue;
@@ -466,12 +460,9 @@ const [majorsResult] = await pool.query<RowDataPacket[]>(
       const studentOverall = round2(
         assessedSkills.reduce(
           (sum, skillName) =>
-            sum +
-            studentSkillPercentMap[
-              studentId
-            ][skillName],
-          0
-        ) / assessedSkills.length
+            sum + studentSkillPercentMap[studentId][skillName],
+          0,
+        ) / assessedSkills.length,
       );
 
       studentOverallScores.push(studentOverall);
@@ -480,10 +471,8 @@ const [majorsResult] = await pool.query<RowDataPacket[]>(
     const averageOverallScore =
       studentOverallScores.length > 0
         ? round2(
-            studentOverallScores.reduce(
-              (sum, score) => sum + score,
-              0
-            ) / studentOverallScores.length
+            studentOverallScores.reduce((sum, score) => sum + score, 0) /
+              studentOverallScores.length,
           )
         : 0;
 
@@ -491,33 +480,21 @@ const [majorsResult] = await pool.query<RowDataPacket[]>(
     // 6. Radar + แยกกลุ่มทักษะ
     // ======================================================
     // Radar แสดงครบทุกทักษะตลอดเวลา
-    const radarData = allSkillAverages.map(
-      (skill) => ({
-        skill: skill.skillName,
-        score: skill.average,
-      })
-    );
-
-    // ค่าเฉลี่ยของกลุ่มทักษะคิดเฉพาะทักษะที่มีนิสิต
-    // เข้าร่วมกิจกรรมและมีผลประเมินจริงเท่านั้น
-    const assessedSkillAverages =
-      allSkillAverages.filter(
-        (skill) => skill.participantCount > 0
-      );
+    const radarData = allSkillAverages.map((skill) => ({
+      skill: skill.skillName,
+      score: skill.average,
+    }));
 
     // กราฟต้องแสดงครบทุกทักษะ
     // ทักษะที่ไม่มีนิสิตเข้าร่วมจะแสดงเป็น 0%
     // แต่ participantCount จะยังเป็น 0 เพื่อไม่ให้นำไปคิดค่าเฉลี่ยหมวด
-    const facultySkills =
-      allSkillAverages.filter((skill) =>
-        isFacultySkill(skill.skillName)
-      );
+    const facultySkills = allSkillAverages.filter((skill) =>
+      isFacultySkill(skill.skillName),
+    );
 
-    const essentialSkills =
-      allSkillAverages.filter(
-        (skill) =>
-          !isFacultySkill(skill.skillName)
-      );
+    const essentialSkills = allSkillAverages.filter(
+      (skill) => !isFacultySkill(skill.skillName),
+    );
 
     // ======================================================
     // 7. ระดับนิสิตจาก Overall
@@ -533,8 +510,7 @@ const [majorsResult] = await pool.query<RowDataPacket[]>(
       else poor++;
     }
 
-    const assessedStudentCount =
-      studentOverallScores.length;
+    const assessedStudentCount = studentOverallScores.length;
 
     const levelDistribution = [
       {
@@ -542,11 +518,7 @@ const [majorsResult] = await pool.query<RowDataPacket[]>(
         count: excellent,
         percent:
           assessedStudentCount > 0
-            ? Math.round(
-                (excellent /
-                  assessedStudentCount) *
-                  100
-              )
+            ? Math.round((excellent / assessedStudentCount) * 100)
             : 0,
       },
       {
@@ -554,11 +526,7 @@ const [majorsResult] = await pool.query<RowDataPacket[]>(
         count: medium,
         percent:
           assessedStudentCount > 0
-            ? Math.round(
-                (medium /
-                  assessedStudentCount) *
-                  100
-              )
+            ? Math.round((medium / assessedStudentCount) * 100)
             : 0,
       },
       {
@@ -566,11 +534,7 @@ const [majorsResult] = await pool.query<RowDataPacket[]>(
         count: poor,
         percent:
           assessedStudentCount > 0
-            ? Math.round(
-                (poor /
-                  assessedStudentCount) *
-                  100
-              )
+            ? Math.round((poor / assessedStudentCount) * 100)
             : 0,
       },
     ];
@@ -578,26 +542,22 @@ const [majorsResult] = await pool.query<RowDataPacket[]>(
     // ======================================================
     // 8. จำนวนกิจกรรมที่กลุ่มที่เลือกเข้าร่วมจริง
     // ======================================================
-    const [activityRows] =
-      await pool.query<ActivityRow[]>(
-        `
-        SELECT DISTINCT
-          a.activityId,
-          a.term
-        FROM participation p
-        INNER JOIN activity a
-          ON a.activityId = p.activityId
-        WHERE p.status = 'completed'
-          AND p.studentId IN (${placeholders})
-          ${term !== "all" ? "AND a.term = ?" : ""}
-        `,
-        term !== "all"
-          ? [...studentIds, term]
-          : studentIds
-      );
+    const [activityRows] = await pool.query<ActivityRow[]>(
+      `
+      SELECT DISTINCT
+        a.activityId,
+        a.term
+      FROM participation p
+      INNER JOIN activity a
+        ON a.activityId = p.activityId
+      WHERE p.status = 'completed'
+        AND p.studentId IN (${placeholders})
+        ${term !== "all" ? "AND a.term = ?" : ""}
+      `,
+      term !== "all" ? [...studentIds, term] : studentIds,
+    );
 
-    const totalActivities =
-      activityRows.length;
+    const totalActivities = activityRows.length;
 
     // ======================================================
     // 9. สรุปตามภาคการศึกษา
@@ -614,37 +574,36 @@ const [majorsResult] = await pool.query<RowDataPacket[]>(
       totalMax: number | string;
     };
 
-    const [termScoreRows] =
-      await pool.query<TermScoreRow[]>(
-        `
-        SELECT
-          p.studentId,
-          a.term,
-          ps.skillName,
-          COALESCE(acs.level, 'พื้นฐาน') AS skillLevel,
-          COUNT(DISTINCT p.activityId) AS activityCount,
-          SUM(COALESCE(ps.earnedScore, 0)) AS totalEarned,
-          SUM(COALESCE(ps.maxScore, 0)) AS totalMax
-        FROM participation p
-        INNER JOIN activity a
-          ON a.activityId = p.activityId
-        INNER JOIN participation_skill ps
-          ON ps.participationId = p.ParticipationId
-        LEFT JOIN activityskill acs
-          ON acs.activityId = p.activityId
-         AND acs.skillname = ps.skillName
-        WHERE p.status = 'completed'
-          AND p.studentId IN (${placeholders})
-          AND a.term IS NOT NULL
-          AND TRIM(a.term) <> ''
-        GROUP BY
-          p.studentId,
-          a.term,
-          ps.skillName,
-          COALESCE(acs.level, 'พื้นฐาน')
-        `,
-        studentIds
-      );
+    const [termScoreRows] = await pool.query<TermScoreRow[]>(
+      `
+      SELECT
+        p.studentId,
+        a.term,
+        ps.skillName,
+        COALESCE(acs.level, 'พื้นฐาน') AS skillLevel,
+        COUNT(DISTINCT p.activityId) AS activityCount,
+        SUM(COALESCE(ps.earnedScore, 0)) AS totalEarned,
+        SUM(COALESCE(ps.maxScore, 0)) AS totalMax
+      FROM participation p
+      INNER JOIN activity a
+        ON a.activityId = p.activityId
+      INNER JOIN participation_skill ps
+        ON ps.participationId = p.ParticipationId
+      LEFT JOIN activityskill acs
+        ON acs.activityId = p.activityId
+       AND acs.skillname = ps.skillName
+      WHERE p.status = 'completed'
+        AND p.studentId IN (${placeholders})
+        AND a.term IS NOT NULL
+        AND TRIM(a.term) <> ''
+      GROUP BY
+        p.studentId,
+        a.term,
+        ps.skillName,
+        COALESCE(acs.level, 'พื้นฐาน')
+      `,
+      studentIds,
+    );
 
     const termLevelMap = new Map<
       string,
@@ -655,9 +614,7 @@ const [majorsResult] = await pool.query<RowDataPacket[]>(
       const termName = String(row.term);
       const studentId = String(row.studentId);
       const skillName = String(row.skillName);
-      const level = normalizeLevel(
-        String(row.skillLevel || 'พื้นฐาน')
-      );
+      const level = normalizeLevel(String(row.skillLevel || "พื้นฐาน"));
 
       if (!termLevelMap.has(termName)) {
         termLevelMap.set(termName, new Map());
@@ -691,7 +648,7 @@ const [majorsResult] = await pool.query<RowDataPacket[]>(
     }
 
     const calculateTermStudentOverall = (
-      studentMap: Map<string, Map<string, LevelScore>>
+      studentMap: Map<string, Map<string, LevelScore>>,
     ) => {
       const skillScores: number[] = [];
 
@@ -700,19 +657,19 @@ const [majorsResult] = await pool.query<RowDataPacket[]>(
 
         if (!levelMap) continue;
 
-        const basic = levelMap.get('พื้นฐาน') || {
+        const basic = levelMap.get("พื้นฐาน") || {
           activityCount: 0,
           earned: 0,
           max: 0,
         };
 
-        const intermediate = levelMap.get('กลาง') || {
+        const intermediate = levelMap.get("กลาง") || {
           activityCount: 0,
           earned: 0,
           max: 0,
         };
 
-        const advanced = levelMap.get('สูง') || {
+        const advanced = levelMap.get("สูง") || {
           activityCount: 0,
           earned: 0,
           max: 0,
@@ -729,10 +686,7 @@ const [majorsResult] = await pool.query<RowDataPacket[]>(
           item.max > 0
             ? Math.min(
                 100,
-                Math.max(
-                  0,
-                  round2((item.earned / item.max) * 100)
-                )
+                Math.max(0, round2((item.earned / item.max) * 100)),
               )
             : 0;
 
@@ -742,12 +696,11 @@ const [majorsResult] = await pool.query<RowDataPacket[]>(
 
         skillScores.push(
           round2(
-            (
-              basicPercent * basic.activityCount +
+            (basicPercent * basic.activityCount +
               intermediatePercent * intermediate.activityCount +
-              advancedPercent * advanced.activityCount
-            ) / totalActivities
-          )
+              advancedPercent * advanced.activityCount) /
+              totalActivities,
+          ),
         );
       }
 
@@ -755,7 +708,7 @@ const [majorsResult] = await pool.query<RowDataPacket[]>(
 
       return round2(
         skillScores.reduce((sum, score) => sum + score, 0) /
-          skillScores.length
+          skillScores.length,
       );
     };
 
@@ -777,25 +730,25 @@ const [majorsResult] = await pool.query<RowDataPacket[]>(
         }
 
         const termActivities = activityRows.filter(
-          (row) => row.term === termName
+          (row) => row.term === termName,
         ).length;
 
         const avgScore =
           studentScores.length > 0
             ? round2(
                 studentScores.reduce((sum, score) => sum + score, 0) /
-                  studentScores.length
+                  studentScores.length,
               )
             : 0;
 
         const level =
           studentScores.length === 0
-            ? 'ยังไม่มีข้อมูล'
+            ? "ยังไม่มีข้อมูล"
             : avgScore >= 80
-              ? 'ดีมาก'
+              ? "ดีมาก"
               : avgScore >= 50
-                ? 'ปานกลาง'
-                : 'ต้องปรับปรุง';
+                ? "ปานกลาง"
+                : "ต้องปรับปรุง";
 
         return {
           term: termName,
@@ -805,9 +758,7 @@ const [majorsResult] = await pool.query<RowDataPacket[]>(
           level,
         };
       })
-      .filter(
-        (item) => item.activityCount > 0 || item.studentCount > 0
-      )
+      .filter((item) => item.activityCount > 0 || item.studentCount > 0)
       .sort((a, b) => {
         const parseTerm = (value: string) => {
           const match = value.trim().match(/^(\d+)\s*[\/-]\s*(\d{4})$/);
