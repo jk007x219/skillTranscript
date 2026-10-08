@@ -149,18 +149,18 @@ function getAcademicYearLabel(year: number) {
 
 function getRadarLabel(title: string) {
   const labels: Record<string, string> = {
-    "ทักษะการสร้างนวัตกรรมสังคม": "สร้างนวัตกรรมสังคม",
-    "ทักษะการใช้ห้องปฏิบัติการและความปลอดภัยในห้องปฏิบัติการ":
+    ทักษะการสร้างนวัตกรรมสังคม: "สร้างนวัตกรรมสังคม",
+    ทักษะการใช้ห้องปฏิบัติการและความปลอดภัยในห้องปฏิบัติการ:
       "ห้องปฏิบัติการ\nและความปลอดภัย",
-    "ทักษะการคิดเชิงออกแบบนวัตกรรม": "คิดเชิงออกแบบ\nนวัตกรรม",
-    "ทักษะการใช้เครื่องมือวิทยาศาสตร์": "ใช้เครื่องมือ\nวิทยาศาสตร์",
-    "ทักษะการใช้ปัญญาประดิษฐ์": "ใช้ปัญญาประดิษฐ์",
-    "ทักษะความปลอดภัยไซเบอร์": "ความปลอดภัย\nไซเบอร์",
-    "ทักษะการสื่อสาร": "การสื่อสาร",
-    "ทักษะการเป็นผู้ประกอบการ": "การเป็น\nผู้ประกอบการ",
-    "ทักษะการทำงานเป็นทีม": "การทำงานเป็นทีม",
-    "ทักษะการคิดและการแก้ปัญหา": "คิดและแก้ปัญหา",
-    "ทักษะดิจิทัล": "ทักษะดิจิทัล",
+    ทักษะการคิดเชิงออกแบบนวัตกรรม: "คิดเชิงออกแบบ\nนวัตกรรม",
+    ทักษะการใช้เครื่องมือวิทยาศาสตร์: "ใช้เครื่องมือ\nวิทยาศาสตร์",
+    ทักษะการใช้ปัญญาประดิษฐ์: "ใช้ปัญญาประดิษฐ์",
+    ทักษะความปลอดภัยไซเบอร์: "ความปลอดภัย\nไซเบอร์",
+    ทักษะการสื่อสาร: "การสื่อสาร",
+    ทักษะการเป็นผู้ประกอบการ: "การเป็น\nผู้ประกอบการ",
+    ทักษะการทำงานเป็นทีม: "การทำงานเป็นทีม",
+    ทักษะการคิดและการแก้ปัญหา: "คิดและแก้ปัญหา",
+    ทักษะดิจิทัล: "ทักษะดิจิทัล",
   };
   return labels[title] ?? title.replace(/^ทักษะ/, "").trim();
 }
@@ -213,7 +213,7 @@ export default function ExecutiveDashboardPage() {
           {
             signal: controller.signal,
             cache: "no-store",
-          }
+          },
         );
 
         if (!res.ok) {
@@ -315,11 +315,11 @@ export default function ExecutiveDashboardPage() {
   // ====================================================
 
   const assessedFacultySkills = facultySkills.filter(
-    (item) => (item.participantCount ?? 0) > 0
+    (item) => (item.participantCount ?? 0) > 0,
   );
 
   const assessedEssentialSkills = essentialSkills.filter(
-    (item) => (item.participantCount ?? 0) > 0
+    (item) => (item.participantCount ?? 0) > 0,
   );
 
   const facultyAverage =
@@ -327,16 +327,19 @@ export default function ExecutiveDashboardPage() {
       ? Math.round(
           (assessedFacultySkills.reduce((sum, item) => sum + item.average, 0) /
             assessedFacultySkills.length) *
-            100
+            100,
         ) / 100
       : 0;
 
   const essentialAverage =
     assessedEssentialSkills.length > 0
       ? Math.round(
-          (assessedEssentialSkills.reduce((sum, item) => sum + item.average, 0) /
+          (assessedEssentialSkills.reduce(
+            (sum, item) => sum + item.average,
+            0,
+          ) /
             assessedEssentialSkills.length) *
-            100
+            100,
         ) / 100
       : 0;
 
@@ -348,8 +351,8 @@ export default function ExecutiveDashboardPage() {
     averageOverallScore >= 80
       ? "ดีมาก"
       : averageOverallScore >= 50
-      ? "ปานกลาง"
-      : "ต้องปรับปรุง";
+        ? "ปานกลาง"
+        : "ต้องปรับปรุง";
 
   // ====================================================
   // Filter summary
@@ -401,12 +404,14 @@ export default function ExecutiveDashboardPage() {
             color: #1f2937 !important;
             -webkit-print-color-adjust: exact !important;
             print-color-adjust: exact !important;
-            font-family: "Sarabun", "TH Sarabun New", "Noto Sans Thai", sans-serif !important;
+            font-family:
+              "Sarabun", "TH Sarabun New", "Noto Sans Thai", sans-serif !important;
           }
 
           .executive-dashboard-print,
           .executive-dashboard-print * {
-            font-family: "Sarabun", "TH Sarabun New", "Noto Sans Thai", sans-serif !important;
+            font-family:
+              "Sarabun", "TH Sarabun New", "Noto Sans Thai", sans-serif !important;
           }
 
           main:has(.executive-dashboard-print) > header,
@@ -626,7 +631,10 @@ export default function ExecutiveDashboardPage() {
             page-break-inside: avoid !important;
           }
 
-          .executive-dashboard-print .print-pdf-skills tbody tr:nth-child(even) {
+          .executive-dashboard-print
+            .print-pdf-skills
+            tbody
+            tr:nth-child(even) {
             background: #f6f8fb !important;
           }
 
@@ -715,7 +723,10 @@ export default function ExecutiveDashboardPage() {
             font-weight: 700 !important;
           }
 
-          .executive-dashboard-print .print-level-summary tbody tr:nth-child(even) {
+          .executive-dashboard-print
+            .print-level-summary
+            tbody
+            tr:nth-child(even) {
             background: #f6f8fb !important;
           }
 
@@ -987,7 +998,10 @@ export default function ExecutiveDashboardPage() {
 
                 <select
                   value={program}
-                  onChange={(e) => setProgram(e.target.value)}
+                  onChange={(e) => {
+                    setProgram(e.target.value);
+                    setMajor("all");
+                  }}
                   className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-700 outline-none transition focus:border-[#1565C0] focus:ring-2 focus:ring-blue-100"
                 >
                   <option value="all">ทุกหลักสูตร</option>
@@ -1009,9 +1023,12 @@ export default function ExecutiveDashboardPage() {
                 <select
                   value={major}
                   onChange={(e) => setMajor(e.target.value)}
-                  className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-700 outline-none transition focus:border-[#1565C0] focus:ring-2 focus:ring-blue-100"
+                  disabled={program === "all"}
+                  className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-700 outline-none transition focus:border-[#1565C0] focus:ring-2 focus:ring-blue-100 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400"
                 >
-                  <option value="all">ทุกวิชาเอก</option>
+                  <option value="all">
+                    {program === "all" ? "เลือกหลักสูตรก่อน" : "ทุกวิชาเอก"}
+                  </option>
 
                   {majors.map((item) => (
                     <option key={item} value={item}>
@@ -1144,8 +1161,8 @@ export default function ExecutiveDashboardPage() {
                     item.score >= 80
                       ? "ดีมาก"
                       : item.score >= 50
-                      ? "ปานกลาง"
-                      : "ต้องปรับปรุง";
+                        ? "ปานกลาง"
+                        : "ต้องปรับปรุง";
 
                   return (
                     <tr key={item.skill} className="border-b border-slate-200">
@@ -1341,16 +1358,15 @@ export default function ExecutiveDashboardPage() {
                 </h2>
 
                 <p className="mt-1 text-xs text-slate-400">
-                  คะแนนคำนวณจาก earnedScore / maxScore และเฉลี่ยนิสิตที่ตรงตามตัวกรอง
+                  คะแนนคำนวณจาก earnedScore / maxScore
+                  และเฉลี่ยนิสิตที่ตรงตามตัวกรอง
                 </p>
               </div>
 
               <div className="flex gap-4 text-xs text-slate-500">
                 <span>
                   ทักษะคณะเฉลี่ย{" "}
-                  <strong className="text-[#FFC107]">
-                    {facultyAverage}%
-                  </strong>
+                  <strong className="text-[#FFC107]">{facultyAverage}%</strong>
                 </span>
 
                 <span>
@@ -1501,7 +1517,8 @@ export default function ExecutiveDashboardPage() {
             </h2>
 
             <p className="mt-1 text-xs text-slate-400">
-              คะแนนเฉลี่ยของนิสิตในแต่ละภาคการศึกษา โดยใช้สูตรเดียวกับคะแนนรวมของแดชบอร์ด
+              คะแนนเฉลี่ยของนิสิตในแต่ละภาคการศึกษา
+              โดยใช้สูตรเดียวกับคะแนนรวมของแดชบอร์ด
             </p>
 
             {termSummary.length > 0 ? (
@@ -1538,25 +1555,26 @@ export default function ExecutiveDashboardPage() {
                           : undefined;
 
                       const trendDiff = previous
-                        ? Math.round((item.avgScore - previous.avgScore) * 100) /
-                          100
+                        ? Math.round(
+                            (item.avgScore - previous.avgScore) * 100,
+                          ) / 100
                         : null;
 
                       const trend: "up" | "down" | "same" | null =
                         trendDiff === null
                           ? null
                           : trendDiff > 0
-                          ? "up"
-                          : trendDiff < 0
-                          ? "down"
-                          : "same";
+                            ? "up"
+                            : trendDiff < 0
+                              ? "down"
+                              : "same";
 
                       const levelColor =
                         item.level === "ดีมาก"
                           ? "text-emerald-600 bg-emerald-50"
                           : item.level === "ปานกลาง"
-                          ? "text-amber-600 bg-amber-50"
-                          : "text-red-600 bg-red-50";
+                            ? "text-amber-600 bg-amber-50"
+                            : "text-red-600 bg-red-50";
 
                       return (
                         <tr
@@ -1637,8 +1655,8 @@ export default function ExecutiveDashboardPage() {
 
           <div className="print-footer mt-4 text-xs text-slate-400">
             <span>
-              เอกสารฉบับนี้จัดทำโดยระบบ Skill Transcript System — ข้อมูลอัปเดตล่าสุดเมื่อ{" "}
-              {new Date().toLocaleString("th-TH")}
+              เอกสารฉบับนี้จัดทำโดยระบบ Skill Transcript System —
+              ข้อมูลอัปเดตล่าสุดเมื่อ {new Date().toLocaleString("th-TH")}
             </span>
 
             <span>คณะวิทยาศาสตร์และนวัตกรรมดิจิทัล มหาวิทยาลัยทักษิณ</span>

@@ -122,12 +122,28 @@ export async function GET(request: NextRequest) {
       WHERE program IS NOT NULL AND TRIM(program) <> ''
       ORDER BY program
     `);
-    const [majorsResult] = await pool.query<RowDataPacket[]>(`
-      SELECT DISTINCT major
-      FROM students
-      WHERE major IS NOT NULL AND TRIM(major) <> ''
-      ORDER BY major
-    `);
+// วิชาเอกต้องอิงตามหลักสูตรที่เลือก
+const majorConditions = [
+  "major IS NOT NULL",
+  "TRIM(major) <> ''",
+];
+
+const majorParams: (string | number)[] = [];
+
+if (program !== "all") {
+  majorConditions.push("program = ?");
+  majorParams.push(program);
+}
+
+const [majorsResult] = await pool.query<RowDataPacket[]>(
+  `
+  SELECT DISTINCT major
+  FROM students
+  WHERE ${majorConditions.join(" AND ")}
+  ORDER BY major
+  `,
+  majorParams
+);
     const [termsResult] = await pool.query<RowDataPacket[]>(`
       SELECT DISTINCT term
       FROM activity
